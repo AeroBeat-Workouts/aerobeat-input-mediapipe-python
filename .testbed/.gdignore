@@ -1,0 +1,2 @@
+# This folder is a symlink to the source directory used for testing.
+# We ignore it here to prevent Godot from seeing duplicate class definitions.
