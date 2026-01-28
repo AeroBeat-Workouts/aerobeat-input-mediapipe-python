@@ -1,0 +1,7 @@
+{
+    "godot_tools.project_path": ".testbed",
+    "files.exclude": {
+        ".testbed/src": true,
+        ".testbed/.godot": true
+    }
+}
