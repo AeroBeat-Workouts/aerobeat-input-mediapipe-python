@@ -18,6 +18,7 @@ const PORT = 4242
 
 var udp_listener: PacketPeerUDP
 var last_landmarks: Array = []
+var _json_parser := JSON.new() # Create the parser once and reuse it.
 
 
 ## Called when the node enters the scene tree.
@@ -47,18 +48,19 @@ func _process(_delta: float) -> void:
 	if not udp_listener:
 		return
 
-	# Process all available packets to get the most recent data
+	# Process all available packets to clear the buffer and get the most recent data.
 	while udp_listener.get_available_packet_count() > 0:
 		var packet_bytes: PackedByteArray = udp_listener.get_packet()
 		var packet_str: String = packet_bytes.get_string_from_utf8()
 		
-		var json := JSON.new()
-		if json.parse(packet_str) != OK:
-			printerr("StrategyMediaPipe: Error parsing JSON: ", json.get_error_message())
+		if _json_parser.parse(packet_str) != OK:
+			printerr("StrategyMediaPipe: Error parsing JSON: ", _json_parser.get_error_message())
 			continue
 		
-		var data: Dictionary = json.get_data()
-		if data.has("landmarks"):
+		var data: Variant = _json_parser.get_data()
+		
+		# Add an extra type check for robustness.
+		if typeof(data) == TYPE_DICTIONARY and data.has("landmarks"):
 			last_landmarks = data["landmarks"]
 			pose_updated.emit(last_landmarks)
 		else:
