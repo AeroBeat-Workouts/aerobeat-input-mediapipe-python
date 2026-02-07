@@ -140,9 +140,10 @@ def serialize_landmarks_json(landmarks, timestamp, capture_ms=0.0, inference_ms=
 def main():
     latency_tracker = LatencyTracker()
     
-    # Initialize UDP socket
+    # Initialize UDP socket with tuned buffer size for low latency
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 65536)  # Increase send buffer
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, args.udp_buffer_size)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, args.udp_buffer_size)
     
     # Initialize MediaPipe with optimized settings
     mp_pose = mp.solutions.pose
@@ -176,6 +177,7 @@ def main():
     print(f"Resolution: {args.width}x{args.height}, Model: {args.model_complexity}, "
           f"Detection: {args.detection_confidence}, Tracking: {args.tracking_confidence}")
     print(f"Binary protocol: {args.binary_protocol}")
+    print(f"UDP buffer size: {args.udp_buffer_size} bytes")
     print(f"Frame skipping: {skip_frames} (capture: {args.max_fps}fps → process: {processing_fps:.1f}fps)")
     
     # Frame skipping for performance

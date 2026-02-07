@@ -24,4 +24,6 @@ def parse_args():
                        help="Use threaded frame capture for lower latency")
     parser.add_argument("--no-threaded-capture", dest="threaded_capture", action="store_false",
                        help="Disable threaded frame capture")
+    parser.add_argument("--udp-buffer-size", type=int, default=4096,
+                       help="UDP socket buffer size in bytes (default: 4096, lower = lower latency)")
     return parser.parse_args()
