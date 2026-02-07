@@ -1,4 +1,5 @@
 import argparse
+from one_euro_filter import FILTER_PRESETS
 
 def parse_args():
     parser = argparse.ArgumentParser(description="MediaPipe Pose Tracker")
@@ -26,4 +27,20 @@ def parse_args():
                        help="Disable threaded frame capture")
     parser.add_argument("--udp-buffer-size", type=int, default=4096,
                        help="UDP socket buffer size in bytes (default: 4096, lower = lower latency)")
+    
+    # One-Euro filter arguments
+    parser.add_argument("--use-filter", action="store_true", default=True,
+                       help="Enable One-Euro filtering for landmark smoothing (default: enabled)")
+    parser.add_argument("--no-filter", dest="use_filter", action="store_false",
+                       help="Disable One-Euro filtering")
+    parser.add_argument("--filter-preset", type=str, default="balanced",
+                       choices=list(FILTER_PRESETS.keys()),
+                       help=f"Filter tuning preset ({', '.join(FILTER_PRESETS.keys())})")
+    parser.add_argument("--filter-min-cutoff", type=float, default=None,
+                       help="Minimum cutoff frequency in Hz (overrides preset, lower = smoother)")
+    parser.add_argument("--filter-beta", type=float, default=None,
+                       help="Speed coefficient (overrides preset, higher = more responsive)")
+    parser.add_argument("--filter-d-cutoff", type=float, default=None,
+                       help="Derivative cutoff frequency in Hz (default: 1.0)")
+    
     return parser.parse_args()

@@ -10,6 +10,7 @@ import struct
 import threading
 from collections import deque
 from args import parse_args
+from one_euro_filter import LandmarkFilterBank, get_preset_params
 
 try:
     import cv2
@@ -71,12 +72,14 @@ class LatencyTracker:
         self.capture_times = deque(maxlen=window_size)
         self.inference_times = deque(maxlen=window_size)
         self.serialization_times = deque(maxlen=window_size)
+        self.filter_times = deque(maxlen=window_size)
         self.total_times = deque(maxlen=window_size)
         
-    def record_frame(self, capture_ms, inference_ms, serialization_ms, total_ms):
+    def record_frame(self, capture_ms, inference_ms, serialization_ms, filter_ms, total_ms):
         self.capture_times.append(capture_ms)
         self.inference_times.append(inference_ms)
         self.serialization_times.append(serialization_ms)
+        self.filter_times.append(filter_ms)
         self.total_times.append(total_ms)
         self.frame_count += 1
         
@@ -90,11 +93,13 @@ class LatencyTracker:
         avg_capture = sum(self.capture_times) / len(self.capture_times)
         avg_inference = sum(self.inference_times) / len(self.inference_times)
         avg_serialization = sum(self.serialization_times) / len(self.serialization_times)
+        avg_filter = sum(self.filter_times) / len(self.filter_times)
         avg_total = sum(self.total_times) / len(self.total_times)
         
         print(f"[LATENCY] Frame {self.frame_count}: "
               f"capture={avg_capture:.2f}ms | "
               f"inference={avg_inference:.2f}ms | "
+              f"filter={avg_filter:.3f}ms | "
               f"serialization={avg_serialization:.2f}ms | "
               f"TOTAL={avg_total:.2f}ms")
 
@@ -106,12 +111,14 @@ def signal_handler(sig, frame):
 signal.signal(signal.SIGTERM, signal_handler)
 signal.signal(signal.SIGINT, signal_handler)
 
-def serialize_landmarks_binary(landmarks, timestamp, capture_ms=0.0, inference_ms=0.0, serialization_ms=0.0, frame_count=0, processing_fps=60.0, skip_frames=1):
+def serialize_landmarks_binary(landmarks, timestamp, capture_ms=0.0, inference_ms=0.0, 
+                               filter_ms=0.0, serialization_ms=0.0, frame_count=0, 
+                               processing_fps=60.0, skip_frames=1):
     """Serialize landmarks using binary format for lower latency"""
-    # Format: timestamp (double) + timing info (3 floats) + frame_count (uint32) + 
+    # Format: timestamp (double) + timing info (4 floats) + frame_count (uint32) + 
     #         processing_fps (float) + skip_frames (uint8) + count (uint16) + landmarks
     data = struct.pack('!d', timestamp)  # 8 bytes for timestamp
-    data += struct.pack('!fff', capture_ms, inference_ms, serialization_ms)  # 12 bytes for timing
+    data += struct.pack('!ffff', capture_ms, inference_ms, filter_ms, serialization_ms)  # 16 bytes
     data += struct.pack('!I', frame_count)  # 4 bytes for frame count
     data += struct.pack('!f', processing_fps)  # 4 bytes for processing FPS
     data += struct.pack('!B', skip_frames)  # 1 byte for skip frames
@@ -123,12 +130,15 @@ def serialize_landmarks_binary(landmarks, timestamp, capture_ms=0.0, inference_m
     
     return data
 
-def serialize_landmarks_json(landmarks, timestamp, capture_ms=0.0, inference_ms=0.0, serialization_ms=0.0, frame_count=0, processing_fps=60.0, skip_frames=1):
+def serialize_landmarks_json(landmarks, timestamp, capture_ms=0.0, inference_ms=0.0,
+                             filter_ms=0.0, serialization_ms=0.0, frame_count=0, 
+                             processing_fps=60.0, skip_frames=1):
     """Serialize landmarks using JSON (fallback)"""
     payload = {
         "timestamp": timestamp,
         "capture_ms": capture_ms,
         "inference_ms": inference_ms,
+        "filter_ms": filter_ms,
         "serialization_ms": serialization_ms,
         "frame_count": frame_count,
         "processing_fps": processing_fps,
@@ -155,6 +165,28 @@ def main():
         smooth_landmarks=True
     )
     
+    # Initialize One-Euro filter bank
+    filter_bank = None
+    if args.use_filter:
+        # Get preset parameters
+        preset_params = get_preset_params(args.filter_preset)
+        
+        # Override with CLI arguments if provided
+        min_cutoff = args.filter_min_cutoff if args.filter_min_cutoff is not None else preset_params['min_cutoff']
+        beta = args.filter_beta if args.filter_beta is not None else preset_params['beta']
+        d_cutoff = args.filter_d_cutoff if args.filter_d_cutoff is not None else preset_params['d_cutoff']
+        
+        filter_bank = LandmarkFilterBank(
+            num_landmarks=33,
+            min_cutoff=min_cutoff,
+            beta=beta,
+            d_cutoff=d_cutoff
+        )
+        print(f"One-Euro filter enabled: preset='{args.filter_preset}', "
+              f"min_cutoff={min_cutoff}Hz, beta={beta}, d_cutoff={d_cutoff}Hz")
+    else:
+        print("One-Euro filter disabled")
+    
     # Initialize camera (with or without threading)
     if args.threaded_capture:
         print("Using threaded frame capture")
@@ -173,6 +205,14 @@ def main():
         cap.set(cv2.CAP_PROP_FPS, args.max_fps)
         frame_capture = None
     
+    # Frame skipping for performance
+    skip_frames = args.skip_frames
+    if skip_frames < 1:
+        skip_frames = 1
+    
+    # Calculate processing FPS based on skip ratio
+    processing_fps = args.max_fps / skip_frames
+    
     print(f"MediaPipe started - Camera: {args.camera}, UDP: {args.host}:{args.port}")
     print(f"Resolution: {args.width}x{args.height}, Model: {args.model_complexity}, "
           f"Detection: {args.detection_confidence}, Tracking: {args.tracking_confidence}")
@@ -180,15 +220,8 @@ def main():
     print(f"UDP buffer size: {args.udp_buffer_size} bytes")
     print(f"Frame skipping: {skip_frames} (capture: {args.max_fps}fps → process: {processing_fps:.1f}fps)")
     
-    # Frame skipping for performance
+    # Frame counter for skipping
     frame_counter = 0
-    skip_frames = args.skip_frames
-    if skip_frames < 1:
-        skip_frames = 1  # Default to processing every frame (1 = no skip)
-    
-    # Calculate processing FPS based on skip ratio
-    processing_fps = args.max_fps / skip_frames
-    last_process_time = time.time()
     
     while _running:
         frame_start = time.time()
@@ -210,7 +243,6 @@ def main():
         frame_counter += 1
         if frame_counter % skip_frames != 0:
             # Skip MediaPipe processing for this frame but continue to capture
-            # We don't sleep here to maintain capture loop responsiveness
             continue
         
         # Process frame
@@ -231,6 +263,13 @@ def main():
                     "v": landmark.visibility
                 })
         
+        # Apply One-Euro filtering
+        filter_start = time.time()
+        if filter_bank and landmarks:
+            timestamp = time.time()
+            landmarks = filter_bank.filter_landmarks(landmarks, timestamp)
+        filter_time = (time.time() - filter_start) * 1000  # ms
+        
         # Serialize and send
         serialization_start = time.time()
         timestamp = time.time()
@@ -239,13 +278,15 @@ def main():
             if args.binary_protocol and not args.json_protocol:
                 packet = serialize_landmarks_binary(
                     landmarks, timestamp, capture_time, inference_time, 
-                    0.0, latency_tracker.frame_count, processing_fps, skip_frames
+                    filter_time, 0.0, latency_tracker.frame_count, 
+                    processing_fps, skip_frames
                 )
                 packet = b'\x01' + packet  # Binary marker
             else:
                 packet = serialize_landmarks_json(
                     landmarks, timestamp, capture_time, inference_time,
-                    0.0, latency_tracker.frame_count, processing_fps, skip_frames
+                    filter_time, 0.0, latency_tracker.frame_count, 
+                    processing_fps, skip_frames
                 )
                 packet = b'\x00' + packet  # JSON marker
             
@@ -257,7 +298,8 @@ def main():
         total_time = (time.time() - frame_start) * 1000  # ms
         
         # Record latency metrics
-        latency_tracker.record_frame(capture_time, inference_time, serialization_time, total_time)
+        latency_tracker.record_frame(capture_time, inference_time, serialization_time, 
+                                     filter_time, total_time)
         
         # Cap FPS
         elapsed = time.time() - frame_start
