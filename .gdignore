@@ -1,0 +1,33 @@
+# Godot ignore file - prevents Godot from scanning these folders
+# This file should list directories that Godot's resource scanner should skip
+
+# Python virtual environments - must be exact folder names
+venv
+env
+
+# Python cache
+__pycache__
+
+# Specific venv subdirectories that cause issues
+venv/lib
+venv/lib64
+venv/include
+venv/share
+
+# File types that cause import warnings
+csv
+ttf
+svg
+wav
+png
+jpg
+jpeg
+ico
+sample
+translation
+
+# Test directories within packages
+tests
+test
+data
+mpl-data

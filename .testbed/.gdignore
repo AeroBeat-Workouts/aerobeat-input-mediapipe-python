@@ -1,0 +1,14 @@
+# Ignore venv completely
+venv/
+
+# Ignore Python cache
+__pycache__/
+*.pyc
+
+# Ignore test data files that cause UID conflicts
+*.csv
+*.ttf
+*.svg
+*.png
+*.jpg
+*.wav

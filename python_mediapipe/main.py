@@ -1,81 +1,96 @@
-import cv2
-import mediapipe as mp
+#!/usr/bin/env python3
+"""MediaPipe Pose Tracker - UDP Sidecar for Godot"""
+
+import signal
+import sys
 import socket
 import json
 import time
-import sys
+from args import parse_args
 
-# --- Configuration ---
-# Ensure this port matches the one defined in '/src/strategies/strategy_mediapipe.gd'
-UDP_IP = "127.0.0.1"
-UDP_PORT = 4242
+try:
+    import cv2
+    import mediapipe as mp
+    import numpy as np
+except ImportError as e:
+    print(f"Error: Missing dependency - {e}")
+    print("Install with: pip install -r requirements.txt")
+    sys.exit(1)
+
+args = parse_args()
+
+# Global flag for graceful shutdown
+_running = True
+
+def signal_handler(sig, frame):
+    global _running
+    print("\nShutting down gracefully...")
+    _running = False
+
+signal.signal(signal.SIGTERM, signal_handler)
+signal.signal(signal.SIGINT, signal_handler)
 
 def main():
-    # 1. Setup UDP Socket
+    # Initialize UDP socket
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    print(f"Target: {UDP_IP}:{UDP_PORT}")
-
-    # 2. Setup MediaPipe Pose
+    
+    # Initialize MediaPipe
     mp_pose = mp.solutions.pose
-    # model_complexity=1 is a good balance between speed and accuracy.
-    # Use 2 for higher accuracy (slower), 0 for speed.
     pose = mp_pose.Pose(
-        min_detection_confidence=0.5,
-        min_tracking_confidence=0.5,
-        model_complexity=1
+        min_detection_confidence=args.detection_confidence,
+        min_tracking_confidence=args.tracking_confidence,
+        model_complexity=args.model_complexity
     )
-
-    # 3. Setup Video Capture
-    cap = cv2.VideoCapture(0)
+    
+    # Initialize camera
+    cap = cv2.VideoCapture(args.camera)
     if not cap.isOpened():
-        print("Error: Could not open video capture device.")
+        print(f"Error: Could not open camera {args.camera}")
         sys.exit(1)
-
-    print("MediaPipe Pose tracking started. Press 'q' to exit.")
-
-    try:
-        while cap.isOpened():
-            success, image = cap.read()
-            if not success:
-                print("Ignoring empty camera frame.")
-                continue
-
-            # MediaPipe requires RGB, OpenCV provides BGR
-            image.flags.writeable = False
-            image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-            
-            # Perform inference
-            results = pose.process(image_rgb)
-
-            # 4. Extract and Send Data
-            if results.pose_landmarks:
-                landmark_list = []
-                # MediaPipe Pose returns 33 landmarks (0-32)
-                for i, lm in enumerate(results.pose_landmarks.landmark):
-                    landmark_list.append({
-                        "id": i,
-                        "x": lm.x,
-                        "y": lm.y,
-                        "z": lm.z,
-                        "v": lm.visibility # Visibility score
-                    })
-
-                payload = {
-                    "timestamp": time.time(),
-                    "landmarks": landmark_list
-                }
-
-                # Send JSON string encoded as bytes
-                sock.sendto(json.dumps(payload).encode('utf-8'), (UDP_IP, UDP_PORT))
-
-            # Optional: Visualization (press 'q' to quit)
-            cv2.imshow('AeroBeat Input - MediaPipe', cv2.flip(image, 1))
-            if cv2.waitKey(5) & 0xFF == ord('q'):
-                break
-
-    finally:
-        cap.release()
-        cv2.destroyAllWindows()
+    
+    print(f"MediaPipe started - Camera: {args.camera}, UDP: {args.host}:{args.port}")
+    
+    while _running:
+        ret, frame = cap.read()
+        if not ret:
+            print("Warning: Failed to capture frame")
+            continue
+        
+        # Process frame
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        results = pose.process(frame_rgb)
+        
+        # Extract landmarks
+        landmarks = []
+        if results.pose_landmarks:
+            for idx, landmark in enumerate(results.pose_landmarks.landmark):
+                landmarks.append({
+                    "id": idx,
+                    "x": landmark.x,
+                    "y": landmark.y,
+                    "z": landmark.z,
+                    "v": landmark.visibility
+                })
+        
+        # Send via UDP
+        payload = {
+            "timestamp": time.time(),
+            "landmarks": landmarks
+        }
+        
+        try:
+            sock.sendto(json.dumps(payload).encode(), (args.host, args.port))
+        except Exception as e:
+            print(f"UDP send error: {e}")
+        
+        # Cap FPS
+        time.sleep(1.0 / args.max_fps)
+    
+    # Cleanup
+    cap.release()
+    pose.close()
+    sock.close()
+    print("MediaPipe stopped")
 
 if __name__ == "__main__":
     main()
