@@ -106,12 +106,15 @@ def signal_handler(sig, frame):
 signal.signal(signal.SIGTERM, signal_handler)
 signal.signal(signal.SIGINT, signal_handler)
 
-def serialize_landmarks_binary(landmarks, timestamp, capture_ms=0.0, inference_ms=0.0, serialization_ms=0.0, frame_count=0):
+def serialize_landmarks_binary(landmarks, timestamp, capture_ms=0.0, inference_ms=0.0, serialization_ms=0.0, frame_count=0, processing_fps=60.0, skip_frames=1):
     """Serialize landmarks using binary format for lower latency"""
-    # Format: timestamp (double) + timing info (3 floats) + frame_count (uint32) + count (uint16) + landmarks
+    # Format: timestamp (double) + timing info (3 floats) + frame_count (uint32) + 
+    #         processing_fps (float) + skip_frames (uint8) + count (uint16) + landmarks
     data = struct.pack('!d', timestamp)  # 8 bytes for timestamp
     data += struct.pack('!fff', capture_ms, inference_ms, serialization_ms)  # 12 bytes for timing
     data += struct.pack('!I', frame_count)  # 4 bytes for frame count
+    data += struct.pack('!f', processing_fps)  # 4 bytes for processing FPS
+    data += struct.pack('!B', skip_frames)  # 1 byte for skip frames
     data += struct.pack('!H', len(landmarks))  # 2 bytes for count
     
     for lm in landmarks:
@@ -120,7 +123,7 @@ def serialize_landmarks_binary(landmarks, timestamp, capture_ms=0.0, inference_m
     
     return data
 
-def serialize_landmarks_json(landmarks, timestamp, capture_ms=0.0, inference_ms=0.0, serialization_ms=0.0, frame_count=0):
+def serialize_landmarks_json(landmarks, timestamp, capture_ms=0.0, inference_ms=0.0, serialization_ms=0.0, frame_count=0, processing_fps=60.0, skip_frames=1):
     """Serialize landmarks using JSON (fallback)"""
     payload = {
         "timestamp": timestamp,
@@ -128,6 +131,8 @@ def serialize_landmarks_json(landmarks, timestamp, capture_ms=0.0, inference_ms=
         "inference_ms": inference_ms,
         "serialization_ms": serialization_ms,
         "frame_count": frame_count,
+        "processing_fps": processing_fps,
+        "skip_frames": skip_frames,
         "landmarks": landmarks
     }
     return json.dumps(payload).encode()
@@ -171,10 +176,17 @@ def main():
     print(f"Resolution: {args.width}x{args.height}, Model: {args.model_complexity}, "
           f"Detection: {args.detection_confidence}, Tracking: {args.tracking_confidence}")
     print(f"Binary protocol: {args.binary_protocol}")
+    print(f"Frame skipping: {skip_frames} (capture: {args.max_fps}fps → process: {processing_fps:.1f}fps)")
     
     # Frame skipping for performance
     frame_counter = 0
     skip_frames = args.skip_frames
+    if skip_frames < 1:
+        skip_frames = 1  # Default to processing every frame (1 = no skip)
+    
+    # Calculate processing FPS based on skip ratio
+    processing_fps = args.max_fps / skip_frames
+    last_process_time = time.time()
     
     while _running:
         frame_start = time.time()
@@ -194,9 +206,9 @@ def main():
         
         # Frame skipping: process every Nth frame
         frame_counter += 1
-        if skip_frames > 0 and frame_counter % (skip_frames + 1) != 0:
-            # Skip processing but still cap FPS
-            time.sleep(1.0 / args.max_fps)
+        if frame_counter % skip_frames != 0:
+            # Skip MediaPipe processing for this frame but continue to capture
+            # We don't sleep here to maintain capture loop responsiveness
             continue
         
         # Process frame
@@ -225,13 +237,13 @@ def main():
             if args.binary_protocol and not args.json_protocol:
                 packet = serialize_landmarks_binary(
                     landmarks, timestamp, capture_time, inference_time, 
-                    0.0, latency_tracker.frame_count
+                    0.0, latency_tracker.frame_count, processing_fps, skip_frames
                 )
                 packet = b'\x01' + packet  # Binary marker
             else:
                 packet = serialize_landmarks_json(
                     landmarks, timestamp, capture_time, inference_time,
-                    0.0, latency_tracker.frame_count
+                    0.0, latency_tracker.frame_count, processing_fps, skip_frames
                 )
                 packet = b'\x00' + packet  # JSON marker
             

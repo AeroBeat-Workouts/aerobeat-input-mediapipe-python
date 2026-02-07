@@ -18,8 +18,8 @@ def parse_args():
                        help="Use binary serialization (faster than JSON)")
     parser.add_argument("--json-protocol", action="store_true",
                        help="Use JSON serialization (slower, for debugging)")
-    parser.add_argument("--skip-frames", type=int, default=0,
-                       help="Process every Nth frame (0 = process all)")
+    parser.add_argument("--skip-frames", type=int, default=1,
+                       help="Process every Nth frame (1 = all frames, 2 = every 2nd, etc.)")
     parser.add_argument("--threaded-capture", action="store_true", default=True,
                        help="Use threaded frame capture for lower latency")
     parser.add_argument("--no-threaded-capture", dest="threaded_capture", action="store_false",
