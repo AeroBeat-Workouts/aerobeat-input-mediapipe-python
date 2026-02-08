@@ -216,6 +216,33 @@ python python_mediapipe/main.py \
     --roi-padding 50
 ```
 
+## Test Results
+
+Comprehensive testing was conducted across 5 diverse video scenarios to validate optimization effectiveness.
+
+### Summary
+
+- **20 tests** across **5 videos** (boxing, dancing, low light, multiple people)
+- **Baseline achieved**: **11.6ms average latency** (2x better than 25-45ms target)
+- **Preprocessing**: Safe, 0.2ms improvement, minimal accuracy impact
+- **ROI tracking**: Unreliable, causes lost tracking, **not recommended**
+
+### Key Findings
+
+| Optimization | Latency Impact | Detection Impact | Reliability |
+|-------------|----------------|------------------|-------------|
+| **Baseline** | 11.8ms | 73.2% | ⭐⭐⭐⭐⭐ |
+| **Preprocess (320px)** | 11.6ms ✅ | -1.1% | ⭐⭐⭐⭐⭐ Safe for all scenarios |
+| **ROI Tracking** | +0.3ms ❌ | -8.4% | ⭐⭐☆☆☆ Fails with multi-person/low light |
+
+### Scenario-Specific Warnings
+
+- **Multiple people**: ROI loses 42 frames, detection crashes from 68% → 52%
+- **Low light**: ROI loses 15 frames, detection drops 6%
+- **Fast movements**: ROI loses 3-6 frames due to prediction failures
+
+📄 **Full Report**: See [COMPREHENSIVE_TEST_REPORT.md](./COMPREHENSIVE_TEST_REPORT.md) for detailed analysis.
+
 ### Platform-Specific Optimizations
 
 Platform-specific tweaks are automatically applied at startup:
@@ -235,34 +262,40 @@ Platform-specific tweaks are automatically applied at startup:
 ### Optimization Usage Examples
 
 ```bash
-# Maximum performance (all optimizations)
+# ✅ Recommended: Preprocessing only (safe, effective)
 python -m python_mediapipe.main \
     --preprocess-size 320 \
-    --udp-batch-size 3 \
-    --use-roi \
     --use-filter \
     --model-complexity 0
 
-# Conservative settings (safer, slightly slower)
+# Maximum performance (conservative settings)
 python -m python_mediapipe.main \
-    --preprocess-size 480 \
-    --use-roi
+    --preprocess-size 320 \
+    --udp-batch-size 3 \
+    --use-filter \
+    --model-complexity 0
+
+# ⚠️ NOT RECOMMENDED: ROI causes tracking loss
+# python -m python_mediapipe.main --use-roi
 
 # Testing individual optimizations
 python -m python_mediapipe.test_runner \
     --video test_boxing.mp4 \
-    --preprocess-size 320 \
-    --use-roi
+    --preprocess-size 320
 ```
 
 ### Expected Performance
 
-| Configuration | Expected Latency | Improvement |
-|--------------|------------------|-------------|
-| Baseline | ~12ms | - |
-| With preprocessing | ~8-9ms | 25-33% faster |
-| With ROI | ~6-7ms | 42-50% faster |
-| All optimizations | ~5-6ms | 50-58% faster |
+Based on [comprehensive testing](#test-results) across 5 video scenarios (20 total tests):
+
+| Configuration | Expected Latency | Detection Rate | Recommendation |
+|--------------|------------------|----------------|----------------|
+| Baseline | ~11.8ms | 73.2% | ⭐⭐⭐⭐⭐ Reliable |
+| With preprocessing (320px) | ~11.6ms ✅ | 72.1% | ⭐⭐⭐⭐⭐ **Recommended** |
+| With ROI | ~12.1ms ❌ | 64.8% | ⭐⭐☆☆☆ **Avoid** |
+| Combined | ~12.2ms ❌ | 64.6% | ⭐⭐☆☆☆ **Avoid** |
+
+**Target achieved:** 11.6ms with preprocessing (2x better than 25-45ms target)
 
 ## Latency Measurement System
 
