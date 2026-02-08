@@ -74,6 +74,83 @@ class FrameCapture:
         self._thread.join(timeout=1.0)
         self.cap.release()
 
+# UDP Sender with batching support
+class UDPSender:
+    """UDP sender with optional batching for reduced network overhead"""
+    def __init__(self, host, port, batch_size=1, buffer_size=4096):
+        self.addr = (host, port)
+        self.batch_size = batch_size
+        self.buffer_size = buffer_size
+        self.batch = []
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, buffer_size)
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, buffer_size)
+        self.frames_in_batch = 0
+        
+    def send(self, landmarks, timestamp, capture_ms=0.0, inference_ms=0.0,
+             filter_ms=0.0, serialization_ms=0.0, frame_count=0,
+             processing_fps=60.0, skip_frames=1, binary=True):
+        """Queue a frame for sending (flushes if batch is full)"""
+        # Serialize this frame
+        if binary:
+            frame_data = serialize_single_landmarks(
+                landmarks, timestamp, capture_ms, inference_ms,
+                filter_ms, serialization_ms, frame_count,
+                processing_fps, skip_frames
+            )
+        else:
+            payload = {
+                "timestamp": timestamp,
+                "capture_ms": capture_ms,
+                "inference_ms": inference_ms,
+                "filter_ms": filter_ms,
+                "serialization_ms": serialization_ms,
+                "frame_count": frame_count,
+                "processing_fps": processing_fps,
+                "skip_frames": skip_frames,
+                "landmarks": landmarks
+            }
+            frame_data = json.dumps(payload).encode()
+        
+        self.batch.append(frame_data)
+        self.frames_in_batch += 1
+        
+        # Flush if batch is full
+        if self.frames_in_batch >= self.batch_size:
+            self.flush(binary)
+            
+    def flush(self, binary=True):
+        """Send all queued frames"""
+        if not self.batch:
+            return
+            
+        try:
+            if self.batch_size == 1:
+                # Single frame - send directly with protocol marker
+                packet = (b'\x01' if binary else b'\x00') + self.batch[0]
+                self.sock.sendto(packet, self.addr)
+            else:
+                # Batched frames: format = marker + count + [frame_data...]
+                # Marker: 0x02 = binary batch, 0x03 = JSON batch
+                marker = b'\x02' if binary else b'\x03'
+                data = struct.pack('!B', len(self.batch))  # 1 byte for batch count
+                for frame_data in self.batch:
+                    # Prepend size of each frame for parsing
+                    data += struct.pack('!I', len(frame_data))  # 4 bytes for frame size
+                    data += frame_data
+                packet = marker + data
+                self.sock.sendto(packet, self.addr)
+        except Exception as e:
+            print(f"UDP send error: {e}")
+        
+        self.batch = []
+        self.frames_in_batch = 0
+        
+    def close(self):
+        self.flush()
+        self.sock.close()
+
+
 # Latency tracking
 class LatencyTracker:
     def __init__(self, window_size=60):
@@ -140,12 +217,29 @@ def create_pose_detector(model_complexity: int = 0,
     
     return vision.PoseLandmarker.create_from_options(options)
 
-def serialize_landmarks_binary(landmarks, timestamp, capture_ms=0.0, inference_ms=0.0, 
-                               filter_ms=0.0, serialization_ms=0.0, frame_count=0, 
-                               processing_fps=60.0, skip_frames=1):
-    """Serialize landmarks using binary format for lower latency"""
-    # Format: timestamp (double) + timing info (4 floats) + frame_count (uint32) + 
-    #         processing_fps (float) + skip_frames (uint8) + count (uint16) + landmarks
+def preprocess_frame(frame, target_size):
+    """Resize frame before MediaPipe for faster inference"""
+    if target_size <= 0 or frame.shape[0] <= target_size:
+        return frame, 1.0
+    
+    scale = target_size / frame.shape[0]
+    new_width = int(frame.shape[1] * scale)
+    small_frame = cv2.resize(frame, (new_width, target_size))
+    return small_frame, scale
+
+
+def scale_landmarks(landmarks, scale_x, scale_y):
+    """Scale landmarks back to original frame coordinates"""
+    for lm in landmarks:
+        lm['x'] *= scale_x
+        lm['y'] *= scale_y
+    return landmarks
+
+
+def serialize_single_landmarks(landmarks, timestamp, capture_ms=0.0, inference_ms=0.0,
+                                filter_ms=0.0, serialization_ms=0.0, frame_count=0,
+                                processing_fps=60.0, skip_frames=1):
+    """Serialize a single frame of landmarks (internal use)"""
     data = struct.pack('!d', timestamp)  # 8 bytes for timestamp
     data += struct.pack('!ffff', capture_ms, inference_ms, filter_ms, serialization_ms)  # 16 bytes
     data += struct.pack('!I', frame_count)  # 4 bytes for frame count
@@ -158,6 +252,15 @@ def serialize_landmarks_binary(landmarks, timestamp, capture_ms=0.0, inference_m
         data += struct.pack('!ffff', lm['x'], lm['y'], lm['z'], lm['v'])  # 16 bytes per landmark
     
     return data
+
+
+def serialize_landmarks_binary(landmarks, timestamp, capture_ms=0.0, inference_ms=0.0, 
+                               filter_ms=0.0, serialization_ms=0.0, frame_count=0, 
+                               processing_fps=60.0, skip_frames=1):
+    """Serialize landmarks using binary format for lower latency"""
+    return serialize_single_landmarks(landmarks, timestamp, capture_ms, inference_ms,
+                                       filter_ms, serialization_ms, frame_count,
+                                       processing_fps, skip_frames)
 
 def serialize_landmarks_json(landmarks, timestamp, capture_ms=0.0, inference_ms=0.0,
                              filter_ms=0.0, serialization_ms=0.0, frame_count=0, 

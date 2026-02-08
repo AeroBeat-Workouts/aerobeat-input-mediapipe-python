@@ -43,4 +43,20 @@ def parse_args():
     parser.add_argument("--filter-d-cutoff", type=float, default=None,
                        help="Derivative cutoff frequency in Hz (default: 1.0)")
     
+    # Frame Preprocessing - resize frame before inference
+    parser.add_argument("--preprocess-size", type=int, default=0,
+                       help="Resize frame to this height before inference, 0=disable (default: 0)")
+    
+    # UDP Batching - batch multiple frames per packet
+    parser.add_argument("--udp-batch-size", type=int, default=1,
+                       help="Number of frames to batch per UDP packet, 1-10 (default: 1)")
+    
+    # Predictive ROI Tracking
+    parser.add_argument("--use-roi", action="store_true",
+                       help="Enable Predictive ROI tracking for focused inference")
+    parser.add_argument("--roi-size", type=int, default=320,
+                       help="ROI target height in pixels (default: 320)")
+    parser.add_argument("--roi-padding", type=int, default=50,
+                       help="Padding around detected person in pixels (default: 50)")
+    
     return parser.parse_args()
