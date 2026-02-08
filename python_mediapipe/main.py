@@ -11,6 +11,7 @@ import threading
 from collections import deque
 from args import parse_args
 from one_euro_filter import LandmarkFilterBank, get_preset_params
+from platform_utils import setup_platform_optimizations
 
 try:
     import cv2
@@ -176,6 +177,9 @@ def serialize_landmarks_json(landmarks, timestamp, capture_ms=0.0, inference_ms=
     return json.dumps(payload).encode()
 
 def main():
+    # Platform-specific setup for optimal performance
+    setup_platform_optimizations()
+    
     latency_tracker = LatencyTracker()
     
     # Initialize UDP socket with tuned buffer size for low latency
