@@ -433,6 +433,11 @@ python python_mediapipe/main.py --camera test_boxing.mp4
 | `--filter-min-cutoff` | - | Override minimum cutoff frequency (Hz) |
 | `--filter-beta` | - | Override speed coefficient |
 | `--filter-d-cutoff` | - | Override derivative cutoff frequency (Hz) |
+| `--preprocess-size` | 480 | Preprocess frame size (0=disable, 320-480 recommended) |
+| `--udp-batch-size` | 1 | Frames per UDP packet (1-3, higher=lower latency) |
+| `--use-roi` | False | Enable predictive ROI tracking |
+| `--roi-size` | 320 | ROI target size in pixels |
+| `--roi-padding` | 50 | Padding around detected person in pixels |
 
 ### Example Commands
 
