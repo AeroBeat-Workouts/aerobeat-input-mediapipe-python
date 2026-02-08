@@ -12,6 +12,7 @@ from collections import deque
 from args import parse_args
 from one_euro_filter import LandmarkFilterBank, get_preset_params
 from platform_utils import setup_platform_optimizations
+from camera_streamer import MJPEGStreamer
 
 try:
     import cv2
@@ -298,6 +299,16 @@ def main():
         min_tracking_confidence=args.tracking_confidence
     )
     
+    # Initialize MJPEG streamer if enabled
+    mjpeg_streamer = None
+    if args.stream_camera:
+        mjpeg_streamer = MJPEGStreamer(port=args.stream_port, quality=args.stream_quality)
+        if mjpeg_streamer.start():
+            print(f"Camera streaming enabled on port {args.stream_port}")
+        else:
+            print("Warning: Failed to start camera streamer")
+            mjpeg_streamer = None
+    
     # Initialize One-Euro filter bank
     filter_bank = None
     if args.use_filter:
@@ -352,6 +363,10 @@ def main():
     print(f"Binary protocol: {args.binary_protocol}")
     print(f"UDP buffer size: {args.udp_buffer_size} bytes")
     print(f"Frame skipping: {skip_frames} (capture: {args.max_fps}fps → process: {processing_fps:.1f}fps)")
+    if args.stream_camera:
+        print(f"Camera streaming: enabled at http://127.0.0.1:{args.stream_port}/camera")
+    else:
+        print("Camera streaming: disabled (use --stream-camera to enable)")
     
     # Frame counter for skipping and timestamp calculation
     frame_counter = 0
@@ -370,6 +385,10 @@ def main():
         if not ret or frame is None:
             print("Warning: Failed to capture frame")
             continue
+        
+        # Update MJPEG streamer with raw frame (before any processing)
+        if mjpeg_streamer and mjpeg_streamer.is_running():
+            mjpeg_streamer.update_frame(frame)
         
         capture_time = (time.time() - frame_start) * 1000  # ms
         
@@ -456,6 +475,8 @@ def main():
         frame_capture.stop()
     if cap:
         cap.release()
+    if mjpeg_streamer:
+        mjpeg_streamer.stop()
     # Close the detector (no explicit close method in Tasks API, let garbage collector handle it)
     sock.close()
     print("MediaPipe stopped")

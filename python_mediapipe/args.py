@@ -59,4 +59,12 @@ def parse_args():
     parser.add_argument("--roi-padding", type=int, default=50,
                        help="Padding around detected person in pixels (default: 50)")
     
+    # MJPEG Camera Streaming
+    parser.add_argument("--stream-camera", action="store_true",
+                       help="Enable MJPEG camera streaming to Godot (default: disabled)")
+    parser.add_argument("--stream-port", type=int, default=4243,
+                       help="HTTP port for camera stream (default: 4243)")
+    parser.add_argument("--stream-quality", type=int, default=70,
+                       help="JPEG quality for stream 0-100 (default: 70)")
+    
     return parser.parse_args()
