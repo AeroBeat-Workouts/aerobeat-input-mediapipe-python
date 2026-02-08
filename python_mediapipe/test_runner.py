@@ -25,7 +25,7 @@ from one_euro_filter import LandmarkFilterBank, get_preset_params
 try:
     import mediapipe as mp
     from mediapipe.tasks.python import vision
-    from mediapipe.tasks.python.core import BaseOptions
+    from mediapipe.tasks.python.core.base_options import BaseOptions
     import numpy as np
 except ImportError as e:
     print(f"Error: Missing dependency - {e}")
@@ -110,7 +110,12 @@ def run_performance_test(video_path: str, args) -> Optional[TestResults]:
     filter_bank = None
     if args.use_filter:
         preset_params = get_preset_params(args.filter_preset)
-        filter_bank = LandmarkFilterBank(preset_params)
+        filter_bank = LandmarkFilterBank(
+            num_landmarks=33,
+            min_cutoff=preset_params['min_cutoff'],
+            beta=preset_params['beta'],
+            d_cutoff=preset_params['d_cutoff']
+        )
         print(f"Using One-Euro filter (preset: {args.filter_preset})")
     
     # Metrics collection
