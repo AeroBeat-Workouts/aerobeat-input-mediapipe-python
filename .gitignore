@@ -28,3 +28,4 @@ env/
 build/
 dist/
 *.tmp
+test_report.json
