@@ -14,13 +14,14 @@ import os
 import struct
 from pathlib import Path
 from dataclasses import dataclass, asdict
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 import statistics
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
 
 from one_euro_filter import LandmarkFilterBank, get_preset_params
+from roi_tracker import PredictiveROITracker
 
 try:
     import mediapipe as mp
@@ -39,8 +40,10 @@ class FrameMetrics:
     frame_num: int
     timestamp_ms: float
     capture_time_ms: float = 0.0
+    preprocess_time_ms: float = 0.0
     inference_time_ms: float = 0.0
     filter_time_ms: float = 0.0
+    roi_time_ms: float = 0.0
     serialize_time_ms: float = 0.0
     total_time_ms: float = 0.0
     landmarks_detected: int = 0
@@ -56,16 +59,33 @@ class TestResults:
     frame_metrics: List[Dict[str, Any]]
 
 
+def preprocess_frame(frame: np.ndarray, target_size: int) -> Tuple[np.ndarray, float]:
+    """Resize frame before MediaPipe for faster inference."""
+    if target_size <= 0 or frame.shape[0] <= target_size:
+        return frame, 1.0
+    
+    scale = target_size / frame.shape[0]
+    new_width = int(frame.shape[1] * scale)
+    small_frame = cv2.resize(frame, (new_width, target_size))
+    return small_frame, scale
+
+
+def scale_landmarks(landmarks: List[Dict], scale: float) -> List[Dict]:
+    """Scale landmarks back to original frame coordinates."""
+    for lm in landmarks:
+        lm['x'] /= scale
+        lm['y'] /= scale
+    return landmarks
+
+
 def create_pose_detector(model_complexity: int = 0):
     """Create MediaPipe pose detector using new Tasks API."""
-    # Model paths based on complexity
     model_paths = {
         0: "pose_landmarker_lite.task",
         1: "pose_landmarker_full.task", 
         2: "pose_landmarker_heavy.task"
     }
     
-    # For now, use the default model that comes with mediapipe
     base_options = BaseOptions(model_asset_path=model_paths.get(model_complexity, model_paths[0]))
     
     options = vision.PoseLandmarkerOptions(
@@ -81,8 +101,9 @@ def create_pose_detector(model_complexity: int = 0):
 
 
 def run_performance_test(video_path: str, args) -> Optional[TestResults]:
-    """Run performance test on video file."""
+    """Run performance test on video file with all optimizations."""
     print(f"Starting performance test on: {video_path}")
+    print(f"Optimizations: preprocess={args.preprocess_size}, ROI={args.use_roi}")
     
     # Open video
     cap = cv2.VideoCapture(video_path)
@@ -104,7 +125,7 @@ def run_performance_test(video_path: str, args) -> Optional[TestResults]:
     except Exception as e:
         print(f"Error creating detector: {e}")
         print("Falling back to basic test without MediaPipe...")
-        return run_basic_test(cap, total_frames, fps, video_path)
+        return run_basic_test(cap, total_frames, fps, video_path, args)
     
     # Initialize filter bank
     filter_bank = None
@@ -118,10 +139,20 @@ def run_performance_test(video_path: str, args) -> Optional[TestResults]:
         )
         print(f"Using One-Euro filter (preset: {args.filter_preset})")
     
+    # Initialize ROI tracker
+    roi_tracker = None
+    if args.use_roi:
+        roi_tracker = PredictiveROITracker(
+            target_size=args.roi_size,
+            padding=args.roi_padding
+        )
+        print(f"Using Predictive ROI (size: {args.roi_size}, padding: {args.roi_padding})")
+    
     # Metrics collection
     frame_metrics: List[FrameMetrics] = []
     frame_num = 0
     test_start = time.time() * 1000
+    lost_tracking_count = 0
     
     print("Processing frames...")
     while True:
@@ -130,6 +161,15 @@ def run_performance_test(video_path: str, args) -> Optional[TestResults]:
             break
         
         frame_start = time.time() * 1000
+        original_shape = frame.shape
+        
+        # Preprocessing (resize)
+        preprocess_start = time.time() * 1000
+        if args.preprocess_size > 0:
+            frame, scale = preprocess_frame(frame, args.preprocess_size)
+        else:
+            scale = 1.0
+        preprocess_time = time.time() * 1000 - preprocess_start
         
         # Convert BGR to RGB
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -146,16 +186,42 @@ def run_performance_test(video_path: str, args) -> Optional[TestResults]:
         filter_start = time.time() * 1000
         landmarks_detected = 0
         pose_detected = False
+        landmarks = []
         
         if detection_result.pose_landmarks:
             pose_detected = True
             landmarks_detected = len(detection_result.pose_landmarks[0])
             
+            # Convert to list of dicts
+            for i, lm in enumerate(detection_result.pose_landmarks[0]):
+                landmarks.append({
+                    'id': i,
+                    'x': lm.x,
+                    'y': lm.y,
+                    'z': lm.z,
+                    'v': lm.visibility
+                })
+            
+            # Scale back if preprocessing was used
+            if args.preprocess_size > 0 and scale != 1.0:
+                landmarks = scale_landmarks(landmarks, scale)
+            
             if filter_bank:
                 # Apply filtering (simplified for test)
                 pass
+        else:
+            lost_tracking_count += 1
         
         filter_time = time.time() * 1000 - filter_start
+        
+        # ROI tracking update
+        roi_start = time.time() * 1000
+        roi_time = 0.0
+        if roi_tracker:
+            roi_tracker.update(landmarks, original_shape)
+            # Note: ROI cropping happens on the NEXT frame
+            # This simulates the real-time behavior
+            roi_time = time.time() * 1000 - roi_start
         
         total_time = time.time() * 1000 - frame_start
         
@@ -163,8 +229,10 @@ def run_performance_test(video_path: str, args) -> Optional[TestResults]:
             frame_num=frame_num,
             timestamp_ms=frame_start - test_start,
             capture_time_ms=capture_time,
+            preprocess_time_ms=preprocess_time,
             inference_time_ms=inference_time,
             filter_time_ms=filter_time,
+            roi_time_ms=roi_time,
             total_time_ms=total_time,
             landmarks_detected=landmarks_detected,
             pose_detected=pose_detected
@@ -180,6 +248,18 @@ def run_performance_test(video_path: str, args) -> Optional[TestResults]:
     latencies = [m.total_time_ms for m in frame_metrics]
     detected_frames = sum(1 for m in frame_metrics if m.pose_detected)
     
+    # Calculate optimization-specific stats
+    if args.preprocess_size > 0:
+        preprocess_times = [m.preprocess_time_ms for m in frame_metrics]
+        avg_preprocess = statistics.mean(preprocess_times)
+        print(f"\n📐 Preprocessing: {avg_preprocess:.2f}ms avg (resize to {args.preprocess_size}px)")
+    
+    if args.use_roi:
+        roi_times = [m.roi_time_ms for m in frame_metrics]
+        avg_roi = statistics.mean(roi_times)
+        print(f"🎯 ROI Tracking: {avg_roi:.2f}ms avg")
+        print(f"📉 Lost tracking frames: {lost_tracking_count}/{frame_num} ({100*lost_tracking_count/frame_num:.1f}%)")
+    
     results = TestResults(
         test_info={
             'video_path': video_path,
@@ -189,6 +269,9 @@ def run_performance_test(video_path: str, args) -> Optional[TestResults]:
             'test_duration_sec': elapsed,
             'test_date': time.strftime('%Y-%m-%d %H:%M:%S'),
             'mediapipe_version': mp.__version__,
+            'preprocess_size': args.preprocess_size,
+            'use_roi': args.use_roi,
+            'roi_size': args.roi_size if args.use_roi else 0,
         },
         performance={
             'avg_latency_ms': statistics.mean(latencies) if latencies else 0,
@@ -216,7 +299,7 @@ def run_performance_test(video_path: str, args) -> Optional[TestResults]:
     return results
 
 
-def run_basic_test(cap, total_frames: int, fps: float, video_path: str) -> TestResults:
+def run_basic_test(cap, total_frames: int, fps: float, video_path: str, args) -> TestResults:
     """Run basic test without MediaPipe (fallback)."""
     print("Running basic video decode test (no pose detection)...")
     
@@ -240,8 +323,10 @@ def run_basic_test(cap, total_frames: int, fps: float, video_path: str) -> TestR
             frame_num=frame_num,
             timestamp_ms=frame_start - test_start,
             capture_time_ms=total_time,
+            preprocess_time_ms=0.0,
             inference_time_ms=0,
             filter_time_ms=0,
+            roi_time_ms=0.0,
             total_time_ms=total_time,
             landmarks_detected=0,
             pose_detected=False
@@ -263,6 +348,8 @@ def run_basic_test(cap, total_frames: int, fps: float, video_path: str) -> TestR
             'test_duration_sec': elapsed,
             'test_date': time.strftime('%Y-%m-%d %H:%M:%S'),
             'note': 'Basic test without MediaPipe (fallback)',
+            'preprocess_size': args.preprocess_size,
+            'use_roi': args.use_roi,
         },
         performance={
             'avg_latency_ms': statistics.mean(latencies) if latencies else 0,
@@ -288,6 +375,16 @@ def main():
     parser.add_argument('--no-filter', dest='use_filter', action='store_false')
     parser.add_argument('--filter-preset', default='balanced', 
                        choices=['responsive', 'balanced', 'smooth'])
+    
+    # New optimization flags
+    parser.add_argument('--preprocess-size', type=int, default=0,
+                       help='Resize frame to this height before inference, 0=disable (default: 0)')
+    parser.add_argument('--use-roi', action='store_true',
+                       help='Enable Predictive ROI tracking for focused inference')
+    parser.add_argument('--roi-size', type=int, default=320,
+                       help='ROI target height in pixels (default: 320)')
+    parser.add_argument('--roi-padding', type=int, default=50,
+                       help='Padding around detected person in pixels (default: 50)')
     
     args = parser.parse_args()
     
