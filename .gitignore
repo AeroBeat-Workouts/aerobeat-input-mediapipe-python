@@ -28,4 +28,7 @@ env/
 build/
 dist/
 *.tmp
-test_report.json
+test_report*.json
+
+# MediaPipe model files (downloaded separately)
+*.task

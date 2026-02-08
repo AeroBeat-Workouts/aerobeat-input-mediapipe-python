@@ -15,6 +15,8 @@ from one_euro_filter import LandmarkFilterBank, get_preset_params
 try:
     import cv2
     import mediapipe as mp
+    from mediapipe.tasks.python import vision
+    from mediapipe.tasks.python.core.base_options import BaseOptions
     import numpy as np
 except ImportError as e:
     print(f"Error: Missing dependency - {e}")
@@ -25,6 +27,13 @@ args = parse_args()
 
 # Global flag for graceful shutdown
 _running = True
+
+# Model paths for different complexity levels
+MODEL_PATHS = {
+    0: 'pose_landmarker_lite.task',
+    1: 'pose_landmarker_full.task',
+    2: 'pose_landmarker_heavy.task'
+}
 
 # Threaded frame capture
 class FrameCapture:
@@ -111,6 +120,25 @@ def signal_handler(sig, frame):
 signal.signal(signal.SIGTERM, signal_handler)
 signal.signal(signal.SIGINT, signal_handler)
 
+def create_pose_detector(model_complexity: int = 0, 
+                        min_detection_confidence: float = 0.3,
+                        min_tracking_confidence: float = 0.3):
+    """Create MediaPipe pose detector using new Tasks API."""
+    model_path = MODEL_PATHS.get(model_complexity, MODEL_PATHS[0])
+    
+    base_options = BaseOptions(model_asset_path=model_path)
+    
+    options = vision.PoseLandmarkerOptions(
+        base_options=base_options,
+        running_mode=vision.RunningMode.VIDEO,
+        num_poses=1,
+        min_pose_detection_confidence=min_detection_confidence,
+        min_pose_presence_confidence=min_detection_confidence,
+        min_tracking_confidence=min_tracking_confidence
+    )
+    
+    return vision.PoseLandmarker.create_from_options(options)
+
 def serialize_landmarks_binary(landmarks, timestamp, capture_ms=0.0, inference_ms=0.0, 
                                filter_ms=0.0, serialization_ms=0.0, frame_count=0, 
                                processing_fps=60.0, skip_frames=1):
@@ -155,14 +183,12 @@ def main():
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, args.udp_buffer_size)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, args.udp_buffer_size)
     
-    # Initialize MediaPipe with optimized settings
-    mp_pose = mp.solutions.pose
-    pose = mp_pose.Pose(
-        min_detection_confidence=args.detection_confidence,
-        min_tracking_confidence=args.tracking_confidence,
+    # Initialize MediaPipe Pose Landmarker with new Tasks API
+    print(f"Initializing MediaPipe Pose Landmarker (model: {MODEL_PATHS.get(args.model_complexity, MODEL_PATHS[0])})...")
+    detector = create_pose_detector(
         model_complexity=args.model_complexity,
-        static_image_mode=False,  # Enable tracking mode for lower latency
-        smooth_landmarks=True
+        min_detection_confidence=args.detection_confidence,
+        min_tracking_confidence=args.tracking_confidence
     )
     
     # Initialize One-Euro filter bank
@@ -220,8 +246,9 @@ def main():
     print(f"UDP buffer size: {args.udp_buffer_size} bytes")
     print(f"Frame skipping: {skip_frames} (capture: {args.max_fps}fps → process: {processing_fps:.1f}fps)")
     
-    # Frame counter for skipping
+    # Frame counter for skipping and timestamp calculation
     frame_counter = 0
+    start_time_ms = int(time.time() * 1000)
     
     while _running:
         frame_start = time.time()
@@ -245,22 +272,32 @@ def main():
             # Skip MediaPipe processing for this frame but continue to capture
             continue
         
-        # Process frame
+        # Process frame with new Tasks API
         inference_start = time.time()
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        results = pose.process(frame_rgb)
+        
+        # Create MediaPipe Image object
+        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame_rgb)
+        
+        # Calculate timestamp in milliseconds for VIDEO running mode
+        timestamp_ms = int((time.time() * 1000) - start_time_ms)
+        
+        # Run detection
+        detection_result = detector.detect_for_video(mp_image, timestamp_ms)
         inference_time = (time.time() - inference_start) * 1000  # ms
         
         # Extract landmarks
         landmarks = []
-        if results.pose_landmarks:
-            for idx, landmark in enumerate(results.pose_landmarks.landmark):
+        if detection_result.pose_landmarks:
+            # pose_landmarks is a list of lists - get the first pose
+            pose_landmarks = detection_result.pose_landmarks[0]
+            for idx, landmark in enumerate(pose_landmarks):
                 landmarks.append({
                     "id": idx,
                     "x": landmark.x,
                     "y": landmark.y,
                     "z": landmark.z,
-                    "v": landmark.visibility
+                    "v": landmark.visibility if hasattr(landmark, 'visibility') else 1.0
                 })
         
         # Apply One-Euro filtering
@@ -312,7 +349,7 @@ def main():
         frame_capture.stop()
     if cap:
         cap.release()
-    pose.close()
+    # Close the detector (no explicit close method in Tasks API, let garbage collector handle it)
     sock.close()
     print("MediaPipe stopped")
 
