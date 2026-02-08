@@ -141,14 +141,16 @@ python python_mediapipe/main.py --udp-buffer-size 2048
 
 The following optimizations can significantly reduce inference latency. All are opt-in via CLI flags.
 
-### Frame Preprocessing
+### Frame Preprocessing ⭐ Recommended
 
 Resizes frames before MediaPipe inference to reduce computational load.
 
 - **CLI flag**: `--preprocess-size 320` (default: 480, use 0 to disable)
-- **Benefit**: 3-5ms faster inference
-- **Trade-off**: Slightly lower accuracy at smaller sizes
-- **Recommendation**: 320-480 for best speed/accuracy balance
+- **Benefit**: ~0.2ms faster inference (1.7% improvement)
+- **Trade-off**: Minimal accuracy impact (-1.1% detection rate)
+- **Recommendation**: **320-480 for best speed/accuracy balance. Safe for all scenarios - enabled by default.**
+
+> ✅ **Preprocessing is safe for all use cases** - single player, multiple people, low light, and fast movements. See [Test Results](#test-results) for details.
 
 ```bash
 # Fast preprocessing (320px)
@@ -177,7 +179,7 @@ python python_mediapipe/main.py --udp-batch-size 3
 python python_mediapipe/main.py --udp-batch-size 1
 ```
 
-### Predictive ROI Tracking (Advanced)
+### Predictive ROI Tracking ⚠️ Not Recommended
 
 Smart region-of-interest tracking with velocity prediction for faster inference on localized regions.
 
@@ -185,9 +187,16 @@ Smart region-of-interest tracking with velocity prediction for faster inference 
 - **Additional flags**:
   - `--roi-size 320` - Target ROI size in pixels (default: 320)
   - `--roi-padding 50` - Padding around detected person in pixels (default: 50)
-- **Benefit**: 5-10ms faster inference
-- **Trade-off**: Complex; may lose tracking on very fast movements
-- **Recommendation**: Test with your specific use case
+- **Expected Benefit**: 5-10ms faster inference (theoretical)
+- **Actual Impact**: +0.3ms slower, -8.4% detection rate, significant tracking loss
+- **Recommendation**: **AVOID unless single player + good lighting + slow movements guaranteed**
+
+> ⚠️ **WARNING - ROI tracking is unreliable and causes lost tracking:**
+> - **Multiple people**: 42 lost frames, detection drops 16% (68% → 52%)
+> - **Low light**: 15 lost frames, detection drops 6% (71% → 65%)
+> - **Fast movements**: 3-6 lost frames per video due to prediction failures
+> 
+> See [Test Results](#test-results) for comprehensive analysis.
 
 **Features:**
 - Tracks player velocity over 5 frames
@@ -197,7 +206,7 @@ Smart region-of-interest tracking with velocity prediction for faster inference 
 - Automatically adjusts landmarks back to original coordinates
 
 ```bash
-# Enable ROI tracking with defaults
+# ⚠️ NOT RECOMMENDED - Only use if single player + good lighting guaranteed
 python python_mediapipe/main.py --use-roi
 
 # Custom ROI settings
@@ -206,8 +215,6 @@ python python_mediapipe/main.py \
     --roi-size 320 \
     --roi-padding 50
 ```
-
-**⚠️ Warning**: ROI tracking is complex and may lose tracking during very fast movements. Monitor latency logs and test thoroughly with your specific movement patterns.
 
 ### Platform-Specific Optimizations
 
