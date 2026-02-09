@@ -81,13 +81,18 @@ func _parse_packet(packet: PackedByteArray) -> void:
     var marker = packet[0]
     var data_bytes = packet.slice(1)
     
+    print("[MediaPipeServer] Packet marker: ", marker, " (0x00=JSON, 0x01=Binary)")
+    
     if marker == 0x00:
         # JSON protocol
+        print("[MediaPipeServer] Parsing as JSON...")
         _parse_json_packet(data_bytes)
     elif marker == 0x01:
         # Binary protocol (legacy single-pose)
+        print("[MediaPipeServer] Parsing as Binary...")
         _parse_binary_packet(data_bytes)
     else:
+        print("[MediaPipeServer] Unknown marker: ", marker)
         parse_error.emit("Unknown protocol marker: %d" % marker)
 
 func _parse_json_packet(data_bytes: PackedByteArray) -> void:

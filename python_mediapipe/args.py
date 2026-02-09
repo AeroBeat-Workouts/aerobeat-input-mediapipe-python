@@ -15,9 +15,9 @@ def parse_args():
     parser.add_argument("--max-fps", type=int, default=60, help="Maximum capture FPS")
     parser.add_argument("--width", type=int, default=640, help="Camera width")
     parser.add_argument("--height", type=int, default=480, help="Camera height")
-    parser.add_argument("--binary-protocol", action="store_true", default=True,
+    parser.add_argument("--binary-protocol", action="store_true",
                        help="Use binary serialization (faster than JSON)")
-    parser.add_argument("--json-protocol", action="store_true",
+    parser.add_argument("--json-protocol", action="store_true", default=True,
                        help="Use JSON serialization (slower, for debugging)")
     parser.add_argument("--skip-frames", type=int, default=1,
                        help="Process every Nth frame (1 = all frames, 2 = every 2nd, etc.)")
