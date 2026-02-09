@@ -217,31 +217,41 @@ func _finish_install_check() -> void:
 ## Start the MediaPipe server (detached mode to avoid stdout blocking)
 func _start_detached_server() -> int:
 	"""Start server detached from Godot's stdout/stderr to prevent pipe blocking."""
-	var python = _find_python()
+	var python = "/usr/bin/python3"  # Use system python directly
 	var script = _find_script()
+	var venv_path = "/home/derrick/Github/AeroBeat/aerobeat-input-mediapipe-python/.testbed/venv"
 	
-	# Build arguments
-	var args = PackedStringArray()
-	args.append("/bin/bash")
-	args.append("-c")
-	# Redirect ALL output to files to prevent blocking
-	var bash_cmd = python + " " + script + " " + _build_args_string() + " > /tmp/aerobeat_server.log 2>&1 &"
-	bash_cmd += "; echo $!"  # Print PID
-	args.append(bash_cmd)
+	# Build the command with venv activation via PYTHONPATH
+	var bash_cmd = "cd /home/derrick/.openclaw/workspace/addons/aerobeat-input-mediapipe && "
+	bash_cmd += "PYTHONPATH=" + venv_path + "/lib/python3.12/site-packages "
+	bash_cmd += python + " " + script + " " + _build_args_string()
+	bash_cmd += " > /tmp/aerobeat_server.log 2>&1 &"
+	bash_cmd += "; sleep 0.5; echo $!"  # Small delay then print PID
 	
 	print("AutoStartManager: Starting detached server...")
-	print("AutoStartManager: Command: bash -c '" + bash_cmd + "'")
+	print("AutoStartManager: Command: " + bash_cmd)
 	
 	var output = []
-	var result = OS.execute("/bin/bash", args, output, true)
+	var result = OS.execute("/bin/bash", ["-c", bash_cmd], output, true)
+	
+	print("AutoStartManager: Execute result: " + str(result))
 	
 	if result == OK and output.size() > 0:
-		var pid = int(output[0].strip_edges())
-		print("AutoStartManager: Detached server started with PID: " + str(pid))
-		return pid
-	else:
-		print("AutoStartManager: Failed to start detached server: " + str(result))
-		return -1
+		var output_str = output[0].strip_edges()
+		print("AutoStartManager: Raw output: '" + output_str + "'")
+		if output_str.is_valid_int():
+			var pid = int(output_str)
+			if pid > 0:
+				print("AutoStartManager: Detached server started with PID: " + str(pid))
+				return pid
+	
+	print("AutoStartManager: Failed to get valid PID, checking log...")
+	var log_check = []
+	OS.execute("cat", ["/tmp/aerobeat_server.log"], log_check)
+	if log_check.size() > 0:
+		print("AutoStartManager: Server log:\n" + log_check[0])
+	
+	return -1
 
 ## Start the MediaPipe server with proper arguments
 func _find_script() -> String:
