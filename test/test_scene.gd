@@ -17,6 +17,9 @@ func _ready():
 	update_status("Initializing...", Color.WHITE)
 	info_label.text = "Starting AutoStartManager..."
 	
+	print("[TestScene] _ready() started")
+	print("[TestScene] landmark_drawer path: ", landmark_drawer)
+	
 	# Create black background for landmark display
 	_create_black_background()
 	
@@ -172,12 +175,17 @@ func _process(_delta):
 
 func _on_pose_updated(landmarks: Array):
 	update_status("Tracking active - " + str(landmarks.size()) + " landmarks detected", Color.GREEN)
+	print("[TestScene] Pose updated with ", landmarks.size(), " landmarks")
 	
 	if landmark_drawer:
+		print("[TestScene] Updating landmark drawer")
 		landmark_drawer.update_landmarks(landmarks)
+	else:
+		print("[TestScene] WARNING: landmark_drawer is null!")
 	
 	# Also update camera overlay if available
 	if camera_view:
+		print("[TestScene] Updating camera view overlay")
 		camera_view.update_overlay(landmarks)
 
 func _on_tracking_lost():
