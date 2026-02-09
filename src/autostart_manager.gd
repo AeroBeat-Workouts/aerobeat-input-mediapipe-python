@@ -37,14 +37,13 @@ func _ready():
 	if auto_start:
 		_check_and_start()
 
-## Find Python - prefer project venv, fallback to system
+## Find Python - prefer project venv in repo, fallback to system
 func _find_python() -> String:
-	# Prefer project venv if it exists (we may have installed MediaPipe there)
-	# Use absolute path to avoid resolving to wrong location
-	var venv_python = "/home/derrick/.openclaw/workspace/addons/aerobeat-input-mediapipe/venv/bin/python"
-	if FileAccess.file_exists(venv_python):
-		print("AutoStartManager: Found venv Python: " + venv_python)
-		return venv_python
+	# Prefer project venv in the repo (not workspace - sandbox issues)
+	var repo_venv = "/home/derrick/Github/AeroBeat/aerobeat-input-mediapipe-python/.testbed/venv/bin/python"
+	if FileAccess.file_exists(repo_venv):
+		print("AutoStartManager: Found repo venv Python: " + repo_venv)
+		return repo_venv
 	
 	# Check for system python3
 	var output: Array = []
@@ -164,8 +163,8 @@ func _ensure_venv_and_install() -> void:
 	"""Create venv and install packages directly."""
 	emit_signal("installation_progress", 10, "Creating virtual environment...")
 	
-	# Use absolute path to avoid resolving to wrong location
-	var venv_path = "/home/derrick/.openclaw/workspace/addons/aerobeat-input-mediapipe/venv"
+	# Create venv in repo location (not workspace - sandbox issues)
+	var venv_path = "/home/derrick/Github/AeroBeat/aerobeat-input-mediapipe-python/.testbed/venv"
 	var output: Array = []
 	var exit_code = OS.execute("python3", ["-m", "venv", venv_path], output, true)
 	
@@ -220,8 +219,9 @@ func _start_server() -> bool:
 	# This is now a coroutine due to await calls
 	python_path = _find_python()
 	
-	# Use absolute path to workspace (ProjectSettings.globalize_path is resolving to wrong location)
+	# Use repo path (not workspace - sandbox/permission issues)
 	var possible_paths = [
+		"/home/derrick/Github/AeroBeat/aerobeat-input-mediapipe-python/.testbed/python_mediapipe/main.py",
 		"/home/derrick/.openclaw/workspace/addons/aerobeat-input-mediapipe/python_mediapipe/main.py"
 	]
 	
