@@ -48,7 +48,13 @@ func _ready():
     print("[MediaPipeProviderTest] Ready on port %d" % config.udp_port)
 
 func start() -> bool:
-    return _server.start()
+    print("[MediaPipeProviderTest] Starting server on port %d" % config.udp_port)
+    var success = _server.start()
+    if success:
+        print("[MediaPipeProviderTest] Server started successfully on port %d" % _server.get_bound_port())
+    else:
+        print("[MediaPipeProviderTest] FAILED to start server")
+    return success
 
 func stop() -> void:
     _server.stop()

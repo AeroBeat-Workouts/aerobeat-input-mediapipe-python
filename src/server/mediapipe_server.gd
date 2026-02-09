@@ -50,10 +50,14 @@ func _process(_delta: float) -> void:
     if not _is_running:
         return
     
+    # Check if there's data available
+    if _udp.get_available_bytes() <= 0:
+        return
+    
     # Drain all pending packets, keep only the newest
     var latest_packet: PackedByteArray
     
-    while true:
+    while _udp.get_available_bytes() > 0:
         var packet = _udp.get_packet()
         if packet.is_empty():
             break
