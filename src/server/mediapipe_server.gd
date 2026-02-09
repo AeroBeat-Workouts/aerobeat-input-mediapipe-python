@@ -98,15 +98,21 @@ func _parse_json_packet(data_bytes: PackedByteArray) -> void:
         parse_error.emit("Expected JSON object, got: " + str(typeof(data)))
         return
     
+    # Debug: Print what we received
+    print("[MediaPipeServer] Received packet with keys: ", data.keys())
+    
     # Check for multi-pose data
     if data.has("poses"):
         var poses = data["poses"]
+        print("[MediaPipeServer] Poses count: ", poses.size() if poses is Array else "not array")
         if poses is Array:
             multi_pose_received.emit(poses)
             
             # Also emit primary pose for backward compatibility
             if poses.size() > 0 and poses[0] is Dictionary and poses[0].has("landmarks"):
-                landmarks_received.emit(poses[0]["landmarks"])
+                var landmarks = poses[0]["landmarks"]
+                print("[MediaPipeServer] Primary pose landmarks: ", landmarks.size() if landmarks is Array else 0)
+                landmarks_received.emit(landmarks)
             return
     
     # Fallback to legacy single-pose format
@@ -119,6 +125,7 @@ func _parse_json_packet(data_bytes: PackedByteArray) -> void:
         parse_error.emit("'landmarks' should be an array")
         return
     
+    print("[MediaPipeServer] Legacy landmarks count: ", landmarks.size())
     landmarks_received.emit(landmarks)
 
 func _parse_binary_packet(data_bytes: PackedByteArray) -> void:
