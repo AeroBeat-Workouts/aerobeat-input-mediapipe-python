@@ -58,7 +58,8 @@ func get_server_pid() -> int:
 
 ## Check if server is running
 func is_server_running() -> bool:
-	if server_pid <= 0:
+	# Safety: PID 0 and 1 are never valid for our server
+	if server_pid <= 1:
 		return false
 	
 	# Check if process is alive (Linux/Mac)
@@ -74,7 +75,13 @@ func start_server() -> bool:
 
 ## Stop the server
 func stop_server() -> void:
-	if server_pid > 0:
+	# Safety check: NEVER kill PID 0 or 1 (kernel/init)
+	if server_pid <= 1:
+		server_pid = -1
+		_is_running = false
+		return
+	
+	if server_pid > 1:
 		# Kill the Python process and any children
 		var output: Array = []
 		OS.execute("pkill", ["-P", str(server_pid)], output, true)  # Kill children first
@@ -231,14 +238,26 @@ func _start_server() -> bool:
 	
 	var pid = OS.execute(python_path, args, [], false)
 	
-	if pid > 0:
+	# Validate PID - must be > 1 (PID 1 is init, would crash system if killed)
+	if pid > 1:
 		server_pid = pid
 		_is_running = true
 		emit_signal("server_started", pid)
 		print("AutoStartManager: Server started with PID: ", pid)
+		
+		# Verify process started by checking if it's still alive after a moment
+		await get_tree().create_timer(1.0).timeout
+		if not is_server_running():
+			print("AutoStartManager: WARNING - Process started but exited immediately")
+			server_pid = -1
+			_is_running = false
+			emit_signal("server_failed", "Server process exited immediately")
+			return false
+		
 		return true
 	else:
-		emit_signal("server_failed", "Failed to start server process")
+		print("AutoStartManager: Failed to start server, got PID: ", pid)
+		emit_signal("server_failed", "Failed to start server process (PID: %d)" % pid)
 		return false
 
 ## Helper to emit progress
