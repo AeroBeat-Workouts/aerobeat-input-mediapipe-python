@@ -146,8 +146,14 @@ Make sure you're in a well-lit area."""
 			update_status("Failed to start provider", Color.RED)
 
 func _start_camera_feed():
+	print("[TestScene] _start_camera_feed() called")
+	
 	# Create camera view for MJPEG stream
 	var MediaPipeCameraView = load("res://src/camera_view.gd")
+	if MediaPipeCameraView == null:
+		print("[TestScene] ERROR: Failed to load camera_view.gd")
+		return
+	
 	camera_view = MediaPipeCameraView.new()
 	camera_view.name = "CameraView"
 	camera_view.stream_url = "http://127.0.0.1:4243/camera"
@@ -155,20 +161,33 @@ func _start_camera_feed():
 	camera_view.size = Vector2(640, 480)
 	camera_view.show_overlay = true
 	
+	print("[TestScene] Camera view created, stream URL: ", camera_view.stream_url)
+	
 	# Replace the black background with camera feed
 	camera_display.replace_by(camera_view)
 	camera_display = camera_view
+	print("[TestScene] Replaced camera_display with camera_view")
 	
 	# Reconnect landmark drawer to new camera display
 	if landmark_drawer:
 		landmark_drawer.reparent(camera_display)
+		print("[TestScene] Reparented landmark_drawer")
 	
 	# Start the stream
-	camera_view.start_stream()
-	print("[TestScene] Camera feed started")
+	print("[TestScene] Starting camera stream...")
+	var success = camera_view.start_stream()
+	print("[TestScene] Camera stream start result: ", success)
 
 func _process(_delta):
 	_frame_count += 1
+	
+	# Check server liveness every 60 frames (~1 second)
+	if _frame_count % 60 == 0:
+		if auto_start_manager and auto_start_manager.server_pid > 0:
+			var is_alive = auto_start_manager.is_server_running()
+			if not is_alive:
+				print("[TestScene] WARNING: Python server (PID: %d) is not running!" % auto_start_manager.server_pid)
+				update_status("Python server died!", Color.RED)
 	
 	if _frame_count % 30 == 0 and _server_ready:
 		_update_debug_info()
