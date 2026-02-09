@@ -37,19 +37,23 @@ func _ready():
 	if auto_start:
 		_check_and_start()
 
-## Find Python - prefer venv, fallback to system
+## Find Python - prefer system, fallback to venv in project
 func _find_python() -> String:
-	# Check for venv in project
-	var venv_python = ProjectSettings.globalize_path("res://venv/bin/python")
-	if FileAccess.file_exists(venv_python):
-		return venv_python
-	
-	# Check for system python3
+	# Check for system python3 first (more reliable)
 	var output: Array = []
 	var exit_code = OS.execute("which", ["python3"], output, true)
 	if exit_code == 0 and output.size() > 0:
-		return output[0].strip_edges()
+		var system_python = output[0].strip_edges()
+		print("AutoStartManager: Found system Python: " + system_python)
+		return system_python
 	
+	# Fallback to venv in project
+	var venv_python = ProjectSettings.globalize_path("res://venv/bin/python")
+	if FileAccess.file_exists(venv_python):
+		print("AutoStartManager: Found venv Python: " + venv_python)
+		return venv_python
+	
+	print("AutoStartManager: Falling back to 'python3'")
 	return "python3"
 
 ## Get the server PID for display
@@ -214,10 +218,23 @@ func _start_server() -> bool:
 	# This is now a coroutine due to await calls
 	python_path = _find_python()
 	
-	var server_script = ProjectSettings.globalize_path("res://python_mediapipe/main.py")
+	# Try multiple possible script locations
+	var possible_paths = [
+		ProjectSettings.globalize_path("res://python_mediapipe/main.py"),
+		ProjectSettings.globalize_path("res://python-mediapipe/main.py"),
+		"/home/derrick/.openclaw/workspace/addons/aerobeat-input-mediapipe/python_mediapipe/main.py"
+	]
 	
-	if not FileAccess.file_exists(server_script):
-		emit_signal("server_failed", "Server script not found: " + server_script)
+	var server_script = ""
+	for path in possible_paths:
+		print("AutoStartManager: Checking for script at: " + path)
+		if FileAccess.file_exists(path):
+			server_script = path
+			print("AutoStartManager: Found script at: " + path)
+			break
+	
+	if server_script == "":
+		emit_signal("server_failed", "Server script not found in any location")
 		return false
 	
 	# Build argument list
