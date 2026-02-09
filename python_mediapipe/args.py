@@ -67,4 +67,10 @@ def parse_args():
     parser.add_argument("--stream-quality", type=int, default=70,
                        help="JPEG quality for stream 0-100 (default: 70)")
     
+    # Debug Window
+    parser.add_argument("--show-window", action="store_true",
+                       help="Show OpenCV debug window with pose overlay (default: disabled)")
+    parser.add_argument("--window-scale", type=float, default=1.0,
+                       help="Scale factor for debug window (default: 1.0)")
+    
     return parser.parse_args()

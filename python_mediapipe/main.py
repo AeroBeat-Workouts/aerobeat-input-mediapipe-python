@@ -37,6 +37,56 @@ MODEL_PATHS = {
     2: 'pose_landmarker_heavy.task'
 }
 
+# Pose connections for drawing skeleton
+POSE_CONNECTIONS = [
+    (0, 1), (1, 2), (2, 3), (3, 7),  # Face left
+    (0, 4), (4, 5), (5, 6), (6, 8),  # Face right
+    (9, 10),  # Mouth
+    (11, 12), (11, 13), (13, 15), (15, 17), (15, 19), (15, 21),  # Left arm
+    (12, 14), (14, 16), (16, 18), (16, 20), (16, 22),  # Right arm
+    (11, 23), (12, 24), (23, 24),  # Torso
+    (23, 25), (25, 27), (27, 29), (29, 31),  # Left leg
+    (24, 26), (26, 28), (28, 30), (30, 32),  # Right leg
+]
+
+def draw_landmarks_on_frame(frame, landmarks, connections=True):
+    """Draw landmarks and skeleton on frame for debug visualization"""
+    if not landmarks:
+        return frame
+    
+    h, w = frame.shape[:2]
+    output = frame.copy()
+    
+    # Draw connections (skeleton)
+    if connections:
+        for start_idx, end_idx in POSE_CONNECTIONS:
+            if start_idx < len(landmarks) and end_idx < len(landmarks):
+                start_lm = landmarks[start_idx]
+                end_lm = landmarks[end_idx]
+                
+                # Only draw if both landmarks are visible
+                if start_lm.get('v', 1.0) > 0.5 and end_lm.get('v', 1.0) > 0.5:
+                    x1, y1 = int(start_lm['x'] * w), int(start_lm['y'] * h)
+                    x2, y2 = int(end_lm['x'] * w), int(end_lm['y'] * h)
+                    cv2.line(output, (x1, y1), (x2, y2), (0, 255, 0), 2)
+    
+    # Draw landmark points
+    for lm in landmarks:
+        x, y = int(lm['x'] * w), int(lm['y'] * h)
+        visibility = lm.get('v', 1.0)
+        
+        # Color based on visibility
+        if visibility > 0.8:
+            color = (0, 255, 0)  # Green - high confidence
+        elif visibility > 0.5:
+            color = (0, 255, 255)  # Yellow - medium confidence
+        else:
+            color = (0, 0, 255)  # Red - low confidence
+        
+        cv2.circle(output, (x, y), 3, color, -1)
+    
+    return output
+
 # Threaded frame capture
 class FrameCapture:
     """Threaded frame capture to always get the latest frame"""
@@ -54,8 +104,18 @@ class FrameCapture:
         self.frame = None
         self.lock = threading.Lock()
         self._running = True
+        self._ready = False  # Flag to indicate first frame captured
         self._thread = threading.Thread(target=self._capture_loop, daemon=True)
         self._thread.start()
+        
+        # Wait for first frame with timeout
+        timeout = 5.0  # 5 seconds
+        start_time = time.time()
+        while not self._ready and time.time() - start_time < timeout:
+            time.sleep(0.01)
+        
+        if not self._ready:
+            raise RuntimeError("Camera failed to capture first frame within timeout")
         
     def _capture_loop(self):
         """Continuously capture frames in background thread"""
@@ -64,6 +124,8 @@ class FrameCapture:
             if ret:
                 with self.lock:
                     self.frame = frame
+                    if not self._ready:
+                        self._ready = True
     
     def get_frame(self):
         """Get the latest frame"""
@@ -281,6 +343,8 @@ def serialize_landmarks_json(landmarks, timestamp, capture_ms=0.0, inference_ms=
     return json.dumps(payload).encode()
 
 def main():
+    global _running
+    
     # Platform-specific setup for optimal performance
     setup_platform_optimizations()
     
@@ -367,6 +431,17 @@ def main():
         print(f"Camera streaming: enabled at http://127.0.0.1:{args.stream_port}/camera")
     else:
         print("Camera streaming: disabled (use --stream-camera to enable)")
+    if args.show_window:
+        print(f"Debug window: enabled (scale: {args.window_scale}x)")
+        print("Press 'q' in the window to quit")
+    else:
+        print("Debug window: disabled (use --show-window to enable)")
+    
+    # Create debug window if enabled
+    if args.show_window:
+        cv2.namedWindow("MediaPipe Pose", cv2.WINDOW_NORMAL)
+        if args.window_scale != 1.0:
+            cv2.resizeWindow("MediaPipe Pose", int(args.width * args.window_scale), int(args.height * args.window_scale))
     
     # Frame counter for skipping and timestamp calculation
     frame_counter = 0
@@ -396,6 +471,15 @@ def main():
         frame_counter += 1
         if frame_counter % skip_frames != 0:
             # Skip MediaPipe processing for this frame but continue to capture
+            # Still show the frame in debug window if enabled
+            if args.show_window:
+                display_frame = frame.copy()
+                cv2.putText(display_frame, "Processing skipped (frame skip)", (10, 30),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+                cv2.imshow("MediaPipe Pose", display_frame)
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    _running = False
+                    break
             continue
         
         # Process frame with new Tasks API
@@ -464,6 +548,20 @@ def main():
         latency_tracker.record_frame(capture_time, inference_time, serialization_time, 
                                      filter_time, total_time)
         
+        # Show debug window with landmarks
+        if args.show_window:
+            display_frame = draw_landmarks_on_frame(frame, landmarks)
+            
+            # Add FPS and landmark count overlay
+            status_text = f"Landmarks: {len(landmarks)} | Press 'q' to quit"
+            cv2.putText(display_frame, status_text, (10, 30),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+            
+            cv2.imshow("MediaPipe Pose", display_frame)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                _running = False
+                break
+        
         # Cap FPS
         elapsed = time.time() - frame_start
         sleep_time = max(0, (1.0 / args.max_fps) - elapsed)
@@ -471,6 +569,8 @@ def main():
             time.sleep(sleep_time)
     
     # Cleanup
+    if args.show_window:
+        cv2.destroyAllWindows()
     if frame_capture:
         frame_capture.stop()
     if cap:
