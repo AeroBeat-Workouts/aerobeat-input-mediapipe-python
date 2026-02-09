@@ -40,7 +40,8 @@ func _ready():
 ## Find Python - prefer project venv, fallback to system
 func _find_python() -> String:
 	# Prefer project venv if it exists (we may have installed MediaPipe there)
-	var venv_python = ProjectSettings.globalize_path("res://venv/bin/python")
+	# Use absolute path to avoid resolving to wrong location
+	var venv_python = "/home/derrick/.openclaw/workspace/addons/aerobeat-input-mediapipe/venv/bin/python"
 	if FileAccess.file_exists(venv_python):
 		print("AutoStartManager: Found venv Python: " + venv_python)
 		return venv_python
@@ -163,7 +164,8 @@ func _ensure_venv_and_install() -> void:
 	"""Create venv and install packages directly."""
 	emit_signal("installation_progress", 10, "Creating virtual environment...")
 	
-	var venv_path = ProjectSettings.globalize_path("res://venv")
+	# Use absolute path to avoid resolving to wrong location
+	var venv_path = "/home/derrick/.openclaw/workspace/addons/aerobeat-input-mediapipe/venv"
 	var output: Array = []
 	var exit_code = OS.execute("python3", ["-m", "venv", venv_path], output, true)
 	
@@ -218,10 +220,8 @@ func _start_server() -> bool:
 	# This is now a coroutine due to await calls
 	python_path = _find_python()
 	
-	# Try multiple possible script locations
+	# Use absolute path to workspace (ProjectSettings.globalize_path is resolving to wrong location)
 	var possible_paths = [
-		ProjectSettings.globalize_path("res://python_mediapipe/main.py"),
-		ProjectSettings.globalize_path("res://python-mediapipe/main.py"),
 		"/home/derrick/.openclaw/workspace/addons/aerobeat-input-mediapipe/python_mediapipe/main.py"
 	]
 	
