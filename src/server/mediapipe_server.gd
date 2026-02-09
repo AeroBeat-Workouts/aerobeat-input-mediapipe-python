@@ -19,18 +19,22 @@ var _is_running := false
 func start() -> bool:
     var port = config.udp_port if config else 4242
     
+    print("[MediaPipeServer] Starting UDP server on port ", port)
+    
     # Try to bind, with fallback to next available port
-    var bind_result = _udp.bind(port)
+    var bind_result = _udp.bind(port, "127.0.0.1")  # Bind to localhost explicitly
     if bind_result != OK:
         push_warning("MediaPipeServer: Failed to bind to port %d, trying auto-select" % port)
-        bind_result = _udp.bind(0)  # 0 = auto-select
+        bind_result = _udp.bind(0, "127.0.0.1")  # 0 = auto-select
         if bind_result != OK:
             push_error("MediaPipeServer: Failed to bind UDP socket")
+            print("[MediaPipeServer] ERROR: Failed to bind UDP socket")
             return false
         port = _udp.get_local_port()
         if config:
             config.udp_port = port
     
+    print("[MediaPipeServer] UDP socket bound to 127.0.0.1:", port)
     _is_running = true
     server_started.emit(port)
     return true
@@ -46,9 +50,13 @@ func is_running() -> bool:
 func get_bound_port() -> int:
     return _udp.get_local_port() if _is_running else -1
 
+var _poll_count: int = 0
+
 func _process(_delta: float) -> void:
     if not _is_running:
         return
+    
+    _poll_count += 1
     
     # Godot 4 UDP: just try to get packets
     var latest_packet: PackedByteArray
@@ -62,10 +70,13 @@ func _process(_delta: float) -> void:
         packet_count += 1
     
     if latest_packet.is_empty():
+        # Log every 60 frames that we're polling but no data
+        if _poll_count % 60 == 0:
+            print("[MediaPipeServer] Polling port %d... no data (poll #%d)" % [get_bound_port(), _poll_count])
         return
     
     # Packet received successfully - parse it
-    print("[MediaPipeServer] Received packet of ", latest_packet.size(), " bytes")
+    print("[MediaPipeServer] Received packet of ", latest_packet.size(), " bytes (poll #%d)" % _poll_count)
     _parse_packet(latest_packet)
 
 func _parse_packet(packet: PackedByteArray) -> void:
