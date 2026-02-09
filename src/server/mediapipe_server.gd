@@ -1,10 +1,12 @@
 class_name MediaPipeServer
 extends Node
 ## UDP server that receives landmark data from Python MediaPipe sidecar
+## Now supports multiple poses for local multiplayer
 
 const MediaPipeConfig = preload("res://src/config/mediapipe_config.gd")
 
 signal landmarks_received(landmarks: Array)
+signal multi_pose_received(poses: Array)  # Array of {pose_id, landmarks}
 signal server_started(port: int)
 signal server_stopped()
 signal parse_error(error: String)
@@ -51,11 +53,7 @@ func _process(_delta: float) -> void:
     # Drain all pending packets, keep only the newest
     var latest_packet: PackedByteArray
     
-    # In Godot 4.x, we poll for packets differently
-    # get_available_bytes() might not exist on PacketPeerUDP in some versions
-    # Use a try-catch approach with get_packet()
     while true:
-        var err = _udp.get_packet_error()
         var packet = _udp.get_packet()
         if packet.is_empty():
             break
@@ -67,8 +65,25 @@ func _process(_delta: float) -> void:
     _parse_packet(latest_packet)
 
 func _parse_packet(packet: PackedByteArray) -> void:
+    # Check for protocol marker
+    if packet.is_empty():
+        return
+    
+    var marker = packet[0]
+    var data_bytes = packet.slice(1)
+    
+    if marker == 0x00:
+        # JSON protocol
+        _parse_json_packet(data_bytes)
+    elif marker == 0x01:
+        # Binary protocol (legacy single-pose)
+        _parse_binary_packet(data_bytes)
+    else:
+        parse_error.emit("Unknown protocol marker: %d" % marker)
+
+func _parse_json_packet(data_bytes: PackedByteArray) -> void:
     var json := JSON.new()
-    var error := json.parse(packet.get_string_from_utf8())
+    var error := json.parse(data_bytes.get_string_from_utf8())
     
     if error != OK:
         parse_error.emit("JSON parse error: " + json.get_error_message())
@@ -79,6 +94,18 @@ func _parse_packet(packet: PackedByteArray) -> void:
         parse_error.emit("Expected JSON object, got: " + str(typeof(data)))
         return
     
+    # Check for multi-pose data
+    if data.has("poses"):
+        var poses = data["poses"]
+        if poses is Array:
+            multi_pose_received.emit(poses)
+            
+            # Also emit primary pose for backward compatibility
+            if poses.size() > 0 and poses[0] is Dictionary and poses[0].has("landmarks"):
+                landmarks_received.emit(poses[0]["landmarks"])
+            return
+    
+    # Fallback to legacy single-pose format
     if not data.has("landmarks"):
         parse_error.emit("Missing 'landmarks' field")
         return
@@ -89,3 +116,8 @@ func _parse_packet(packet: PackedByteArray) -> void:
         return
     
     landmarks_received.emit(landmarks)
+
+func _parse_binary_packet(data_bytes: PackedByteArray) -> void:
+    # Binary protocol - legacy single-pose support
+    # For now, just emit parse error since we primarily use JSON for multi-pose
+    parse_error.emit("Binary protocol not yet supported for multi-pose")

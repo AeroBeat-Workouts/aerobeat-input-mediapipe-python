@@ -49,13 +49,20 @@ POSE_CONNECTIONS = [
     (24, 26), (26, 28), (28, 30), (30, 32),  # Right leg
 ]
 
-def draw_landmarks_on_frame(frame, landmarks, connections=True):
+def draw_landmarks_on_frame(frame, landmarks, connections=True, pose_id=0):
     """Draw landmarks and skeleton on frame for debug visualization"""
     if not landmarks:
         return frame
     
     h, w = frame.shape[:2]
     output = frame.copy()
+    
+    # Different colors for different poses
+    pose_colors = [
+        (0, 255, 0),    # Green - Player 1
+        (255, 0, 255),  # Magenta - Player 2
+    ]
+    skeleton_color = pose_colors[pose_id % len(pose_colors)]
     
     # Draw connections (skeleton)
     if connections:
@@ -68,7 +75,7 @@ def draw_landmarks_on_frame(frame, landmarks, connections=True):
                 if start_lm.get('v', 1.0) > 0.5 and end_lm.get('v', 1.0) > 0.5:
                     x1, y1 = int(start_lm['x'] * w), int(start_lm['y'] * h)
                     x2, y2 = int(end_lm['x'] * w), int(end_lm['y'] * h)
-                    cv2.line(output, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                    cv2.line(output, (x1, y1), (x2, y2), skeleton_color, 2)
     
     # Draw landmark points
     for lm in landmarks:
@@ -77,13 +84,22 @@ def draw_landmarks_on_frame(frame, landmarks, connections=True):
         
         # Color based on visibility
         if visibility > 0.8:
-            color = (0, 255, 0)  # Green - high confidence
+            color = skeleton_color
         elif visibility > 0.5:
             color = (0, 255, 255)  # Yellow - medium confidence
         else:
             color = (0, 0, 255)  # Red - low confidence
         
-        cv2.circle(output, (x, y), 3, color, -1)
+        cv2.circle(output, (x, y), 4, color, -1)
+    
+    # Draw pose ID label above head (landmark 0 is nose, move up further)
+    if landmarks and len(landmarks) > 0:
+        nose = landmarks[0]
+        x, y = int(nose['x'] * w), int(nose['y'] * h)
+        label = f"P{pose_id + 1}"
+        # Move label 40px above nose to avoid facial landmarks
+        cv2.putText(output, label, (x - 15, y - 40),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, skeleton_color, 2)
     
     return output
 
@@ -272,7 +288,7 @@ def create_pose_detector(model_complexity: int = 0,
     options = vision.PoseLandmarkerOptions(
         base_options=base_options,
         running_mode=vision.RunningMode.VIDEO,
-        num_poses=1,
+        num_poses=2,
         min_pose_detection_confidence=min_detection_confidence,
         min_pose_presence_confidence=min_detection_confidence,
         min_tracking_confidence=min_tracking_confidence
@@ -327,8 +343,13 @@ def serialize_landmarks_binary(landmarks, timestamp, capture_ms=0.0, inference_m
 
 def serialize_landmarks_json(landmarks, timestamp, capture_ms=0.0, inference_ms=0.0,
                              filter_ms=0.0, serialization_ms=0.0, frame_count=0, 
-                             processing_fps=60.0, skip_frames=1):
-    """Serialize landmarks using JSON (fallback)"""
+                             processing_fps=60.0, skip_frames=1, all_poses=None):
+    """Serialize landmarks using JSON (fallback)
+    
+    Args:
+        landmarks: Primary pose landmarks (for backward compatibility)
+        all_poses: List of (pose_id, landmarks) tuples for multi-pose support
+    """
     payload = {
         "timestamp": timestamp,
         "capture_ms": capture_ms,
@@ -338,8 +359,25 @@ def serialize_landmarks_json(landmarks, timestamp, capture_ms=0.0, inference_ms=
         "frame_count": frame_count,
         "processing_fps": processing_fps,
         "skip_frames": skip_frames,
-        "landmarks": landmarks
+        "landmarks": landmarks,  # Primary pose (backward compat)
+        "num_poses": len(all_poses) if all_poses else (1 if landmarks else 0),
+        "poses": []
     }
+    
+    # Add all poses
+    if all_poses:
+        for pose_id, pose_landmarks in all_poses:
+            payload["poses"].append({
+                "pose_id": pose_id,
+                "landmarks": pose_landmarks
+            })
+    elif landmarks:
+        # Single pose mode
+        payload["poses"].append({
+            "pose_id": 0,
+            "landmarks": landmarks
+        })
+    
     return json.dumps(payload).encode()
 
 def main():
@@ -424,6 +462,7 @@ def main():
     print(f"MediaPipe started - Camera: {args.camera}, UDP: {args.host}:{args.port}")
     print(f"Resolution: {args.width}x{args.height}, Model: {args.model_complexity}, "
           f"Detection: {args.detection_confidence}, Tracking: {args.tracking_confidence}")
+    print(f"Multi-pose: 2 people max (Player 1 = Green, Player 2 = Magenta)")
     print(f"Binary protocol: {args.binary_protocol}")
     print(f"UDP buffer size: {args.udp_buffer_size} bytes")
     print(f"Frame skipping: {skip_frames} (capture: {args.max_fps}fps → process: {processing_fps:.1f}fps)")
@@ -496,21 +535,27 @@ def main():
         detection_result = detector.detect_for_video(mp_image, timestamp_ms)
         inference_time = (time.time() - inference_start) * 1000  # ms
         
-        # Extract landmarks
-        landmarks = []
+        # Extract landmarks for all detected poses
+        all_landmarks = []  # List of (pose_id, landmarks) tuples
+        num_poses_detected = 0
         if detection_result.pose_landmarks:
-            # pose_landmarks is a list of lists - get the first pose
-            pose_landmarks = detection_result.pose_landmarks[0]
-            for idx, landmark in enumerate(pose_landmarks):
-                landmarks.append({
-                    "id": idx,
-                    "x": landmark.x,
-                    "y": landmark.y,
-                    "z": landmark.z,
-                    "v": landmark.visibility if hasattr(landmark, 'visibility') else 1.0
-                })
+            num_poses_detected = len(detection_result.pose_landmarks)
+            for pose_idx, pose_landmarks in enumerate(detection_result.pose_landmarks):
+                pose_landmarks_list = []
+                for idx, landmark in enumerate(pose_landmarks):
+                    pose_landmarks_list.append({
+                        "id": idx,
+                        "x": landmark.x,
+                        "y": landmark.y,
+                        "z": landmark.z,
+                        "v": landmark.visibility if hasattr(landmark, 'visibility') else 1.0
+                    })
+                all_landmarks.append((pose_idx, pose_landmarks_list))
         
-        # Apply One-Euro filtering
+        # For now, use first pose for UDP (Godot side needs update for multi-pose)
+        landmarks = all_landmarks[0][1] if all_landmarks else []
+        
+        # Apply One-Euro filtering (only to first pose for now)
         filter_start = time.time()
         if filter_bank and landmarks:
             timestamp = time.time()
@@ -523,6 +568,7 @@ def main():
         
         try:
             if args.binary_protocol and not args.json_protocol:
+                # Binary mode: for now just send primary pose (multi-pose binary needs protocol update)
                 packet = serialize_landmarks_binary(
                     landmarks, timestamp, capture_time, inference_time, 
                     filter_time, 0.0, latency_tracker.frame_count, 
@@ -530,10 +576,11 @@ def main():
                 )
                 packet = b'\x01' + packet  # Binary marker
             else:
+                # JSON mode: send all poses
                 packet = serialize_landmarks_json(
                     landmarks, timestamp, capture_time, inference_time,
                     filter_time, 0.0, latency_tracker.frame_count, 
-                    processing_fps, skip_frames
+                    processing_fps, skip_frames, all_landmarks
                 )
                 packet = b'\x00' + packet  # JSON marker
             
@@ -550,12 +597,22 @@ def main():
         
         # Show debug window with landmarks
         if args.show_window:
-            display_frame = draw_landmarks_on_frame(frame, landmarks)
+            display_frame = frame.copy()
             
-            # Add FPS and landmark count overlay
-            status_text = f"Landmarks: {len(landmarks)} | Press 'q' to quit"
+            # Draw all detected poses
+            for pose_id, pose_landmarks in all_landmarks:
+                display_frame = draw_landmarks_on_frame(display_frame, pose_landmarks, pose_id=pose_id)
+            
+            # Add FPS and pose count overlay
+            total_landmarks = sum(len(lm) for _, lm in all_landmarks)
+            status_text = f"Poses: {num_poses_detected} | Total Landmarks: {total_landmarks} | Press 'q' to quit"
             cv2.putText(display_frame, status_text, (10, 30),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+            
+            # Add inference time
+            time_text = f"Inference: {inference_time:.1f}ms"
+            cv2.putText(display_frame, time_text, (10, 60),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
             
             cv2.imshow("MediaPipe Pose", display_frame)
             if cv2.waitKey(1) & 0xFF == ord('q'):
