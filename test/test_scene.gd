@@ -89,8 +89,22 @@ func _on_server_started(pid: int) -> void:
 	_start_camera_feed()
 
 func _on_server_failed(error: String) -> void:
-	update_status("Server failed: " + error, Color.RED)
-	info_label.text = "Error: " + error + "\n\nPlease check:\n1. Python 3 is installed\n2. Camera is connected"
+	update_status("Auto-start failed: " + error, Color.RED)
+	info_label.text = """Auto-start failed!
+
+You can start Python manually:
+
+1. Open terminal
+2. Run:
+cd /home/derrick/.openclaw/workspace/addons/aerobeat-input-mediapipe
+python3 python_mediapipe/main.py --camera 0 --show-window
+
+3. Press F5 in Godot to restart this scene
+
+Or check:
+- Python 3 is installed
+- Camera is connected
+- No firewall blocking ports 4242/4243"""
 
 func _on_server_stopped() -> void:
 	update_status("Server stopped", Color.ORANGE)
