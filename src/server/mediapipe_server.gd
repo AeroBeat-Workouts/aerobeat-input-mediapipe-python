@@ -50,18 +50,18 @@ func _process(_delta: float) -> void:
     if not _is_running:
         return
     
-    # Check if there's data available
-    if _udp.get_available_bytes() <= 0:
-        return
-    
     # Drain all pending packets, keep only the newest
+    # Godot 4: just keep calling get_packet() until it returns empty
     var latest_packet: PackedByteArray
+    var max_packets = 10  # Safety limit to prevent infinite loops
+    var packets_read = 0
     
-    while _udp.get_available_bytes() > 0:
+    while packets_read < max_packets:
         var packet = _udp.get_packet()
         if packet.is_empty():
             break
         latest_packet = packet
+        packets_read += 1
     
     if latest_packet.is_empty():
         return
