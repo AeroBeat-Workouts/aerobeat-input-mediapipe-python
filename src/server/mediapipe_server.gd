@@ -65,6 +65,7 @@ func _process(_delta: float) -> void:
         return
     
     # Packet received successfully - parse it
+    print("[MediaPipeServer] Received packet of ", latest_packet.size(), " bytes")
     _parse_packet(latest_packet)
 
 func _parse_packet(packet: PackedByteArray) -> void:
@@ -77,6 +78,7 @@ func _parse_packet(packet: PackedByteArray) -> void:
     
     if marker == 0x00:
         # JSON protocol
+        print("[MediaPipeServer] Parsing JSON packet...")
         _parse_json_packet(data_bytes)
     elif marker == 0x01:
         # Binary protocol (legacy single-pose)
@@ -97,15 +99,20 @@ func _parse_json_packet(data_bytes: PackedByteArray) -> void:
         parse_error.emit("Expected JSON object, got: " + str(typeof(data)))
         return
     
+    # Debug: Show what keys we received
+    print("[MediaPipeServer] JSON keys: ", data.keys())
+    
     # Check for multi-pose data
     if data.has("poses"):
         var poses = data["poses"]
+        print("[MediaPipeServer] Poses count: ", poses.size() if poses is Array else 0)
         if poses is Array:
             multi_pose_received.emit(poses)
             
             # Also emit primary pose for backward compatibility
             if poses.size() > 0 and poses[0] is Dictionary and poses[0].has("landmarks"):
                 var landmarks = poses[0]["landmarks"]
+                print("[MediaPipeServer] Primary landmarks: ", landmarks.size() if landmarks is Array else 0)
                 landmarks_received.emit(landmarks)
             return
     
@@ -119,6 +126,7 @@ func _parse_json_packet(data_bytes: PackedByteArray) -> void:
         parse_error.emit("'landmarks' should be an array")
         return
     
+    print("[MediaPipeServer] Legacy landmarks: ", landmarks.size())
     landmarks_received.emit(landmarks)
 
 func _parse_binary_packet(data_bytes: PackedByteArray) -> void:

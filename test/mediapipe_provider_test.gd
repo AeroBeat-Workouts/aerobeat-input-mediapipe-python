@@ -108,12 +108,14 @@ func is_tracking() -> bool:
     return is_currently_tracking
 
 func _on_landmarks_received(landmarks: Array):
+    print("[MediaPipeProviderTest] Received ", landmarks.size(), " landmarks")
     _landmarks.clear()
     for lm in landmarks:
         if lm.has("v") and lm.v > config.min_visibility:
             _landmarks[lm.id] = lm
     
     _last_update_time = Time.get_time_dict_from_system()["second"]
+    print("[MediaPipeProviderTest] After filtering: ", _landmarks.size(), " landmarks (min_visibility=", config.min_visibility, ")")
     pose_updated.emit(landmarks)
 
 func _notification(what: int) -> void:
