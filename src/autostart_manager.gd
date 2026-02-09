@@ -214,87 +214,94 @@ func _finish_install_check() -> void:
 		emit_signal("installation_complete", false)
 		emit_signal("server_failed", "Installation completed but MediaPipe still not available")
 
-## Start the MediaPipe server with proper arguments
-func _start_server() -> bool:
-	# This is now a coroutine due to await calls
-	python_path = _find_python()
+## Start the MediaPipe server (detached mode to avoid stdout blocking)
+func _start_detached_server() -> int:
+	"""Start server detached from Godot's stdout/stderr to prevent pipe blocking."""
+	var python = _find_python()
+	var script = _find_script()
 	
-	# Script is in workspace, venv is in repo (to avoid sandbox issues)
+	# Build arguments
+	var args = PackedStringArray()
+	args.append("/bin/bash")
+	args.append("-c")
+	# Redirect ALL output to files to prevent blocking
+	var bash_cmd = python + " " + script + " " + _build_args_string() + " > /tmp/aerobeat_server.log 2>&1 &"
+	bash_cmd += "; echo $!"  # Print PID
+	args.append(bash_cmd)
+	
+	print("AutoStartManager: Starting detached server...")
+	print("AutoStartManager: Command: bash -c '" + bash_cmd + "'")
+	
+	var output = []
+	var result = OS.execute("/bin/bash", args, output, true)
+	
+	if result == OK and output.size() > 0:
+		var pid = int(output[0].strip_edges())
+		print("AutoStartManager: Detached server started with PID: " + str(pid))
+		return pid
+	else:
+		print("AutoStartManager: Failed to start detached server: " + str(result))
+		return -1
+
+## Start the MediaPipe server with proper arguments
+func _find_script() -> String:
+	# Try multiple possible script locations
 	var possible_paths = [
 		"/home/derrick/.openclaw/workspace/addons/aerobeat-input-mediapipe/python_mediapipe/main.py"
 	]
 	
-	var server_script = ""
 	for path in possible_paths:
 		print("AutoStartManager: Checking for script at: " + path)
 		if FileAccess.file_exists(path):
-			server_script = path
 			print("AutoStartManager: Found script at: " + path)
-			break
+			return path
 	
-	if server_script == "":
-		emit_signal("server_failed", "Server script not found in any location")
-		return false
-	
-	# Build argument list
-	var args = [
-		server_script,
-		"--camera", "0",
-		"--port", str(server_port),
-		"--model-complexity", str(model_complexity),
-		"--preprocess-size", str(preprocess_size),
-	]
+	push_error("AutoStartManager: Script not found")
+	return ""
+
+func _build_args_string() -> String:
+	var arg_str = "--camera 0 "
+	arg_str += "--port " + str(server_port) + " "
+	arg_str += "--model-complexity " + str(model_complexity) + " "
+	arg_str += "--preprocess-size " + str(preprocess_size) + " "
 	
 	if use_camera_stream:
-		args.append("--stream-camera")
-		args.append("--stream-port")
-		args.append(str(stream_port))
+		arg_str += "--stream-camera --stream-port " + str(stream_port) + " "
 	
 	if no_filter:
-		args.append("--no-filter")
+		arg_str += "--no-filter"
 	
-	print("AutoStartManager: Starting server with args: ", args)
-	print("AutoStartManager: Using Python: " + python_path)
-	print("AutoStartManager: Using script: " + server_script)
+	return arg_str
+
+func _start_server() -> bool:
+	# Try detached mode first (prevents stdout pipe blocking)
+	print("AutoStartManager: Attempting detached server start...")
+	var detached_pid = _start_detached_server()
 	
-	# Check if Python exists
-	if not FileAccess.file_exists(python_path):
-		print("AutoStartManager: ERROR - Python not found at: " + python_path)
-		emit_signal("server_failed", "Python not found at: " + python_path)
-		return false
-	
-	# Try OS.create_process first (more reliable for spawning)
-	print("AutoStartManager: Calling OS.create_process...")
-	var pid = OS.create_process(python_path, args)
-	print("AutoStartManager: create_process returned PID: " + str(pid))
-	
-	# Fall back to OS.execute if create_process fails
-	if pid <= 0:
-		print("AutoStartManager: create_process failed (returned " + str(pid) + "), trying execute...")
-		pid = OS.execute(python_path, args, [], false)
-		print("AutoStartManager: execute returned PID: " + str(pid))
-	
-	# Validate PID - must be > 1 (PID 1 is init, would crash system if killed)
-	if pid > 1:
-		server_pid = pid
+	if detached_pid > 0:
+		server_pid = detached_pid
 		_is_running = true
-		emit_signal("server_started", pid)
-		print("AutoStartManager: Server started with PID: ", pid)
+		emit_signal("server_started", detached_pid)
+		print("AutoStartManager: Detached server started with PID: ", detached_pid)
 		
-		# Verify process started by checking if it's still alive after a moment
-		await get_tree().create_timer(1.0).timeout
-		if not is_server_running():
-			print("AutoStartManager: WARNING - Process started but exited immediately")
+		# Wait briefly then verify it's still running
+		await get_tree().create_timer(2.0).timeout
+		if is_server_running():
+			print("AutoStartManager: Server confirmed running")
+			return true
+		else:
+			print("AutoStartManager: Detached server exited, trying to read log...")
+			var log_output = []
+			OS.execute("cat", ["/tmp/aerobeat_server.log"], log_output)
+			if log_output.size() > 0:
+				print("AutoStartManager: Server log:\n" + log_output[0])
 			server_pid = -1
 			_is_running = false
-			emit_signal("server_failed", "Server process exited immediately - check Python script")
+			emit_signal("server_failed", "Server exited - check /tmp/aerobeat_server.log")
 			return false
-		
-		return true
-	else:
-		print("AutoStartManager: Failed to start server, got PID: ", pid)
-		emit_signal("server_failed", "Failed to start server (PID: %d). Check Python is installed and script exists." % pid)
-		return false
+	
+	emit_signal("server_failed", "Failed to start detached server")
+	return false
 
 ## Helper to emit progress
 func _emit_progress(percentage: int, message: String) -> void:
