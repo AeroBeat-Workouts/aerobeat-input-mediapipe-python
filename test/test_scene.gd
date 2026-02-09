@@ -39,10 +39,18 @@ func _create_black_background():
 	print("[TestScene] Display background created")
 
 func _setup_auto_start():
-	# Create AutoStartManager
-	var AutoStartManager = load("res://src/autostart_manager.gd")
-	auto_start_manager = AutoStartManager.new()
-	auto_start_manager.name = "AutoStartManager"
+	# Check if AutoStartManager already exists in scene
+	auto_start_manager = get_node_or_null("AutoStartManager")
+	
+	if auto_start_manager == null:
+		# Create AutoStartManager if not found
+		var AutoStartManager = load("res://src/autostart_manager.gd")
+		auto_start_manager = AutoStartManager.new()
+		auto_start_manager.name = "AutoStartManager"
+		add_child(auto_start_manager)
+		print("[TestScene] Created AutoStartManager")
+	else:
+		print("[TestScene] Found existing AutoStartManager")
 	
 	# Connect signals
 	auto_start_manager.server_started.connect(_on_server_started)
@@ -53,8 +61,6 @@ func _setup_auto_start():
 	auto_start_manager.check_progress.connect(_on_check_progress)
 	auto_start_manager.installation_progress.connect(_on_install_progress)
 	auto_start_manager.installation_complete.connect(_on_install_complete)
-	
-	add_child(auto_start_manager)
 	
 	# Start server
 	auto_start_manager.start_server()

@@ -1,12 +1,13 @@
-[gd_scene load_steps=4 format=3 uid="uid://c0wvu1t7h6xqr"]
+[gd_scene format=3 uid="uid://c0wvu1t7h6xqr"]
 
-[ext_resource type="Script" path="res://test/test_scene.gd" id="1_3x72q"]
-[ext_resource type="Script" path="res://test/landmark_drawer.gd" id="2_landmark"]
+[ext_resource type="Script" uid="uid://hc8k3q61kd6s" path="res://test/test_scene.gd" id="1_3x72q"]
+[ext_resource type="Script" uid="uid://b7yrfwv07ycys" path="res://test/landmark_drawer.gd" id="2_landmark"]
+[ext_resource type="Script" uid="uid://cntshlv75amau" path="res://src/autostart_manager.gd" id="3_56kpk"]
 
-[node name="TestScene" type="Node2D"]
+[node name="TestScene" type="Node2D" unique_id=948834556]
 script = ExtResource("1_3x72q")
 
-[node name="StatusLabel" type="Label" parent="."]
+[node name="StatusLabel" type="Label" parent="." unique_id=1013912889]
 offset_left = 20.0
 offset_top = 20.0
 offset_right = 620.0
@@ -14,14 +15,14 @@ offset_bottom = 60.0
 theme_override_font_sizes/font_size = 24
 text = "Initializing..."
 
-[node name="InfoLabel" type="Label" parent="."]
+[node name="InfoLabel" type="Label" parent="." unique_id=859282152]
 offset_left = 20.0
 offset_top = 560.0
 offset_right = 400.0
 offset_bottom = 700.0
 theme_override_font_sizes/font_size = 14
 
-[node name="CameraDisplay" type="TextureRect" parent="."]
+[node name="CameraDisplay" type="TextureRect" parent="." unique_id=1244279974]
 offset_left = 20.0
 offset_top = 80.0
 offset_right = 660.0
@@ -29,7 +30,7 @@ offset_bottom = 520.0
 expand_mode = 1
 stretch_mode = 5
 
-[node name="LandmarkDrawer" type="Control" parent="CameraDisplay"]
+[node name="LandmarkDrawer" type="Control" parent="CameraDisplay" unique_id=49152154]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -37,3 +38,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("2_landmark")
+
+[node name="AutoStartManager" type="Node" parent="." unique_id=643202539]
+script = ExtResource("3_56kpk")
+metadata/_custom_type_script = "uid://cntshlv75amau"
