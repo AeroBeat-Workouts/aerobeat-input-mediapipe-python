@@ -14,34 +14,13 @@ var _installing: bool = false
 
 func _ready():
 	update_status("Initializing...", Color.WHITE)
-	info_label.text = "Waiting for AutoStartManager..."
+	info_label.text = "Starting MediaPipe provider..."
 	
 	# Create black background for landmark display
 	_create_black_background()
 	
-	# Connect to autostart manager signals if available
-	var auto_start = get_node_or_null("AutoStartManager")
-	if auto_start:
-		auto_start.server_started.connect(_on_server_started)
-		auto_start.server_failed.connect(_on_server_failed)
-		auto_start.server_stopped.connect(_on_server_stopped)
-		auto_start.python_not_found.connect(_on_python_not_found)
-		auto_start.mediapipe_not_found.connect(_on_mediapipe_not_found)
-		auto_start.check_progress.connect(_on_check_progress)
-		auto_start.installation_progress.connect(_on_install_progress)
-		auto_start.installation_complete.connect(_on_install_complete)
-		
-		# Check current status
-		if auto_start.is_server_running():
-			_on_server_started(auto_start.get_server_pid())
-		elif auto_start.is_installing:
-			_installing = true
-			update_status("Installation in progress...", Color.YELLOW)
-		else:
-			update_status("Waiting for dependencies...", Color.YELLOW)
-	else:
-		update_status("AutoStartManager not found - starting manually", Color.ORANGE)
-		_start_provider()
+	# Start provider directly (manual mode - no AutoStartManager)
+	_start_provider()
 
 func _create_black_background():
 	"""Create a black background texture for landmark display."""

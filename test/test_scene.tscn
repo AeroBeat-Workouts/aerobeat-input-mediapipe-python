@@ -1,8 +1,7 @@
 [gd_scene load_steps=4 format=3 uid="uid://c0wvu1t7h6xqr"]
 
 [ext_resource type="Script" path="res://test/test_scene.gd" id="1_3x72q"]
-[ext_resource type="Script" path="res://src/autostart_manager.gd" id="2_autostart"]
-[ext_resource type="Script" path="res://test/landmark_drawer.gd" id="3_landmark"]
+[ext_resource type="Script" path="res://test/landmark_drawer.gd" id="2_landmark"]
 
 [node name="TestScene" type="Node2D"]
 script = ExtResource("1_3x72q")
@@ -37,4 +36,4 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-script = ExtResource("3_landmark")
+script = ExtResource("2_landmark")
