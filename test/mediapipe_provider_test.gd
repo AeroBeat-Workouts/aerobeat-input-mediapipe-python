@@ -44,6 +44,8 @@ func _ready():
     
     _server.config = config
     _server.landmarks_received.connect(_on_landmarks_received)
+    
+    print("[MediaPipeProviderTest] Ready on port %d" % config.udp_port)
 
 func start() -> bool:
     return _server.start()
