@@ -15,7 +15,6 @@ signal parse_error(error: String)
 
 var _udp := PacketPeerUDP.new()
 var _is_running := false
-var _frame_count: int = 0
 
 func start() -> bool:
     var port = config.udp_port if config else 4242
@@ -51,8 +50,6 @@ func _process(_delta: float) -> void:
     if not _is_running:
         return
     
-    _frame_count += 1
-    
     # Godot 4 UDP: just try to get packets
     var latest_packet: PackedByteArray
     var packet_count = 0
@@ -65,12 +62,9 @@ func _process(_delta: float) -> void:
         packet_count += 1
     
     if latest_packet.is_empty():
-        # Log every 60 frames that we're polling but no data
-        if _frame_count % 60 == 0:
-            print("[MediaPipeServer] Polling... no data (frame ", _frame_count, ")")
         return
     
-    print("[MediaPipeServer] Received ", packet_count, " packets, latest size: ", latest_packet.size())
+    # Packet received successfully - parse it
     _parse_packet(latest_packet)
 
 func _parse_packet(packet: PackedByteArray) -> void:
@@ -81,18 +75,13 @@ func _parse_packet(packet: PackedByteArray) -> void:
     var marker = packet[0]
     var data_bytes = packet.slice(1)
     
-    print("[MediaPipeServer] Packet marker: ", marker, " (0x00=JSON, 0x01=Binary)")
-    
     if marker == 0x00:
         # JSON protocol
-        print("[MediaPipeServer] Parsing as JSON...")
         _parse_json_packet(data_bytes)
     elif marker == 0x01:
         # Binary protocol (legacy single-pose)
-        print("[MediaPipeServer] Parsing as Binary...")
         _parse_binary_packet(data_bytes)
     else:
-        print("[MediaPipeServer] Unknown marker: ", marker)
         parse_error.emit("Unknown protocol marker: %d" % marker)
 
 func _parse_json_packet(data_bytes: PackedByteArray) -> void:
@@ -108,20 +97,15 @@ func _parse_json_packet(data_bytes: PackedByteArray) -> void:
         parse_error.emit("Expected JSON object, got: " + str(typeof(data)))
         return
     
-    # Debug: Print what we received
-    print("[MediaPipeServer] Received packet with keys: ", data.keys())
-    
     # Check for multi-pose data
     if data.has("poses"):
         var poses = data["poses"]
-        print("[MediaPipeServer] Poses count: ", poses.size() if poses is Array else "not array")
         if poses is Array:
             multi_pose_received.emit(poses)
             
             # Also emit primary pose for backward compatibility
             if poses.size() > 0 and poses[0] is Dictionary and poses[0].has("landmarks"):
                 var landmarks = poses[0]["landmarks"]
-                print("[MediaPipeServer] Primary pose landmarks: ", landmarks.size() if landmarks is Array else 0)
                 landmarks_received.emit(landmarks)
             return
     
@@ -135,7 +119,6 @@ func _parse_json_packet(data_bytes: PackedByteArray) -> void:
         parse_error.emit("'landmarks' should be an array")
         return
     
-    print("[MediaPipeServer] Legacy landmarks count: ", landmarks.size())
     landmarks_received.emit(landmarks)
 
 func _parse_binary_packet(data_bytes: PackedByteArray) -> void:
