@@ -44,12 +44,6 @@ signal camera_view_toggled(enabled: bool)
 @export var overlay_color: Color = Color(0, 1, 0, 0.8)
 @export var camera_toggle_key: Key = KEY_TAB
 
-## Tracking mode enum
-enum TrackingMode {
-	MODE_2D,
-	MODE_3D
-}
-
 ## References (created dynamically)
 var _provider: MediaPipeProvider
 var _camera_view: MediaPipeCameraView
@@ -127,22 +121,22 @@ func is_camera_visible() -> bool:
 
 ## Position Getters (delegate to provider)
 
-func get_left_hand_position(mode: TrackingMode = TrackingMode.MODE_2D) -> Variant:
+func get_left_hand_position(mode: int = 0) -> Variant:
 	return _provider.get_left_hand_position(mode) if _provider else null
 
-func get_right_hand_position(mode: TrackingMode = TrackingMode.MODE_2D) -> Variant:
+func get_right_hand_position(mode: int = 0) -> Variant:
 	return _provider.get_right_hand_position(mode) if _provider else null
 
-func get_head_position(mode: TrackingMode = TrackingMode.MODE_2D) -> Variant:
+func get_head_position(mode: int = 0) -> Variant:
 	return _provider.get_head_position(mode) if _provider else null
 
-func get_left_foot_position(mode: TrackingMode = TrackingMode.MODE_2D) -> Variant:
+func get_left_foot_position(mode: int = 0) -> Variant:
 	return _provider.get_left_foot_position(mode) if _provider else null
 
-func get_right_foot_position(mode: TrackingMode = TrackingMode.MODE_2D) -> Variant:
+func get_right_foot_position(mode: int = 0) -> Variant:
 	return _provider.get_right_foot_position(mode) if _provider else null
 
-func get_landmark_position(landmark_id: int, mode: TrackingMode = TrackingMode.MODE_2D) -> Variant:
+func get_landmark_position(landmark_id: int, mode: int = 0) -> Variant:
 	return _provider._get_landmark_position(landmark_id, mode) if _provider else null
 
 ## Internal Methods
