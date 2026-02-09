@@ -255,14 +255,25 @@ func _start_server() -> bool:
 		args.append("--no-filter")
 	
 	print("AutoStartManager: Starting server with args: ", args)
+	print("AutoStartManager: Using Python: " + python_path)
+	print("AutoStartManager: Using script: " + server_script)
+	
+	# Check if Python exists
+	if not FileAccess.file_exists(python_path):
+		print("AutoStartManager: ERROR - Python not found at: " + python_path)
+		emit_signal("server_failed", "Python not found at: " + python_path)
+		return false
 	
 	# Try OS.create_process first (more reliable for spawning)
+	print("AutoStartManager: Calling OS.create_process...")
 	var pid = OS.create_process(python_path, args)
+	print("AutoStartManager: create_process returned PID: " + str(pid))
 	
 	# Fall back to OS.execute if create_process fails
 	if pid <= 0:
-		print("AutoStartManager: create_process failed, trying execute...")
+		print("AutoStartManager: create_process failed (returned " + str(pid) + "), trying execute...")
 		pid = OS.execute(python_path, args, [], false)
+		print("AutoStartManager: execute returned PID: " + str(pid))
 	
 	# Validate PID - must be > 1 (PID 1 is init, would crash system if killed)
 	if pid > 1:
