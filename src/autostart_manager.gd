@@ -236,7 +236,13 @@ func _start_server() -> bool:
 	
 	print("AutoStartManager: Starting server with args: ", args)
 	
-	var pid = OS.execute(python_path, args, [], false)
+	# Try OS.create_process first (more reliable for spawning)
+	var pid = OS.create_process(python_path, args)
+	
+	# Fall back to OS.execute if create_process fails
+	if pid <= 0:
+		print("AutoStartManager: create_process failed, trying execute...")
+		pid = OS.execute(python_path, args, [], false)
 	
 	# Validate PID - must be > 1 (PID 1 is init, would crash system if killed)
 	if pid > 1:
@@ -251,13 +257,13 @@ func _start_server() -> bool:
 			print("AutoStartManager: WARNING - Process started but exited immediately")
 			server_pid = -1
 			_is_running = false
-			emit_signal("server_failed", "Server process exited immediately")
+			emit_signal("server_failed", "Server process exited immediately - check Python script")
 			return false
 		
 		return true
 	else:
 		print("AutoStartManager: Failed to start server, got PID: ", pid)
-		emit_signal("server_failed", "Failed to start server process (PID: %d)" % pid)
+		emit_signal("server_failed", "Failed to start server (PID: %d). Check Python is installed and script exists." % pid)
 		return false
 
 ## Helper to emit progress
