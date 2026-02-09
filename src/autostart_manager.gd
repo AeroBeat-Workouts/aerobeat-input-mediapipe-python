@@ -71,7 +71,8 @@ func is_server_running() -> bool:
 func start_server() -> bool:
 	if _is_running:
 		return true
-	return _check_and_start()
+	var result = await _check_and_start()
+	return result
 
 ## Stop the server
 func stop_server() -> void:
@@ -106,7 +107,8 @@ func _check_and_start() -> bool:
 		return false  # Will restart after install
 	
 	# All good, start server
-	return _start_server()
+	var result = await _start_server()
+	return result
 
 ## Check if Python is available
 func check_python_installed() -> bool:
@@ -202,13 +204,14 @@ func _finish_install_check() -> void:
 	if check_mediapipe_installed():
 		emit_signal("installation_complete", true)
 		print("AutoStartManager: Dependencies installed successfully")
-		_start_server()
+		await _start_server()
 	else:
 		emit_signal("installation_complete", false)
 		emit_signal("server_failed", "Installation completed but MediaPipe still not available")
 
 ## Start the MediaPipe server with proper arguments
 func _start_server() -> bool:
+	# This is now a coroutine due to await calls
 	python_path = _find_python()
 	
 	var server_script = ProjectSettings.globalize_path("res://python_mediapipe/main.py")
