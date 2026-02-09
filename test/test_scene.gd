@@ -82,14 +82,17 @@ func _on_install_complete(success: bool) -> void:
 		update_status("Installation failed!", Color.RED)
 		info_label.text = "Failed to install dependencies.\nCheck the console for errors."
 
-func _on_server_started(pid: int) -> void:
+func _on_server_started(pid: int):
 	update_status("Python server started (PID: " + str(pid) + ")", Color.GREEN)
 	print("[TestScene] Server started with PID: ", pid)
 	
 	# Wait a moment for server to initialize
 	await get_tree().create_timer(2.0).timeout
+	print("[TestScene] Timer completed, starting provider...")
 	_start_provider()
+	print("[TestScene] Provider started, starting camera feed...")
 	_start_camera_feed()
+	print("[TestScene] Camera feed started")
 
 func _on_server_failed(error: String) -> void:
 	update_status("Auto-start failed: " + error, Color.RED)
