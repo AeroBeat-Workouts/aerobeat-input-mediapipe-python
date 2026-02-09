@@ -37,21 +37,21 @@ func _ready():
 	if auto_start:
 		_check_and_start()
 
-## Find Python - prefer system, fallback to venv in project
+## Find Python - prefer project venv, fallback to system
 func _find_python() -> String:
-	# Check for system python3 first (more reliable)
+	# Prefer project venv if it exists (we may have installed MediaPipe there)
+	var venv_python = ProjectSettings.globalize_path("res://venv/bin/python")
+	if FileAccess.file_exists(venv_python):
+		print("AutoStartManager: Found venv Python: " + venv_python)
+		return venv_python
+	
+	# Check for system python3
 	var output: Array = []
 	var exit_code = OS.execute("which", ["python3"], output, true)
 	if exit_code == 0 and output.size() > 0:
 		var system_python = output[0].strip_edges()
 		print("AutoStartManager: Found system Python: " + system_python)
 		return system_python
-	
-	# Fallback to venv in project
-	var venv_python = ProjectSettings.globalize_path("res://venv/bin/python")
-	if FileAccess.file_exists(venv_python):
-		print("AutoStartManager: Found venv Python: " + venv_python)
-		return venv_python
 	
 	print("AutoStartManager: Falling back to 'python3'")
 	return "python3"
