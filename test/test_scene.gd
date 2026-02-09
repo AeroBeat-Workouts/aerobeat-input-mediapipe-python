@@ -62,8 +62,8 @@ func _setup_auto_start():
 	auto_start_manager.installation_progress.connect(_on_install_progress)
 	auto_start_manager.installation_complete.connect(_on_install_complete)
 	
-	# Start server
-	auto_start_manager.start_server()
+	# Start server (async)
+	await auto_start_manager.start_server()
 
 func _on_check_progress(percentage: int, message: String) -> void:
 	update_status(str(percentage) + "% - " + message, Color.YELLOW)
