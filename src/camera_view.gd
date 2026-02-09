@@ -94,18 +94,31 @@ func toggle_camera_view() -> void:
 	else:
 		start_stream()
 
-func start_stream() -> bool:
+func start_stream():
 	"""Start receiving MJPEG stream from Python sidecar"""
 	if _is_streaming:
 		return true
+	
+	print("[CameraView] Starting stream...")
+	print("[CameraView] Stream URL: " + stream_url)
 	
 	# Initialize HTTP client
 	_http_client = HTTPClient.new()
 	_http_client.set_blocking_mode(false)
 	
-	var err = _http_client.connect_to_host(stream_url.split("://")[1].split("/")[0], 4243)
+	# Parse host and port from URL
+	var host = stream_url.split("://")[1].split("/")[0]
+	var port = 4243
+	if host.find(":") != -1:
+		port = host.split(":")[1].to_int()
+		host = host.split(":")[0]
+	
+	print("[CameraView] Connecting to " + host + ":" + str(port))
+	
+	var err = _http_client.connect_to_host(host, port)
 	if err != OK:
-		push_error("Failed to connect to camera stream: %d" % err)
+		push_error("Failed to connect to camera stream: " + str(err))
+		print("[CameraView] Connection error: " + str(err))
 		return false
 	
 	# Wait for connection
@@ -113,22 +126,22 @@ func start_stream() -> bool:
 	while _http_client.get_status() == HTTPClient.STATUS_CONNECTING:
 		_http_client.poll()
 		timeout += get_process_delta_time()
-		if timeout > 2.0:
+		if timeout > 3.0:
 			push_error("Connection timeout")
+			print("[CameraView] Connection timeout after 3 seconds")
 			return false
 		await get_tree().process_frame
 	
 	if _http_client.get_status() != HTTPClient.STATUS_CONNECTED:
-		push_error("Failed to connect to stream server")
+		push_error("Failed to connect to stream server, status: " + str(_http_client.get_status()))
+		print("[CameraView] Connection failed, status: " + str(_http_client.get_status()))
 		return false
 	
-	# Request the stream
-	var request = "GET /camera HTTP/1.1\r\n"
-	request += "Host: %s\r\n" % stream_url.split("://")[1].split("/")[0]
-	request += "Accept: multipart/x-mixed-replace\r\n"
-	request += "Connection: keep-alive\r\n\r\n"
+	print("[CameraView] Connected to stream server")
 	
-	_http_client.request(HTTPClient.METHOD_GET, "/camera", ["Accept: multipart/x-mixed-replace", "Connection: keep-alive"])
+	# Request the stream
+	_http_client.request(HTTPClient.METHOD_GET, "/camera", ["Accept: multipart/x-mixed-replace", "Connection: keep-alive", "Cache-Control: no-cache"])
+	print("[CameraView] HTTP request sent")
 	
 	# Start streaming thread
 	_is_streaming = true
@@ -138,7 +151,7 @@ func start_stream() -> bool:
 	
 	visible = true
 	stream_started.emit()
-	print("[CameraView] Stream started: %s" % stream_url)
+	print("[CameraView] Stream started successfully")
 	return true
 
 func stop_stream() -> void:
@@ -178,6 +191,10 @@ func get_stream_url() -> String:
 
 func _stream_loop():
 	"""Background thread for receiving MJPEG stream"""
+	print("[CameraView] Stream thread started")
+	var frame_count = 0
+	var last_log_time = Time.get_ticks_msec()
+	
 	while _thread_running:
 		if _http_client:
 			_http_client.poll()
@@ -200,8 +217,16 @@ func _stream_loop():
 				print("[CameraView] Connection lost, reconnecting...")
 				_http_client.connect_to_host(stream_url.split("://")[1].split("/")[0], 4243)
 		
+		# Log frame reception every 5 seconds
+		var current_time = Time.get_ticks_msec()
+		if current_time - last_log_time > 5000:
+			print("[CameraView] Stream thread alive, buffer size: " + str(_mjpeg_buffer.size()))
+			last_log_time = current_time
+		
 		# Small delay to prevent busy-waiting
 		OS.delay_msec(5)
+	
+	print("[CameraView] Stream thread ended")
 
 func _parse_mjpeg_buffer():
 	"""Parse MJPEG buffer and extract JPEG frames"""
@@ -258,6 +283,9 @@ func _parse_mjpeg_buffer():
 				_current_frame = image
 				_frame_mutex.unlock()
 				frame_received.emit()
+				print("[CameraView] Frame decoded, size: " + str(image.get_width()) + "x" + str(image.get_height()))
+			else:
+				print("[CameraView] JPEG decode error: " + str(err))
 	
 	# Remove processed data from buffer
 	_mjpeg_buffer = _mjpeg_buffer.slice(next_boundary_pos)
