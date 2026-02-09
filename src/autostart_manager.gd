@@ -219,9 +219,8 @@ func _start_server() -> bool:
 	# This is now a coroutine due to await calls
 	python_path = _find_python()
 	
-	# Use repo path (not workspace - sandbox/permission issues)
+	# Script is in workspace, venv is in repo (to avoid sandbox issues)
 	var possible_paths = [
-		"/home/derrick/Github/AeroBeat/aerobeat-input-mediapipe-python/.testbed/python_mediapipe/main.py",
 		"/home/derrick/.openclaw/workspace/addons/aerobeat-input-mediapipe/python_mediapipe/main.py"
 	]
 	
