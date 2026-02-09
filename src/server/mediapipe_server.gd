@@ -15,6 +15,7 @@ signal parse_error(error: String)
 
 var _udp := PacketPeerUDP.new()
 var _is_running := false
+var _frame_count: int = 0
 
 func start() -> bool:
     var port = config.udp_port if config else 4242
@@ -50,22 +51,26 @@ func _process(_delta: float) -> void:
     if not _is_running:
         return
     
-    # Drain all pending packets, keep only the newest
-    # Godot 4: just keep calling get_packet() until it returns empty
-    var latest_packet: PackedByteArray
-    var max_packets = 10  # Safety limit to prevent infinite loops
-    var packets_read = 0
+    _frame_count += 1
     
-    while packets_read < max_packets:
+    # Godot 4 UDP: just try to get packets
+    var latest_packet: PackedByteArray
+    var packet_count = 0
+    
+    while packet_count < 10:
         var packet = _udp.get_packet()
         if packet.is_empty():
             break
         latest_packet = packet
-        packets_read += 1
+        packet_count += 1
     
     if latest_packet.is_empty():
+        # Log every 60 frames that we're polling but no data
+        if _frame_count % 60 == 0:
+            print("[MediaPipeServer] Polling... no data (frame ", _frame_count, ")")
         return
     
+    print("[MediaPipeServer] Received ", packet_count, " packets, latest size: ", latest_packet.size())
     _parse_packet(latest_packet)
 
 func _parse_packet(packet: PackedByteArray) -> void:
