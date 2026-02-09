@@ -1,6 +1,11 @@
 extends Node2D
-## Test scene for MediaPipe Provider with AutoStart Manager
-## Displays connection status, landmark overlay, and debug information
+## Test scene for MediaPipe Provider (manual mode)
+## Start Python sidecar separately before running this scene
+##
+## Usage:
+##   1. In terminal: python3 python_mediapipe/main.py --camera 0 --show-window
+##   2. In Godot: Run this scene
+##   3. Green dots should appear when body is detected
 
 @onready var status_label: Label = $StatusLabel
 @onready var info_label: Label = $InfoLabel
@@ -10,16 +15,15 @@ extends Node2D
 var provider = null
 var _frame_count: int = 0
 var _server_ready: bool = false
-var _installing: bool = false
 
 func _ready():
 	update_status("Initializing...", Color.WHITE)
-	info_label.text = "Starting MediaPipe provider..."
+	info_label.text = "Starting MediaPipe provider...\n\nMake sure Python sidecar is running:\npython3 python_mediapipe/main.py --camera 0 --show-window"
 	
 	# Create black background for landmark display
 	_create_black_background()
 	
-	# Start provider directly (manual mode - no AutoStartManager)
+	# Start provider directly
 	_start_provider()
 
 func _create_black_background():
@@ -39,59 +43,8 @@ func _create_black_background():
 	camera_display.texture = texture
 	print("[TestScene] Display background created")
 
-func _on_check_progress(percentage: int, message: String) -> void:
-	update_status(str(percentage) + "% - " + message, Color.YELLOW)
-
-func _on_install_progress(percentage: int, message: String) -> void:
-	_installing = true
-	update_status("Installing: " + str(percentage) + "% - " + message, Color.ORANGE)
-	info_label.text = "Setting up Python environment...\nThis may take a few minutes on first run."
-
-func _on_install_complete(success: bool) -> void:
-	_installing = false
-	if success:
-		update_status("Installation complete! Starting server...", Color.GREEN)
-	else:
-		update_status("Installation failed!", Color.RED)
-		info_label.text = "Failed to install dependencies.\nCheck the console for errors."
-
-func _on_server_started(pid: int) -> void:
-	update_status("Python server started (PID: " + str(pid) + ")", Color.GREEN)
-	print("[TestScene] Server started with PID: ", pid)
-	
-	# Give the server a moment to initialize before connecting
-	await get_tree().create_timer(1.0).timeout
-	_start_provider()
-
-func _on_server_failed(error: String) -> void:
-	update_status("Server failed: " + error, Color.RED)
-	push_error("AutoStart failed: " + error)
-	info_label.text = "Error: " + error + "\n\nPlease check:\n1. Python 3 is installed\n2. Camera is connected\n3. No other app is using port 4242"
-
-func _on_server_stopped() -> void:
-	update_status("Server stopped", Color.ORANGE)
-	_server_ready = false
-
-func _on_python_not_found() -> void:
-	update_status("Python 3 not found!", Color.RED)
-	info_label.text = """Python Not Found
-
-Please install Python 3.8 or later:
-- Ubuntu/Debian: sudo apt install python3 python3-venv
-- macOS: brew install python3
-- Windows: Download from python.org
-
-Then restart Godot."""
-
-func _on_mediapipe_not_found() -> void:
-	update_status("MediaPipe not installed - Installing...", Color.YELLOW)
-	info_label.text = """Installing MediaPipe...
-
-This may take 2-5 minutes on first run.
-You'll see progress updates in the status."""
-
-func _start_provider() -> void:
-	# Load the test version of MediaPipeProvider (standalone, no AeroInputProvider dependency)
+func _start_provider():
+	# Load the test version of MediaPipeProvider
 	var provider_script = load("res://test/mediapipe_provider_test.gd")
 	if provider_script:
 		provider = provider_script.new()
@@ -110,21 +63,18 @@ func _start_provider() -> void:
 			update_status("Provider listening on port " + str(provider._server.get_bound_port()) + " - Waiting for tracking data...", Color.GREEN)
 			info_label.text = """MediaPipe Provider Ready
 
-Tracking landmarks on black background.
+Waiting for Python sidecar data...
 
-The Python server is processing your camera feed.
-Landmarks will appear as green dots when detected.
+Make sure sidecar is running:
+python3 python_mediapipe/main.py --camera 0 --show-window
 
-Make sure:
-1. Your camera is connected
-2. You're in a well-lit area
-3. Nothing is blocking the camera"""
+Landmarks will appear as green dots when detected."""
 		else:
 			update_status("Failed to start provider", Color.RED)
 	else:
 		update_status("Failed to load MediaPipeProvider script", Color.RED)
 
-func _process(_delta: float):
+func _process(_delta):
 	_frame_count += 1
 	
 	# Update debug info every 30 frames
@@ -160,14 +110,6 @@ func _update_debug_info():
 	var info := "MediaPipe Provider Status\n"
 	info += "==========================\n\n"
 	
-	# AutoStart Manager status
-	var auto_start = get_node_or_null("AutoStartManager")
-	if auto_start:
-		info += "Server PID: " + str(auto_start.get_server_pid()) + "\n"
-		info += "Server Running: " + str(auto_start.is_server_running()) + "\n"
-	else:
-		info += "AutoStart: Disabled\n"
-	
 	# Provider status
 	if provider:
 		info += "Provider Port: %d\n" % provider._server.get_bound_port()
@@ -198,13 +140,10 @@ func _format_pos(pos) -> String:
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
-		# Graceful shutdown on window close request
 		print("[TestScene] Window close requested - shutting down gracefully...")
 		if provider:
 			provider.stop()
-		# Let AutoStartManager stop the server via its _exit_tree
 		get_tree().quit()
 	elif what == NOTIFICATION_EXIT_TREE:
 		if provider:
 			provider.stop()
-		# AutoStartManager will auto-stop server on _exit_tree
