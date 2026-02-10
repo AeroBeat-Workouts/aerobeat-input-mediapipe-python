@@ -234,13 +234,13 @@ func _start_detached_server() -> int:
 	var venv_packages = "/home/derrick/Github/AeroBeat/aerobeat-input-mediapipe-python/.testbed/venv/lib/python3.12/site-packages"
 	var project_dir = "/home/derrick/.openclaw/workspace/addons/aerobeat-input-mediapipe"
 	
-	# Build the exact command that works manually
+	# Build the command - use nohup to fully detach and get PID via pgrep
 	var bash_cmd = "cd " + project_dir + " && "
 	bash_cmd += "PYTHONPATH=" + venv_packages + " "
-	bash_cmd += python + " " + script + " "
+	bash_cmd += "nohup " + python + " " + script + " "
 	bash_cmd += "--camera 0 --port 4242 --model-complexity 1 --preprocess-size 480 --stream-camera --stream-port 4243 --no-filter"
 	bash_cmd += " > /tmp/aerobeat_server.log 2>&1 &"
-	bash_cmd += " sleep 1 && echo $!"
+	bash_cmd += " sleep 2 && pgrep -f 'python_mediapipe/main.py' | tail -1"
 	
 	print("AutoStartManager: Starting detached server...")
 	print("AutoStartManager: Command: bash -c '" + bash_cmd + "'")
@@ -259,6 +259,17 @@ func _start_detached_server() -> int:
 				if pid > 0:
 					print("AutoStartManager: Detached server started with PID: " + str(pid))
 					return pid
+	
+	print("AutoStartManager: Failed to get valid PID, checking if server started anyway...")
+	# Try to find PID via pgrep as fallback
+	var pgrep_output = []
+	OS.execute("pgrep", ["-f", "python_mediapipe/main.py"], pgrep_output, true)
+	if pgrep_output.size() > 0:
+		var pid_line = pgrep_output[0].strip_edges()
+		if pid_line.is_valid_int():
+			var pid = int(pid_line)
+			print("AutoStartManager: Found server PID via pgrep: " + str(pid))
+			return pid
 	
 	print("AutoStartManager: Failed to get valid PID")
 	return -1
