@@ -214,9 +214,21 @@ func _finish_install_check() -> void:
 		emit_signal("installation_complete", false)
 		emit_signal("server_failed", "Installation completed but MediaPipe still not available")
 
+## Kill any existing Python sidecar processes
+func _kill_existing_servers() -> void:
+	print("AutoStartManager: Checking for existing Python processes...")
+	var output = []
+	OS.execute("pkill", ["-f", "python_mediapipe/main.py"], output, true)
+	print("AutoStartManager: Killed existing processes if any")
+	# Small delay to let ports free up
+	OS.delay_msec(500)
+
 ## Start the MediaPipe server (detached mode to avoid stdout blocking)
 func _start_detached_server() -> int:
 	"""Start server detached from Godot's stdout/stderr to prevent pipe blocking."""
+	# First kill any existing servers
+	_kill_existing_servers()
+	
 	var python = "/usr/bin/python3"
 	var script = "/home/derrick/.openclaw/workspace/addons/aerobeat-input-mediapipe/python_mediapipe/main.py"
 	var venv_packages = "/home/derrick/Github/AeroBeat/aerobeat-input-mediapipe-python/.testbed/venv/lib/python3.12/site-packages"
