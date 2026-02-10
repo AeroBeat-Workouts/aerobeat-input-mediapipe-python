@@ -39,6 +39,6 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("2_landmark")
 
-[node name="AutoStartManager" type="Node" parent="." unique_id=643202539]
+[node name="AutoStartManager" type="Node" parent="." unique_id=1821046586]
 script = ExtResource("3_56kpk")
 metadata/_custom_type_script = "uid://cntshlv75amau"

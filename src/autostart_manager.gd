@@ -29,7 +29,8 @@ var _is_running: bool = false
 
 @onready var progress_timer: Timer = Timer.new()
 
-func _ready():
+func _ready() -> void:
+	print("AutoStartManager: _ready() ")
 	add_child(progress_timer)
 	progress_timer.timeout.connect(_check_install_progress)
 	
@@ -39,17 +40,19 @@ func _ready():
 
 ## Find Python - prefer project venv in repo, fallback to system
 func _find_python() -> String:
+	print("AutoStartManager: _find_python() ")
+
 	# Prefer project venv in the repo (not workspace - sandbox issues)
-	var repo_venv = "/home/derrick/Github/AeroBeat/aerobeat-input-mediapipe-python/.testbed/venv/bin/python"
+	var repo_venv: String = "/home/derrick/Github/AeroBeat/aerobeat-input-mediapipe-python/.testbed/venv/bin/python"
 	if FileAccess.file_exists(repo_venv):
 		print("AutoStartManager: Found repo venv Python: " + repo_venv)
 		return repo_venv
 	
 	# Check for system python3
 	var output: Array = []
-	var exit_code = OS.execute("which", ["python3"], output, true)
+	var exit_code: int = OS.execute("which", ["python3"], output, true)
 	if exit_code == 0 and output.size() > 0:
-		var system_python = output[0].strip_edges()
+		var system_python: String = output[0].strip_edges()
 		print("AutoStartManager: Found system Python: " + system_python)
 		return system_python
 	
@@ -58,17 +61,20 @@ func _find_python() -> String:
 
 ## Get the server PID for display
 func get_server_pid() -> int:
+	print("AutoStartManager: get_server_pid() ")
 	return server_pid
 
 ## Check if server is running
 func is_server_running() -> bool:
+	print("AutoStartManager: is_server_running() ")
+	
 	# Safety: PID 0 and 1 are never valid for our server
 	if server_pid <= 1:
 		return false
 	
 	# Check if process is alive (Linux/Mac)
 	var output: Array = []
-	var exit_code = OS.execute("kill", ["-0", str(server_pid)], output, true)
+	var exit_code: int = OS.execute("kill", ["-0", str(server_pid)], output, true)
 	return exit_code == 0
 
 ## Start the server (public API)
@@ -78,12 +84,14 @@ func start_server() -> bool:
 		print("[AutoStartManager] Already running, returning true")
 		return true
 	print("[AutoStartManager] Calling _check_and_start()...")
-	var result = await _check_and_start()
+	var result: bool = await _check_and_start()
 	print("[AutoStartManager] _check_and_start() returned: ", result)
 	return result
 
 ## Stop the server
 func stop_server() -> void:
+	print("AutoStartManager: stop_server() ")
+
 	# Safety check: NEVER kill PID 0 or 1 (kernel/init)
 	if server_pid <= 1:
 		server_pid = -1
@@ -103,6 +111,8 @@ func stop_server() -> void:
 
 ## Main entry point - check and start
 func _check_and_start() -> bool:
+	print("AutoStartManager: _check_and_start() ")
+
 	_emit_progress(0, "Starting dependency check...")
 	
 	if not check_python_installed():
@@ -115,16 +125,18 @@ func _check_and_start() -> bool:
 		return false  # Will restart after install
 	
 	# All good, start server
-	var result = await _start_server()
+	var result: bool = await _start_server()
 	return result
 
 ## Check if Python is available
 func check_python_installed() -> bool:
+	print("AutoStartManager: check_python_installed() ")
+
 	_emit_progress(25, "Looking for Python...")
 	python_path = _find_python()
 	
 	var output: Array = []
-	var exit_code = OS.execute(python_path, ["--version"], output, true)
+	var exit_code: int = OS.execute(python_path, ["--version"], output, true)
 	
 	if exit_code == 0:
 		_emit_progress(50, "Python found at " + python_path)
@@ -136,10 +148,12 @@ func check_python_installed() -> bool:
 
 ## Check if MediaPipe is installed
 func check_mediapipe_installed() -> bool:
+	print("AutoStartManager: check_mediapipe_installed() ")
+
 	_emit_progress(75, "Checking MediaPipe installation...")
 	
 	var output: Array = []
-	var exit_code = OS.execute(python_path, ["-c", "import mediapipe; print('OK')"], output, true)
+	var exit_code: int = OS.execute(python_path, ["-c", "import mediapipe; print('OK')"], output, true)
 	
 	if exit_code == 0 and output.size() > 0 and "OK" in output[0]:
 		_emit_progress(100, "All dependencies ready - starting server...")
@@ -151,6 +165,8 @@ func check_mediapipe_installed() -> bool:
 
 ## Install dependencies automatically
 func install_dependencies() -> void:
+	print("AutoStartManager: install_dependencies() ")
+
 	if is_installing:
 		print("AutoStartManager: Installation already in progress")
 		return
@@ -164,13 +180,14 @@ func install_dependencies() -> void:
 	_ensure_venv_and_install()
 
 func _ensure_venv_and_install() -> void:
-	"""Create venv and install packages directly."""
+	print("AutoStartManager: _ensure_venv_and_install() ")
+
 	emit_signal("installation_progress", 10, "Creating virtual environment...")
 	
 	# Create venv in repo location (not workspace - sandbox issues)
-	var venv_path = "/home/derrick/Github/AeroBeat/aerobeat-input-mediapipe-python/.testbed/venv"
+	var venv_path: String = "/home/derrick/Github/AeroBeat/aerobeat-input-mediapipe-python/.testbed/venv"
 	var output: Array = []
-	var exit_code = OS.execute("python3", ["-m", "venv", venv_path], output, true)
+	var exit_code: int = OS.execute("python3", ["-m", "venv", venv_path], output, true)
 	
 	if exit_code != 0:
 		is_installing = false
@@ -184,8 +201,8 @@ func _ensure_venv_and_install() -> void:
 	emit_signal("installation_progress", 25, "Installing MediaPipe...")
 	
 	# Install packages
-	var args = ["-m", "pip", "install", "mediapipe", "opencv-python", "numpy"]
-	var pid = OS.execute(python_path, args, [], false)
+	var args: PackedStringArray = ["-m", "pip", "install", "mediapipe", "opencv-python", "numpy"]
+	var pid: int = OS.execute(python_path, args, [], false)
 	install_pid = pid
 	
 	if pid > 0:
@@ -196,6 +213,8 @@ func _ensure_venv_and_install() -> void:
 		emit_signal("server_failed", "Failed to start pip install")
 
 func _check_install_progress() -> void:
+	print("AutoStartManager: _check_install_progress() ")
+
 	if install_pid <= 0:
 		progress_timer.stop()
 		return
@@ -203,10 +222,12 @@ func _check_install_progress() -> void:
 	emit_signal("installation_progress", 50, "Installing packages (this may take a few minutes)...")
 	progress_timer.stop()
 	
-	var timer = get_tree().create_timer(5.0)
+	var timer: SceneTreeTimer = get_tree().create_timer(5.0)
 	timer.timeout.connect(_finish_install_check)
 
 func _finish_install_check() -> void:
+	print("AutoStartManager: _finish_install_check() ")
+
 	is_installing = false
 	install_pid = -1
 	
@@ -220,8 +241,8 @@ func _finish_install_check() -> void:
 
 ## Kill any existing Python sidecar processes
 func _kill_existing_servers() -> void:
-	print("AutoStartManager: Checking for existing Python processes...")
-	var output = []
+	print("AutoStartManager: _kill_existing_servers() Checking for existing Python processes...")
+	var output: Array = []
 	OS.execute("pkill", ["-f", "python_mediapipe/main.py"], output, true)
 	print("AutoStartManager: Killed existing processes if any")
 	# Small delay to let ports free up
@@ -229,18 +250,19 @@ func _kill_existing_servers() -> void:
 
 ## Start the MediaPipe server (detached mode to avoid stdout blocking)
 func _start_detached_server() -> int:
+	print("AutoStartManager: _start_detached_server() ")
 	"""Start server detached from Godot's stdout/stderr to prevent pipe blocking."""
 	# First kill any existing servers
 	_kill_existing_servers()
 	
-	var python = "/usr/bin/python3"
-	var script = "/home/derrick/.openclaw/workspace/addons/aerobeat-input-mediapipe/python_mediapipe/main.py"
-	var venv_packages = "/home/derrick/Github/AeroBeat/aerobeat-input-mediapipe-python/.testbed/venv/lib/python3.12/site-packages"
-	var project_dir = "/home/derrick/.openclaw/workspace/addons/aerobeat-input-mediapipe"
+	var python: String = "/usr/bin/python3"
+	var script: String = "/home/derrick/.openclaw/workspace/addons/aerobeat-input-mediapipe/python_mediapipe/main.py"
+	var venv_packages: String = "/home/derrick/Github/AeroBeat/aerobeat-input-mediapipe-python/.testbed/venv/lib/python3.12/site-packages"
+	var project_dir: String = "/home/derrick/.openclaw/workspace/addons/aerobeat-input-mediapipe"
 	
 	# Build the command - auto-detect DISPLAY on Linux (required for OpenCV camera access)
 	# When Godot spawns processes from GUI, DISPLAY is not set, causing Python to hang
-	var bash_cmd = ""
+	var bash_cmd: String = ""
 	
 	# Linux: Auto-detect DISPLAY environment variable
 	# Use a simple one-liner to test displays without complex if/for syntax
@@ -258,29 +280,29 @@ func _start_detached_server() -> int:
 	print("AutoStartManager: Starting detached server...")
 	print("AutoStartManager: Command: bash -c '" + bash_cmd + "'")
 	
-	var output = []
-	var result = OS.execute("/bin/bash", ["-c", bash_cmd], output, true)
+	var output: Array = []
+	var result: int = OS.execute("/bin/bash", ["-c", bash_cmd], output, true)
 	
 	print("AutoStartManager: Execute result: " + str(result))
 	
 	if result == OK and output.size() > 0:
-		var lines = output[0].split("\n")
-		for line in lines:
+		var lines: PackedStringArray = output[0].split("\n")
+		for line: String in lines:
 			line = line.strip_edges()
 			if line.is_valid_int():
-				var pid = int(line)
+				var pid: int = int(line)
 				if pid > 0:
 					print("AutoStartManager: Detached server started with PID: " + str(pid))
 					return pid
 	
 	print("AutoStartManager: Failed to get valid PID, checking if server started anyway...")
 	# Try to find PID via pgrep as fallback
-	var pgrep_output = []
+	var pgrep_output: Array = []
 	OS.execute("pgrep", ["-f", "python_mediapipe/main.py"], pgrep_output, true)
 	if pgrep_output.size() > 0:
-		var pid_line = pgrep_output[0].strip_edges()
+		var pid_line: String = pgrep_output[0].strip_edges()
 		if pid_line.is_valid_int():
-			var pid = int(pid_line)
+			var pid: int = int(pid_line)
 			print("AutoStartManager: Found server PID via pgrep: " + str(pid))
 			return pid
 	
@@ -289,12 +311,14 @@ func _start_detached_server() -> int:
 
 ## Start the MediaPipe server with proper arguments
 func _find_script() -> String:
+	print("AutoStartManager: _find_script() ")
+
 	# Try multiple possible script locations
-	var possible_paths = [
+	var possible_paths: Array = [
 		"/home/derrick/.openclaw/workspace/addons/aerobeat-input-mediapipe/python_mediapipe/main.py"
 	]
 	
-	for path in possible_paths:
+	for path: String in possible_paths:
 		print("AutoStartManager: Checking for script at: " + path)
 		if FileAccess.file_exists(path):
 			print("AutoStartManager: Found script at: " + path)
@@ -304,7 +328,9 @@ func _find_script() -> String:
 	return ""
 
 func _build_args_string() -> String:
-	var arg_str = "--camera 0 "
+	print("AutoStartManager: _build_args_string() ")
+
+	var arg_str: String = "--camera 0 "
 	arg_str += "--port " + str(server_port) + " "
 	arg_str += "--model-complexity " + str(model_complexity) + " "
 	arg_str += "--preprocess-size " + str(preprocess_size) + " "
@@ -322,7 +348,7 @@ func _start_server() -> bool:
 	
 	# Try detached mode first (prevents stdout pipe blocking)
 	print("[AutoStartManager] Attempting detached server start...")
-	var detached_pid = _start_detached_server()
+	var detached_pid: int = _start_detached_server()
 	print("[AutoStartManager] _start_detached_server() returned PID: ", detached_pid)
 	
 	if detached_pid > 0:
@@ -342,7 +368,7 @@ func _start_server() -> bool:
 			return true
 		else:
 			print("[AutoStartManager] Detached server exited, trying to read log...")
-			var log_output = []
+			var log_output: Array = []
 			OS.execute("cat", ["/tmp/aerobeat_server.log"], log_output)
 			if log_output.size() > 0:
 				print("[AutoStartManager] Server log:\n" + log_output[0])
@@ -361,6 +387,7 @@ func _emit_progress(percentage: int, message: String) -> void:
 	emit_signal("check_progress", percentage, message)
 
 ## Cleanup on exit
-func _exit_tree():
+func _exit_tree() -> void:
+	print("AutoStartManager: _exit_tree() ")
 	stop_server()
 	progress_timer.stop()

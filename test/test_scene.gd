@@ -31,6 +31,7 @@ func _ready():
 	print("[TestScene] _setup_auto_start() completed")
 
 func _create_black_background():
+	print("[TestScene] _create_black_background() entered")
 	var image = Image.create(640, 480, false, Image.FORMAT_RGB8)
 	image.fill(Color(0.05, 0.05, 0.05))
 	
@@ -49,17 +50,19 @@ func _setup_auto_start():
 	print("[TestScene] _setup_auto_start() entered")
 	
 	# Check if AutoStartManager already exists in scene
-	auto_start_manager = get_node_or_null("AutoStartManager")
+	var existing_node = get_node_or_null("AutoStartManager")
 	
-	if auto_start_manager == null:
-		print("[TestScene] Creating new AutoStartManager...")
-		var AutoStartManager = load("res://src/autostart_manager.gd")
-		auto_start_manager = AutoStartManager.new()
-		auto_start_manager.name = "AutoStartManager"
-		add_child(auto_start_manager)
-		print("[TestScene] Created AutoStartManager")
+	if existing_node == null:
+		print("[TestScene] No AutoStartManager node found, creating new one...")
+		_create_auto_start_manager()
+	elif existing_node.get_script() == null:
+		print("[TestScene] WARNING: AutoStartManager node exists but has NO SCRIPT attached!")
+		print("[TestScene] Removing empty node and creating new one...")
+		existing_node.queue_free()
+		_create_auto_start_manager()
 	else:
-		print("[TestScene] Found existing AutoStartManager")
+		print("[TestScene] Found existing AutoStartManager with script")
+		auto_start_manager = existing_node
 	
 	# Connect signals
 	print("[TestScene] Connecting signals...")
@@ -79,13 +82,16 @@ func _setup_auto_start():
 	print("[TestScene] start_server() returned: ", result)
 
 func _on_check_progress(percentage: int, message: String) -> void:
+	print("[TestScene] _on_check_progress() entered: ", percentage, "% - ", message)
 	update_status(str(percentage) + "% - " + message, Color.YELLOW)
 
 func _on_install_progress(percentage: int, message: String) -> void:
+	print("[TestScene] _on_install_progress() entered: ", percentage, "% - ", message)
 	update_status("Installing: " + str(percentage) + "% - " + message, Color.ORANGE)
 	info_label.text = "Setting up Python environment...\nThis may take a few minutes on first run."
 
 func _on_install_complete(success: bool) -> void:
+	print("[TestScene] _on_install_complete() entered, success: ", success)
 	if success:
 		update_status("Installation complete! Starting server...", Color.GREEN)
 	else:
@@ -105,6 +111,7 @@ func _on_server_started(pid: int):
 	print("[TestScene] Camera feed started")
 
 func _on_server_failed(error: String) -> void:
+	print("[TestScene] _on_server_failed() entered: ", error)
 	update_status("Auto-start failed: " + error, Color.RED)
 	info_label.text = """Auto-start failed!
 
@@ -123,18 +130,22 @@ Or check:
 - No firewall blocking ports 4242/4243"""
 
 func _on_server_stopped() -> void:
+	print("[TestScene] _on_server_stopped() entered")
 	update_status("Server stopped", Color.ORANGE)
 	_server_ready = false
 
 func _on_python_not_found() -> void:
+	print("[TestScene] _on_python_not_found() entered")
 	update_status("Python 3 not found!", Color.RED)
 	info_label.text = "Python Not Found. Please install Python 3.8 or later."
 
 func _on_mediapipe_not_found() -> void:
+	print("[TestScene] _on_mediapipe_not_found() entered")
 	update_status("MediaPipe not installed - Installing...", Color.YELLOW)
 	info_label.text = "Installing MediaPipe...\nThis may take 2-5 minutes."
 
 func _start_provider():
+	print("[TestScene] _start_provider() entered")
 	var provider_script = load("res://test/mediapipe_provider_test.gd")
 	if provider_script:
 		provider = provider_script.new()
@@ -192,6 +203,7 @@ func _start_camera_feed():
 	print("[TestScene] Camera stream start result: ", success)
 
 func _process(_delta):
+	print("[TestScene] _process() entered, frame: ", _frame_count + 1)
 	_frame_count += 1
 	
 	# Check server liveness every 60 frames (~1 second)
@@ -221,20 +233,24 @@ func _on_pose_updated(landmarks: Array):
 		camera_view.update_overlay(landmarks)
 
 func _on_tracking_lost():
+	print("[TestScene] _on_tracking_lost() entered")
 	update_status("Tracking lost - Check camera view", Color.ORANGE)
 	if landmark_drawer:
 		landmark_drawer.clear_landmarks()
 
 func _on_tracking_restored():
+	print("[TestScene] _on_tracking_restored() entered")
 	update_status("Tracking restored", Color.GREEN)
 
 func update_status(text: String, color: Color = Color.WHITE):
+	print("[TestScene] update_status() entered: ", text)
 	if status_label:
 		status_label.text = text
 		status_label.modulate = color
 	print("[MediaPipe Test] ", text)
 
 func _update_debug_info():
+	print("[TestScene] _update_debug_info() entered")
 	if not info_label or not provider or not _server_ready:
 		return
 	
@@ -258,6 +274,7 @@ func _update_debug_info():
 	info_label.text = info
 
 func _format_pos(pos) -> String:
+	print("[TestScene] _format_pos() entered")
 	if pos == null:
 		return "N/A"
 	if pos is Vector2:
@@ -267,6 +284,7 @@ func _format_pos(pos) -> String:
 	return str(pos)
 
 func _notification(what: int) -> void:
+	print("[TestScene] _notification() entered, what: ", what)
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
 		print("[TestScene] Window close requested - shutting down gracefully...")
 		if provider:
