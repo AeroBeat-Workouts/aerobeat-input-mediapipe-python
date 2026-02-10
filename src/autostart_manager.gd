@@ -239,10 +239,10 @@ func _start_detached_server() -> int:
 	var bash_cmd = ""
 	
 	# Linux: Auto-detect DISPLAY environment variable
+	# Use a simple one-liner to test displays without complex if/for syntax
 	if OS.get_name() == "Linux":
-		# Try to find active display, fallback to common values
-		bash_cmd += "if [ -z \"$DISPLAY\" ]; then for disp in :1 :0 :2; do if xdpyinfo -display $disp >/dev/null 2>&1; then export DISPLAY=$disp; break; fi; done; fi; "
-		bash_cmd += "export DISPLAY=${DISPLAY:-:1} && "  # Final fallback
+		# Try :1 first (your active display), fallback to :0, then :2
+		bash_cmd += 'export DISPLAY=:1; xdpyinfo >/dev/null 2>&1 || export DISPLAY=:0; xdpyinfo >/dev/null 2>&1 || export DISPLAY=:2; xdpyinfo >/dev/null 2>&1 || export DISPLAY=:1; '
 	
 	bash_cmd += "export HOME=/home/derrick && cd " + project_dir + " && "
 	bash_cmd += "PYTHONPATH=" + venv_packages + " "
