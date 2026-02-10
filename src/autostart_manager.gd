@@ -234,14 +234,16 @@ func _start_detached_server() -> int:
 	var venv_packages = "/home/derrick/Github/AeroBeat/aerobeat-input-mediapipe-python/.testbed/venv/lib/python3.12/site-packages"
 	var project_dir = "/home/derrick/.openclaw/workspace/addons/aerobeat-input-mediapipe"
 	
-	# Build the command - use nohup to fully detach and get PID via pgrep
-	# CRITICAL: Export DISPLAY for OpenCV camera access (X11 requirement)
-	var bash_cmd = "export DISPLAY=:1 && cd " + project_dir + " && "
+	# Build the command - source full user environment first (critical!)
+	# When Godot spawns processes, it doesn't load .bashrc/.profile
+	# MediaPipe needs the full environment that works in interactive shells
+	var bash_cmd = "source /home/derrick/.bashrc 2>/dev/null; source /home/derrick/.profile 2>/dev/null; "
+	bash_cmd += "export DISPLAY=:1 && export HOME=/home/derrick && cd " + project_dir + " && "
 	bash_cmd += "PYTHONPATH=" + venv_packages + " "
-	bash_cmd += "nohup " + python + " " + script + " "
+	bash_cmd += python + " -u " + script + " "
 	bash_cmd += "--camera 0 --port 4242 --model-complexity 1 --preprocess-size 480 --stream-camera --stream-port 4243 --no-filter"
 	bash_cmd += " > /tmp/aerobeat_server.log 2>&1 &"
-	bash_cmd += " sleep 2 && pgrep -f 'python_mediapipe/main.py' | tail -1"
+	bash_cmd += " sleep 3 && pgrep -f 'python_mediapipe/main.py' | tail -1"
 	
 	print("AutoStartManager: Starting detached server...")
 	print("AutoStartManager: Command: bash -c '" + bash_cmd + "'")
