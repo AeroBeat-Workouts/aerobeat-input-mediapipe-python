@@ -235,7 +235,8 @@ func _start_detached_server() -> int:
 	var project_dir = "/home/derrick/.openclaw/workspace/addons/aerobeat-input-mediapipe"
 	
 	# Build the command - use nohup to fully detach and get PID via pgrep
-	var bash_cmd = "cd " + project_dir + " && "
+	# CRITICAL: Export DISPLAY for OpenCV camera access (X11 requirement)
+	var bash_cmd = "export DISPLAY=:1 && cd " + project_dir + " && "
 	bash_cmd += "PYTHONPATH=" + venv_packages + " "
 	bash_cmd += "nohup " + python + " " + script + " "
 	bash_cmd += "--camera 0 --port 4242 --model-complexity 1 --preprocess-size 480 --stream-camera --stream-port 4243 --no-filter"
