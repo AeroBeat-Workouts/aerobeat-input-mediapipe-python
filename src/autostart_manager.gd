@@ -73,9 +73,13 @@ func is_server_running() -> bool:
 
 ## Start the server (public API)
 func start_server() -> bool:
+	print("[AutoStartManager] start_server() called")
 	if _is_running:
+		print("[AutoStartManager] Already running, returning true")
 		return true
+	print("[AutoStartManager] Calling _check_and_start()...")
 	var result = await _check_and_start()
+	print("[AutoStartManager] _check_and_start() returned: ", result)
 	return result
 
 ## Stop the server
@@ -314,32 +318,40 @@ func _build_args_string() -> String:
 	return arg_str
 
 func _start_server() -> bool:
+	print("[AutoStartManager] _start_server() entered")
+	
 	# Try detached mode first (prevents stdout pipe blocking)
-	print("AutoStartManager: Attempting detached server start...")
+	print("[AutoStartManager] Attempting detached server start...")
 	var detached_pid = _start_detached_server()
+	print("[AutoStartManager] _start_detached_server() returned PID: ", detached_pid)
 	
 	if detached_pid > 0:
 		server_pid = detached_pid
 		_is_running = true
+		print("[AutoStartManager] Emitting server_started signal...")
 		emit_signal("server_started", detached_pid)
-		print("AutoStartManager: Detached server started with PID: ", detached_pid)
+		print("[AutoStartManager] Signal emitted, PID: ", detached_pid)
 		
 		# Wait briefly then verify it's still running
+		print("[AutoStartManager] Waiting 2 seconds for server to stabilize...")
 		await get_tree().create_timer(2.0).timeout
+		print("[AutoStartManager] Timer completed, checking if server is running...")
+		
 		if is_server_running():
-			print("AutoStartManager: Server confirmed running")
+			print("[AutoStartManager] Server confirmed running, returning true")
 			return true
 		else:
-			print("AutoStartManager: Detached server exited, trying to read log...")
+			print("[AutoStartManager] Detached server exited, trying to read log...")
 			var log_output = []
 			OS.execute("cat", ["/tmp/aerobeat_server.log"], log_output)
 			if log_output.size() > 0:
-				print("AutoStartManager: Server log:\n" + log_output[0])
+				print("[AutoStartManager] Server log:\n" + log_output[0])
 			server_pid = -1
 			_is_running = false
 			emit_signal("server_failed", "Server exited - check /tmp/aerobeat_server.log")
 			return false
 	
+	print("[AutoStartManager] Failed to start detached server, emitting server_failed")
 	emit_signal("server_failed", "Failed to start detached server")
 	return false
 

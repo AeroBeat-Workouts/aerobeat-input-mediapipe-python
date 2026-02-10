@@ -21,10 +21,14 @@ func _ready():
 	print("[TestScene] landmark_drawer path: ", landmark_drawer)
 	
 	# Create black background for landmark display
+	print("[TestScene] Creating black background...")
 	_create_black_background()
+	print("[TestScene] Black background created")
 	
 	# Setup AutoStartManager
+	print("[TestScene] Setting up AutoStartManager...")
 	_setup_auto_start()
+	print("[TestScene] _setup_auto_start() completed")
 
 func _create_black_background():
 	var image = Image.create(640, 480, false, Image.FORMAT_RGB8)
@@ -42,11 +46,13 @@ func _create_black_background():
 	print("[TestScene] Display background created")
 
 func _setup_auto_start():
+	print("[TestScene] _setup_auto_start() entered")
+	
 	# Check if AutoStartManager already exists in scene
 	auto_start_manager = get_node_or_null("AutoStartManager")
 	
 	if auto_start_manager == null:
-		# Create AutoStartManager if not found
+		print("[TestScene] Creating new AutoStartManager...")
 		var AutoStartManager = load("res://src/autostart_manager.gd")
 		auto_start_manager = AutoStartManager.new()
 		auto_start_manager.name = "AutoStartManager"
@@ -56,6 +62,7 @@ func _setup_auto_start():
 		print("[TestScene] Found existing AutoStartManager")
 	
 	# Connect signals
+	print("[TestScene] Connecting signals...")
 	auto_start_manager.server_started.connect(_on_server_started)
 	auto_start_manager.server_failed.connect(_on_server_failed)
 	auto_start_manager.server_stopped.connect(_on_server_stopped)
@@ -64,9 +71,12 @@ func _setup_auto_start():
 	auto_start_manager.check_progress.connect(_on_check_progress)
 	auto_start_manager.installation_progress.connect(_on_install_progress)
 	auto_start_manager.installation_complete.connect(_on_install_complete)
+	print("[TestScene] Signals connected")
 	
 	# Start server (async)
-	await auto_start_manager.start_server()
+	print("[TestScene] Calling start_server()...")
+	var result = await auto_start_manager.start_server()
+	print("[TestScene] start_server() returned: ", result)
 
 func _on_check_progress(percentage: int, message: String) -> void:
 	update_status(str(percentage) + "% - " + message, Color.YELLOW)
