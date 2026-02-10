@@ -234,11 +234,17 @@ func _start_detached_server() -> int:
 	var venv_packages = "/home/derrick/Github/AeroBeat/aerobeat-input-mediapipe-python/.testbed/venv/lib/python3.12/site-packages"
 	var project_dir = "/home/derrick/.openclaw/workspace/addons/aerobeat-input-mediapipe"
 	
-	# Build the command - source full user environment first (critical!)
-	# When Godot spawns processes, it doesn't load .bashrc/.profile
-	# MediaPipe needs the full environment that works in interactive shells
-	var bash_cmd = "source /home/derrick/.bashrc 2>/dev/null; source /home/derrick/.profile 2>/dev/null; "
-	bash_cmd += "export DISPLAY=:1 && export HOME=/home/derrick && cd " + project_dir + " && "
+	# Build the command - auto-detect DISPLAY on Linux (required for OpenCV camera access)
+	# When Godot spawns processes from GUI, DISPLAY is not set, causing Python to hang
+	var bash_cmd = ""
+	
+	# Linux: Auto-detect DISPLAY environment variable
+	if OS.get_name() == "Linux":
+		# Try to find active display, fallback to common values
+		bash_cmd += "if [ -z \"$DISPLAY\" ]; then for disp in :1 :0 :2; do if xdpyinfo -display $disp >/dev/null 2>&1; then export DISPLAY=$disp; break; fi; done; fi; "
+		bash_cmd += "export DISPLAY=${DISPLAY:-:1} && "  # Final fallback
+	
+	bash_cmd += "export HOME=/home/derrick && cd " + project_dir + " && "
 	bash_cmd += "PYTHONPATH=" + venv_packages + " "
 	bash_cmd += python + " -u " + script + " "
 	bash_cmd += "--camera 0 --port 4242 --model-complexity 1 --preprocess-size 480 --stream-camera --stream-port 4243 --no-filter"
