@@ -75,7 +75,7 @@ func is_server_running() -> bool:
 	# Check if process group is alive using negative PGID
 	# kill -0 returns 0 if process exists, non-zero if it doesn't
 	var output: Array = []
-	var exit_code: int = OS.execute("/bin/kill", ["-0", "-" + str(server_pid)], output, true)
+	var exit_code: int = OS.execute("/bin/kill", ["-0", "-" + str(server_pid)], output, false)
 	return exit_code == 0
 
 ## Start the server (public API)
@@ -351,10 +351,15 @@ func _read_pid_file(path: String) -> int:
 
 ## Setup heartbeat to keep Python process alive
 func _setup_heartbeat(heartbeat_port: int) -> void:
+	print("[AutoStartManager] Setting up heartbeat on port %d" % heartbeat_port)
+	
 	if _heartbeat_udp == null:
 		_heartbeat_udp = PacketPeerUDP.new()
-		_heartbeat_udp.set_dest_address("127.0.0.1", heartbeat_port)
-		print("[AutoStartManager] Heartbeat target: 127.0.0.1:%d" % heartbeat_port)
+		var err := _heartbeat_udp.set_dest_address("127.0.0.1", heartbeat_port)
+		if err != OK:
+			print("[AutoStartManager] ERROR: Failed to set heartbeat destination, error: %d" % err)
+		else:
+			print("[AutoStartManager] Heartbeat target: 127.0.0.1:%d" % heartbeat_port)
 	
 	if _heartbeat_timer == null:
 		_heartbeat_timer = Timer.new()
@@ -362,14 +367,25 @@ func _setup_heartbeat(heartbeat_port: int) -> void:
 		_heartbeat_timer.autostart = true
 		_heartbeat_timer.timeout.connect(_send_heartbeat)
 		add_child(_heartbeat_timer)
+		print("[AutoStartManager] Heartbeat timer started (interval: %dms)" % heartbeat_interval_ms)
 	else:
 		_heartbeat_timer.start()
 
 func _send_heartbeat() -> void:
-	if _heartbeat_udp and is_server_running():
-		var packet := PackedByteArray()
-		packet.append(0x01)  # Heartbeat marker
-		_heartbeat_udp.put_packet(packet)
+	if _heartbeat_udp == null:
+		print("[AutoStartManager] Heartbeat: UDP socket is null")
+		return
+	
+	var running := is_server_running()
+	if not running:
+		print("[AutoStartManager] Heartbeat: Server not running (PID: %d)" % server_pid)
+		return
+	
+	var packet := PackedByteArray()
+	packet.append(0x01)  # Heartbeat marker
+	var err := _heartbeat_udp.put_packet(packet)
+	if err != OK:
+		print("[AutoStartManager] Heartbeat: Failed to send packet, error: %d" % err)
 
 func _stop_heartbeat() -> void:
 	if _heartbeat_timer:
