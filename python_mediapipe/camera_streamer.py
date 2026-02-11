@@ -19,7 +19,7 @@ class MJPEGHTTPHandler(BaseHTTPRequestHandler):
     # Stream settings
     boundary = '--frame-boundary'
     content_type = 'multipart/x-mixed-replace; boundary=' + boundary
-    jpeg_quality = 70
+    jpeg_quality = 50  # Reduced from 70 for faster encoding + lower bandwidth
     
     def log_message(self, format, *args):
         """Suppress default HTTP logging to reduce noise"""
@@ -45,6 +45,13 @@ class MJPEGHTTPHandler(BaseHTTPRequestHandler):
         self.send_header('Expires', '0')
         self.end_headers()
         
+        # Disable Nagle's algorithm for low-latency streaming
+        if hasattr(self.request, 'setsockopt'):
+            try:
+                self.request.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+            except (OSError, AttributeError):
+                pass  # Some socket types don't support this
+        
         try:
             while True:
                 # Get current frame
@@ -62,8 +69,9 @@ class MJPEGHTTPHandler(BaseHTTPRequestHandler):
                 self.wfile.write(frame_data)
                 self.wfile.write(b'\r\n')
                 
-                # Small delay to control frame rate (~30 FPS max)
-                threading.Event().wait(0.033)
+                # Minimal delay to yield CPU - let camera dictate pace
+                # Reduced from 33ms (30 FPS cap) to 1ms for lower latency
+                threading.Event().wait(0.001)
                 
         except (BrokenPipeError, ConnectionResetError):
             # Client disconnected
@@ -104,7 +112,7 @@ class MJPEGHTTPHandler(BaseHTTPRequestHandler):
         """Create a placeholder frame when no camera data available"""
         img = np.zeros((480, 640, 3), dtype=np.uint8)
         cv2.putText(img, "No Camera Feed", (180, 240), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-        _, jpeg = cv2.imencode('.jpg', img, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
+        _, jpeg = cv2.imencode('.jpg', img, [int(cv2.IMWRITE_JPEG_QUALITY), cls.jpeg_quality])
         return jpeg.tobytes()
 
 

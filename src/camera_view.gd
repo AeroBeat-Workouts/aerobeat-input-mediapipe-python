@@ -15,6 +15,10 @@ signal stream_stopped()
 		flip_horizontal = value
 		_update_flip_material()
 
+# Buffer limits for latency control
+const MAX_BUFFER_SIZE := 131072  # 128KB max - larger frames will cause drops
+const MAX_BUFFERED_FRAMES := 2   # Keep at most 2 frames buffered
+
 var _tcp: StreamPeerTCP
 var _is_streaming: bool = false
 var _stream_thread: Thread
@@ -59,10 +63,10 @@ func _exit_tree() -> void:
 func _process(delta: float) -> void:
 	if not _is_streaming:
 		return
-	_update_timer += delta * 1000.0
-	if _update_timer >= update_interval_ms:
-		_update_timer = 0.0
-		_update_texture()
+	
+	# Update texture every frame for lowest latency (was capped at 30 FPS)
+	# This ensures we display the latest decoded frame immediately
+	_update_texture()
 	
 	# Queue overlay redraw
 	if show_overlay and _overlay_canvas:
@@ -333,6 +337,14 @@ func _stream_loop() -> void:
 				bytes_received += chunk[1].size()
 				_mjpeg_buffer.append_array(chunk[1])
 				
+				# Buffer overflow protection - drop old data if buffer grows too large
+				if _mjpeg_buffer.size() > MAX_BUFFER_SIZE:
+					print("[CameraView] Buffer overflow (", _mjpeg_buffer.size(), " bytes), dropping stale frames")
+					# Keep only the most recent data (last 8KB which likely contains a partial frame)
+					var keep_size := min(8192, _mjpeg_buffer.size())
+					_mjpeg_buffer = _mjpeg_buffer.slice(_mjpeg_buffer.size() - keep_size)
+					header_parsed = false  # Reset header parsing
+				
 				# Parse HTTP headers first (search for \r\n\r\n as bytes, not UTF-8)
 				if not header_parsed:
 					var header_end := _find_byte_pattern(_mjpeg_buffer, PackedByteArray([0x0D, 0x0A, 0x0D, 0x0A]))  # \r\n\r\n
@@ -341,10 +353,12 @@ func _stream_loop() -> void:
 						_mjpeg_buffer = _mjpeg_buffer.slice(header_end + 4)
 						header_parsed = true
 				
-				# Try to parse frames
+				# Try to parse frames - but limit to prevent frame buildup
 				if header_parsed:
-					while _parse_mjpeg_frame():
+					var parsed_count := 0
+					while parsed_count < MAX_BUFFERED_FRAMES and _parse_mjpeg_frame():
 						frames_decoded += 1
+						parsed_count += 1
 		
 		# Log stats every 5 seconds
 		var now := Time.get_ticks_msec()
@@ -354,7 +368,7 @@ func _stream_loop() -> void:
 			frames_decoded = 0
 			last_log = now
 		
-		OS.delay_msec(5)
+		OS.delay_msec(1)  # Reduced from 5ms for lower latency
 	
 	print("[CameraView] Stream thread ended")
 
