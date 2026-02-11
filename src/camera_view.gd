@@ -25,7 +25,6 @@ var _stream_thread: Thread
 var _thread_running: bool = false
 var _current_frame: Image
 var _frame_mutex: Mutex
-var _update_timer: float = 0.0
 var _mjpeg_buffer: PackedByteArray
 var _is_starting: bool = false  # Guard against concurrent start_stream calls
 
@@ -60,7 +59,7 @@ func _exit_tree() -> void:
 	# Stop the stream properly to ensure thread cleanup
 	stop_stream()
 
-func _process(delta: float) -> void:
+func _process(_delta: float) -> void:
 	if not _is_streaming:
 		return
 	
