@@ -344,25 +344,10 @@ func _start_detached_server() -> int:
 		print("[AutoStartManager] Warning: Could not read PGID, using bash PID ", bash_pid)
 		pgid = bash_pid
 	
-	# Wait for server to fully start
-	print("[AutoStartManager] Waiting 2.5s for server to start...")
-	if get_tree() == null:
-		print("[AutoStartManager] ERROR: get_tree() is null before 2.5s wait!")
-		return -1
-	await get_tree().create_timer(2.5).timeout
-	print("[AutoStartManager] 2.5s wait complete")
-	
-	# Verify server is actually running
-	print("[AutoStartManager] Checking if PGID %d is alive..." % pgid)
-	var is_alive := _is_process_alive(pgid)
-	print("[AutoStartManager] _is_process_alive returned: %s" % str(is_alive))
-	
-	if is_alive:
-		print("[AutoStartManager] PGID %d is alive, returning success" % pgid)
-		return pgid
-	
-	print("[AutoStartManager] PGID %d is NOT alive, returning failure" % pgid)
-	return -1
+	# Server is starting - return PGID immediately so heartbeats can begin
+	# The caller (_start_server) will handle waiting and verification
+	print("[AutoStartManager] Returning PGID %d immediately for heartbeat" % pgid)
+	return pgid
 
 func _read_pid_file(path: String) -> int:
 	var file: FileAccess = FileAccess.open(path, FileAccess.READ)
@@ -449,36 +434,45 @@ func _start_server() -> bool:
 	
 	# Try detached mode first (prevents stdout pipe blocking)
 	print("[AutoStartManager] Calling _start_detached_server()...")
+	
+	# Start server and get PGID immediately
 	var detached_pid: int = await _start_detached_server()
 	print("[AutoStartManager] _start_detached_server() returned PID: %d" % detached_pid)
 	
-	if detached_pid > 0:
-		server_pid = detached_pid
-		_is_running = true
-		
-		# Setup heartbeat on port + 2 (avoid conflict with stream port at +1)
-		_setup_heartbeat(server_port + 2)
-		
-		emit_signal("server_started", detached_pid)
-		
-		# Wait briefly then verify it's still running
-		await get_tree().create_timer(2.0).timeout
-		
-		if is_server_running():
-			return true
-		else:
-			var log_output: Array = []
-			OS.execute("cat", ["/tmp/aerobeat_server.log"], log_output, false)
-			if log_output.size() > 0:
-				print("[AutoStartManager] Server log:\n" + log_output[0])
-			server_pid = -1
-			_is_running = false
-			_stop_heartbeat()
-			emit_signal("server_failed", "Server exited - check /tmp/aerobeat_server.log")
-			return false
+	if detached_pid <= 0:
+		emit_signal("server_failed", "Failed to start detached server")
+		return false
 	
-	emit_signal("server_failed", "Failed to start detached server")
-	return false
+	server_pid = detached_pid
+	_is_running = true
+	
+	# CRITICAL: Start heartbeat IMMEDIATELY before Python times out (3s timeout)
+	print("[AutoStartManager] Starting heartbeat immediately...")
+	_setup_heartbeat(server_port + 2)
+	
+	# Send first heartbeat right away
+	_send_heartbeat()
+	print("[AutoStartManager] First heartbeat sent")
+	
+	emit_signal("server_started", detached_pid)
+	
+	# Now wait for server to fully initialize (but heartbeats are already flowing)
+	print("[AutoStartManager] Waiting 2.0s for server to stabilize...")
+	await get_tree().create_timer(2.0).timeout
+	
+	if is_server_running():
+		print("[AutoStartManager] Server is running after wait!")
+		return true
+	else:
+		var log_output: Array = []
+		OS.execute("cat", ["/tmp/aerobeat_server.log"], log_output, false)
+		if log_output.size() > 0:
+			print("[AutoStartManager] Server log:\n" + log_output[0])
+		server_pid = -1
+		_is_running = false
+		_stop_heartbeat()
+		emit_signal("server_failed", "Server exited - check /tmp/aerobeat_server.log")
+		return false
 
 ## Helper to emit progress
 func _emit_progress(percentage: int, message: String) -> void:
