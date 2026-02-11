@@ -5,223 +5,280 @@ extends TextureRect
 signal stream_started()
 signal stream_stopped()
 
-## Configuration
 @export var stream_url: String = "http://127.0.0.1:4243/camera"
 @export var update_interval_ms: float = 33.0
 
-## Runtime state
-var _http_client: HTTPClient
+var _tcp: StreamPeerTCP
 var _is_streaming: bool = false
 var _stream_thread: Thread
 var _thread_running: bool = false
 var _current_frame: Image
 var _frame_mutex: Mutex
 var _update_timer: float = 0.0
-
-## MJPEG parsing state
 var _mjpeg_buffer: PackedByteArray
-var _boundary_marker: String = "--frame-boundary"
 
 func _ready() -> void:
 	_current_frame = Image.create(640, 480, false, Image.FORMAT_RGB8)
-	var texture := ImageTexture.create_from_image(_current_frame)
-	self.texture = texture
-	
+	self.texture = ImageTexture.create_from_image(_current_frame)
 	_frame_mutex = Mutex.new()
 	_mjpeg_buffer = PackedByteArray()
-	
 	visible = false
 
 func _exit_tree() -> void:
-	stop_stream()
+	print("[CameraView] _exit_tree called, stopping stream...")
+	_thread_running = false
+	
+	if _stream_thread:
+		if _stream_thread.is_alive():
+			_stream_thread.wait_to_finish()
+		_stream_thread = null
+	
+	if _tcp:
+		_tcp.disconnect_from_host()
+		_tcp = null
 
 func _process(delta: float) -> void:
 	if not _is_streaming:
 		return
-	
 	_update_timer += delta * 1000.0
 	if _update_timer >= update_interval_ms:
 		_update_timer = 0.0
 		_update_texture()
 
-func toggle_camera_view() -> void:
-	if _is_streaming:
-		stop_stream()
-	else:
-		start_stream()
-
 func start_stream() -> bool:
 	if _is_streaming:
 		return true
 	
-	print("[CameraView] Starting stream...")
+	print("[CameraView] Starting stream from: ", stream_url)
 	
-	_http_client = HTTPClient.new()
-	_http_client.set_blocking_mode(false)
+	# Parse URL
+	var host := "127.0.0.1"
+	var port := 4243
+	var path := "/camera"
 	
-	var host := stream_url.split("://")[1].split("/")[0]
-	var port: int = 4243
-	if host.find(":") != -1:
-		port = host.split(":")[1].to_int()
-		host = host.split(":")[0]
+	if stream_url.begins_with("http://"):
+		var rest := stream_url.substr(7)
+		var path_start := rest.find("/")
+		if path_start != -1:
+			host = rest.substr(0, path_start)
+			path = rest.substr(path_start)
+		else:
+			host = rest
+		
+		var port_sep := host.find(":")
+		if port_sep != -1:
+			port = host.substr(port_sep + 1).to_int()
+			host = host.substr(0, port_sep)
 	
-	var err := _http_client.connect_to_host(host, port)
+	print("[CameraView] Connecting to ", host, ":", port, path)
+	
+	# Use raw TCP instead of HTTPClient
+	_tcp = StreamPeerTCP.new()
+	var err := _tcp.connect_to_host(host, port)
+	print("[CameraView] connect_to_host returned: ", err)
+	
 	if err != OK:
-		push_error("Failed to connect to camera stream: " + str(err))
+		push_error("Failed to start connection: " + str(err))
 		return false
 	
-	# Wait for connection
-	var timeout: float = 0.0
-	while _http_client.get_status() == HTTPClient.STATUS_CONNECTING:
-		_http_client.poll()
+	# Wait for connection with timeout
+	var timeout := 0.0
+	var status := _tcp.get_status()
+	print("[CameraView] Initial TCP status: ", status)
+	
+	while status == StreamPeerTCP.STATUS_CONNECTING:
+		_tcp.poll()
+		status = _tcp.get_status()
 		timeout += get_process_delta_time()
-		if timeout > 3.0:
-			push_error("Connection timeout")
+		
+		if timeout > 10.0:
+			print("[CameraView] Connection timeout! Status: ", status)
+			push_error("Connection timeout after 10s")
 			return false
+		
 		await get_tree().process_frame
 	
-	if _http_client.get_status() != HTTPClient.STATUS_CONNECTED:
-		push_error("Failed to connect to stream server")
+	print("[CameraView] Final TCP status: ", status)
+	
+	if _tcp.get_status() != StreamPeerTCP.STATUS_CONNECTED:
+		push_error("Failed to connect, status: " + str(_tcp.get_status()))
 		return false
 	
-	_http_client.request(HTTPClient.METHOD_GET, "/camera", 
-		["Accept: multipart/x-mixed-replace", "Connection: keep-alive", "Cache-Control: no-cache"])
+	print("[CameraView] Connected, sending HTTP request...")
+	
+	# Send HTTP request manually
+	var request := "GET " + path + " HTTP/1.1\r\n"
+	request += "Host: " + host + ":" + str(port) + "\r\n"
+	request += "Accept: multipart/x-mixed-replace\r\n"
+	request += "Connection: keep-alive\r\n"
+	request += "\r\n"
+	
+	_tcp.put_data(request.to_utf8_buffer())
+	
+	print("[CameraView] Request sent, starting stream thread...")
 	
 	_is_streaming = true
 	_thread_running = true
 	_stream_thread = Thread.new()
-	_stream_thread.start(_stream_loop)
+	var thread_err := _stream_thread.start(_stream_loop)
+	if thread_err != OK:
+		push_error("Failed to start stream thread: " + str(thread_err))
+		_is_streaming = false
+		_thread_running = false
+		return false
 	
 	visible = true
 	stream_started.emit()
+	print("[CameraView] Stream started successfully")
 	return true
 
 func stop_stream() -> void:
 	if not _is_streaming:
 		return
 	
+	print("[CameraView] Stopping stream...")
 	_thread_running = false
 	_is_streaming = false
 	
 	if _stream_thread and _stream_thread.is_alive():
 		_stream_thread.wait_to_finish()
 	
-	if _http_client:
-		_http_client.close()
-		_http_client = null
+	if _tcp:
+		_tcp.disconnect_from_host()
+		_tcp = null
 	
 	visible = false
 	stream_stopped.emit()
+	print("[CameraView] Stream stopped")
 
 func is_streaming() -> bool:
 	return _is_streaming
 
-func get_stream_url() -> String:
-	return stream_url
-
 func _stream_loop() -> void:
 	print("[CameraView] Stream thread started")
-	var frame_count: int = 0
-	var last_log_time: int = Time.get_ticks_msec()
+	var bytes_received := 0
+	var frames_decoded := 0
+	var last_log := Time.get_ticks_msec()
+	var header_parsed := false
 	
-	while _thread_running:
-		if _http_client:
-			_http_client.poll()
-			
-			var status := _http_client.get_status()
-			
-			if status == HTTPClient.STATUS_BODY:
-				var chunk := _http_client.read_response_body_chunk()
-				if chunk.size() > 0:
-					_mjpeg_buffer.append_array(chunk)
-					_parse_mjpeg_buffer()
-			
-			elif status == HTTPClient.STATUS_DISCONNECTED:
-				print("[CameraView] Connection lost, reconnecting...")
-				_http_client.connect_to_host(stream_url.split("://")[1].split("/")[0], 4243)
-			
-			frame_count += 1
+	while _thread_running and _tcp:
+		_tcp.poll()
 		
-		var current_time: int = Time.get_ticks_msec()
-		if current_time - last_log_time > 5000:
-			last_log_time = current_time
+		if _tcp.get_status() != StreamPeerTCP.STATUS_CONNECTED:
+			print("[CameraView] Connection lost")
+			break
+		
+		# Read available data
+		var available := _tcp.get_available_bytes()
+		if available > 0:
+			var chunk := _tcp.get_data(available)
+			if chunk[0] == OK:
+				bytes_received += chunk[1].size()
+				_mjpeg_buffer.append_array(chunk[1])
+				
+				# Parse HTTP headers first
+				if not header_parsed:
+					var header_end := _mjpeg_buffer.get_string_from_utf8().find("\r\n\r\n")
+					if header_end != -1:
+						print("[CameraView] HTTP headers received")
+						_mjpeg_buffer = _mjpeg_buffer.slice(header_end + 4)
+						header_parsed = true
+				
+				# Try to parse frames
+				if header_parsed:
+					while _parse_mjpeg_frame():
+						frames_decoded += 1
+		
+		# Log stats every 5 seconds
+		var now := Time.get_ticks_msec()
+		if now - last_log > 5000:
+			print("[CameraView] Stats: ", bytes_received, " bytes, ", frames_decoded, " frames")
+			bytes_received = 0
+			frames_decoded = 0
+			last_log = now
 		
 		OS.delay_msec(5)
 	
 	print("[CameraView] Stream thread ended")
 
-func _parse_mjpeg_buffer() -> void:
+func _parse_mjpeg_frame() -> bool:
+	# Convert buffer to string just for finding boundaries (headers are ASCII)
 	var buffer_str := _mjpeg_buffer.get_string_from_utf8()
 	
-	var boundary_pos := buffer_str.find(_boundary_marker)
+	# Find boundary
+	var boundary := "--frame-boundary"
+	var boundary_pos := buffer_str.find(boundary)
 	if boundary_pos == -1:
-		return
+		return false
 	
-	var next_boundary_pos := buffer_str.find(_boundary_marker, boundary_pos + _boundary_marker.length())
-	if next_boundary_pos == -1:
-		return
+	var next_boundary := buffer_str.find(boundary, boundary_pos + boundary.length())
+	if next_boundary == -1:
+		return false
 	
-	var frame_section := buffer_str.substr(boundary_pos, next_boundary_pos - boundary_pos)
+	# Extract frame section as string for parsing headers
+	var frame_section := buffer_str.substr(boundary_pos, next_boundary - boundary_pos)
 	
-	var jpeg_start := frame_section.find("\r\n\r\n")
-	if jpeg_start == -1:
-		jpeg_start = frame_section.find("\n\n")
+	# Find Content-Length header
+	var content_length_start := frame_section.find("Content-Length: ")
+	var jpeg_data: PackedByteArray
 	
-	if jpeg_start != -1:
-		jpeg_start += 4
-		
-		var content_length_start := frame_section.find("Content-Length: ")
-		var jpeg_size: int = -1
-		if content_length_start != -1 and content_length_start < jpeg_start:
-			var length_end := frame_section.find("\r\n", content_length_start)
-			if length_end != -1:
-				var length_str := frame_section.substr(content_length_start + 16, length_end - content_length_start - 16)
-				jpeg_size = length_str.to_int()
-		
-		var jpeg_data: PackedByteArray
-		if jpeg_size > 0:
-			var header_bytes := frame_section.substr(0, jpeg_start).to_utf8_buffer().size()
-			var start_byte := boundary_pos + header_bytes
-			jpeg_data = _mjpeg_buffer.slice(start_byte, start_byte + jpeg_size)
+	if content_length_start != -1:
+		var length_end := frame_section.find("\r\n", content_length_start)
+		if length_end != -1:
+			var len_str := frame_section.substr(content_length_start + 16, length_end - content_length_start - 16)
+			var jpeg_size := len_str.to_int()
+			
+			# Find header end in string
+			var header_end := frame_section.find("\r\n\r\n")
+			if header_end == -1:
+				header_end = frame_section.find("\n\n")
+			if header_end != -1:
+				header_end += 4
+				
+				# Calculate byte positions
+				var header_str := frame_section.substr(0, header_end)
+				var header_bytes := header_str.to_utf8_buffer().size()
+				var start_byte := boundary_pos + header_bytes
+				
+				if start_byte + jpeg_size <= _mjpeg_buffer.size():
+					jpeg_data = _mjpeg_buffer.slice(start_byte, start_byte + jpeg_size)
+	
+	if jpeg_data.is_empty():
+		# Fallback: find JPEG start marker (FF D8) in raw bytes
+		for i in range(boundary_pos, min(next_boundary, _mjpeg_buffer.size() - 1)):
+			if _mjpeg_buffer[i] == 0xFF and _mjpeg_buffer[i + 1] == 0xD8:
+				# Found JPEG start, extract until end marker (FF D9) or next boundary
+				var jpeg_start := i
+				var jpeg_end := next_boundary
+				
+				# Look for JPEG end marker
+				for j in range(jpeg_start + 2, min(next_boundary, _mjpeg_buffer.size() - 1)):
+					if _mjpeg_buffer[j] == 0xFF and _mjpeg_buffer[j + 1] == 0xD9:
+						jpeg_end = j + 2
+						break
+				
+				if jpeg_end > jpeg_start:
+					jpeg_data = _mjpeg_buffer.slice(jpeg_start, jpeg_end)
+					break
+	
+	if jpeg_data.size() > 0:
+		var img := Image.new()
+		var err := img.load_jpg_from_buffer(jpeg_data)
+		if err == OK:
+			_frame_mutex.lock()
+			_current_frame = img
+			_frame_mutex.unlock()
+			_mjpeg_buffer = _mjpeg_buffer.slice(next_boundary)
+			return true
 		else:
-			var jpeg_str := frame_section.substr(jpeg_start, next_boundary_pos - boundary_pos - jpeg_start)
-			jpeg_data = jpeg_str.to_utf8_buffer()
-		
-		if jpeg_data.size() > 0:
-			var image := Image.new()
-			var err := image.load_jpg_from_buffer(jpeg_data)
-			if err == OK:
-				_frame_mutex.lock()
-				_current_frame = image
-				_frame_mutex.unlock()
+			print("[CameraView] JPEG decode error: ", err, " (size: ", jpeg_data.size(), ")")
 	
-	_mjpeg_buffer = _mjpeg_buffer.slice(next_boundary_pos)
+	_mjpeg_buffer = _mjpeg_buffer.slice(next_boundary)
+	return false
 
 func _update_texture() -> void:
 	_frame_mutex.lock()
 	var frame := _current_frame
 	_frame_mutex.unlock()
-	
 	if frame and frame.get_width() > 0:
-		var texture := ImageTexture.create_from_image(frame)
-		self.texture = texture
-
-static func create_picture_in_picture(parent: Node, position: Vector2 = Vector2(10, 10), 
-									size: Vector2 = Vector2(320, 240)) -> MediaPipeCameraView:
-	var camera_view := MediaPipeCameraView.new()
-	camera_view.position = position
-	camera_view.size = size
-	camera_view.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
-	camera_view.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	
-	var bg := ColorRect.new()
-	bg.color = Color(0, 0, 0, 0.5)
-	bg.size = size
-	bg.position = Vector2.ZERO
-	camera_view.add_child(bg)
-	bg.owner = parent
-	
-	parent.add_child(camera_view)
-	camera_view.owner = parent
-	
-	return camera_view
+		self.texture = ImageTexture.create_from_image(frame)

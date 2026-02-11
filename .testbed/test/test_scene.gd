@@ -138,6 +138,9 @@ func _start_camera_feed() -> void:
 	if landmark_drawer:
 		landmark_drawer.reparent(camera_display)
 	
+	# Wait a frame for the node to be fully added to the tree
+	await get_tree().process_frame
+	
 	# Start the stream (async)
 	await camera_view.start_stream()
 
@@ -173,7 +176,6 @@ func update_status(text: String, color: Color = Color.WHITE) -> void:
 	if status_label:
 		status_label.text = text
 		status_label.modulate = color
-	print("[MediaPipe Test] ", text)
 
 func _update_debug_info() -> void:
 	if not info_label or not provider or not _server_ready:
@@ -209,13 +211,20 @@ func _format_pos(pos: Variant) -> String:
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
-		if provider:
-			provider.stop()
-		if auto_start_manager:
-			auto_start_manager.stop_server()
+		print("[TestScene] Window close request, stopping everything...")
+		_stop_everything()
 		get_tree().quit()
 	elif what == NOTIFICATION_EXIT_TREE:
-		if provider:
-			provider.stop()
-		if auto_start_manager:
-			auto_start_manager.stop_server()
+		print("[TestScene] Exit tree, stopping everything...")
+		_stop_everything()
+
+func _stop_everything() -> void:
+	if camera_view and camera_view.is_streaming():
+		print("[TestScene] Stopping camera stream...")
+		camera_view.stop_stream()
+	if provider:
+		print("[TestScene] Stopping provider...")
+		provider.stop()
+	if auto_start_manager:
+		print("[TestScene] Stopping auto-start manager...")
+		auto_start_manager.stop_server()

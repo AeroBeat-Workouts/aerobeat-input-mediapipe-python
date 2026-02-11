@@ -15,7 +15,6 @@ signal parse_error(error: String)
 var _udp: PacketPeerUDP = PacketPeerUDP.new()
 var _is_running: bool = false
 var _poll_count: int = 0
-var _last_packet_time: int = 0
 
 func start() -> bool:
 	var port: int = config.udp_port if config else 4242
@@ -110,21 +109,21 @@ func _parse_json_packet(data_bytes: PackedByteArray) -> void:
 				if first_pose is Dictionary:
 					var first_pose_dict: Dictionary = first_pose
 					if first_pose_dict.has("landmarks"):
-						var landmarks: Variant = first_pose_dict["landmarks"]
-						if landmarks is Array:
-							landmarks_received.emit(landmarks)
+						var pose_landmarks: Variant = first_pose_dict["landmarks"]
+						if pose_landmarks is Array:
+							landmarks_received.emit(pose_landmarks)
 			return
 	
 	if not data_dict.has("landmarks"):
 		parse_error.emit("Missing 'landmarks' field")
 		return
 	
-	var landmarks: Variant = data_dict["landmarks"]
-	if not landmarks is Array:
+	var landmarks_array: Variant = data_dict["landmarks"]
+	if not landmarks_array is Array:
 		parse_error.emit("'landmarks' should be an array")
 		return
 	
-	landmarks_received.emit(landmarks)
+	landmarks_received.emit(landmarks_array)
 
 func _parse_binary_packet(_data_bytes: PackedByteArray) -> void:
 	parse_error.emit("Binary protocol not yet supported")

@@ -77,22 +77,28 @@ func start_server() -> bool:
 
 ## Stop the server
 func stop_server() -> void:
+	print("[AutoStartManager] stop_server() called, PID: ", server_pid)
+	
 	# Safety check: NEVER kill PID 0 or 1 (kernel/init)
 	if server_pid <= 1:
+		print("[AutoStartManager] Invalid PID, nothing to stop")
 		server_pid = -1
 		_is_running = false
 		return
 	
 	if server_pid > 1:
+		print("[AutoStartManager] Killing server processes...")
 		# Kill the Python process and any children (non-blocking)
 		var output: Array = []
-		OS.execute("pkill", ["-P", str(server_pid)], output, false)  # Kill children first
-		OS.execute("kill", [str(server_pid)], output, false)  # Kill parent
-		OS.execute("pkill", ["-f", "python_mediapipe/main.py"], output, false)  # Kill any stragglers
+		OS.execute("pkill", ["-9", "-P", str(server_pid)], output, false)  # Kill children with SIGKILL
+		OS.execute("kill", ["-9", str(server_pid)], output, false)  # Kill parent with SIGKILL
+		OS.execute("pkill", ["-9", "-f", "python_mediapipe/main.py"], output, false)  # Kill any stragglers
+		OS.execute("pkill", ["-9", "-f", "mediapipe"], output, false)  # Kill any mediapipe processes
 		
 		server_pid = -1
 		_is_running = false
 		emit_signal("server_stopped")
+		print("[AutoStartManager] Server stopped")
 
 ## Main entry point - check and start
 func _check_and_start() -> bool:

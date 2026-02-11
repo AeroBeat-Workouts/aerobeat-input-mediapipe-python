@@ -79,8 +79,9 @@ func _get_landmark_position(landmark_id: int, mode: TrackingMode) -> Variant:
 		return Vector3(x, y, lm.z)
 
 func is_tracking() -> bool:
-	var current_time: float = Time.get_time_dict_from_system()["second"]
-	var is_currently_tracking: bool = (current_time - _last_update_time) < _tracking_timeout
+	var current_time_ms: int = Time.get_ticks_msec()
+	var time_since_update: float = (current_time_ms - _last_update_time) / 1000.0
+	var is_currently_tracking: bool = time_since_update < _tracking_timeout
 	
 	if is_currently_tracking and not _was_tracking:
 		tracking_restored.emit()
@@ -96,7 +97,7 @@ func _on_landmarks_received(landmarks: Array) -> void:
 		if lm.has("v") and lm.v > config.min_visibility:
 			_landmarks[lm.id] = lm
 	
-	_last_update_time = Time.get_time_dict_from_system()["second"]
+	_last_update_time = Time.get_ticks_msec()
 	pose_updated.emit(landmarks)
 
 func _notification(what: int) -> void:
