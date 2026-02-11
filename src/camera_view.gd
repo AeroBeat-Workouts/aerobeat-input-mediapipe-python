@@ -339,17 +339,31 @@ func _stream_loop() -> void:
 				
 				# Buffer overflow protection - drop old data if buffer grows too large
 				if _mjpeg_buffer.size() > MAX_BUFFER_SIZE:
-					print("[CameraView] Buffer overflow (", _mjpeg_buffer.size(), " bytes), dropping stale frames")
-					# Keep only the most recent data (last 8KB which likely contains a partial frame)
-					var keep_size: int = mini(8192, _mjpeg_buffer.size())
-					_mjpeg_buffer = _mjpeg_buffer.slice(_mjpeg_buffer.size() - keep_size)
-					header_parsed = false  # Reset header parsing
+					# Find the most recent frame boundary and keep from there
+					var boundary_bytes := PackedByteArray([0x2D, 0x2D, 0x66, 0x72, 0x61, 0x6D, 0x65, 0x2D, 0x62, 0x6F, 0x75, 0x6E, 0x64, 0x61, 0x72, 0x79])  # "--frame-boundary"
+					var last_boundary := -1
+					var search_start := maxi(0, _mjpeg_buffer.size() - 32768)  # Search last 32KB
+					for i in range(search_start, _mjpeg_buffer.size() - boundary_bytes.size()):
+						var found := true
+						for j in range(boundary_bytes.size()):
+							if _mjpeg_buffer[i + j] != boundary_bytes[j]:
+								found = false
+								break
+						if found:
+							last_boundary = i
+					
+					if last_boundary != -1:
+						_mjpeg_buffer = _mjpeg_buffer.slice(last_boundary)
+						header_parsed = false
+					else:
+						# No boundary found, clear buffer and start fresh
+						_mjpeg_buffer.clear()
+						header_parsed = false
 				
 				# Parse HTTP headers first (search for \r\n\r\n as bytes, not UTF-8)
 				if not header_parsed:
 					var header_end := _find_byte_pattern(_mjpeg_buffer, PackedByteArray([0x0D, 0x0A, 0x0D, 0x0A]))  # \r\n\r\n
 					if header_end != -1:
-						print("[CameraView] HTTP headers received")
 						_mjpeg_buffer = _mjpeg_buffer.slice(header_end + 4)
 						header_parsed = true
 				
