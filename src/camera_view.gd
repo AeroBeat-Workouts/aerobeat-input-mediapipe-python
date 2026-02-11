@@ -337,28 +337,10 @@ func _stream_loop() -> void:
 				bytes_received += chunk[1].size()
 				_mjpeg_buffer.append_array(chunk[1])
 				
-				# Buffer overflow protection - drop old data if buffer grows too large
+				# Buffer overflow protection - simple clear when too large
 				if _mjpeg_buffer.size() > MAX_BUFFER_SIZE:
-					# Find the most recent frame boundary and keep from there
-					var boundary_bytes := PackedByteArray([0x2D, 0x2D, 0x66, 0x72, 0x61, 0x6D, 0x65, 0x2D, 0x62, 0x6F, 0x75, 0x6E, 0x64, 0x61, 0x72, 0x79])  # "--frame-boundary"
-					var last_boundary := -1
-					var search_start := maxi(0, _mjpeg_buffer.size() - 32768)  # Search last 32KB
-					for i in range(search_start, _mjpeg_buffer.size() - boundary_bytes.size()):
-						var found := true
-						for j in range(boundary_bytes.size()):
-							if _mjpeg_buffer[i + j] != boundary_bytes[j]:
-								found = false
-								break
-						if found:
-							last_boundary = i
-					
-					if last_boundary != -1:
-						_mjpeg_buffer = _mjpeg_buffer.slice(last_boundary)
-						header_parsed = false
-					else:
-						# No boundary found, clear buffer and start fresh
-						_mjpeg_buffer.clear()
-						header_parsed = false
+					_mjpeg_buffer.clear()
+					header_parsed = false
 				
 				# Parse HTTP headers first (search for \r\n\r\n as bytes, not UTF-8)
 				if not header_parsed:
@@ -369,11 +351,10 @@ func _stream_loop() -> void:
 				
 				# Parse frames as they arrive
 				if header_parsed:
-					while _parse_mjpeg_frame():
+					var parsed_this_iteration := 0
+					while parsed_this_iteration < 2 and _parse_mjpeg_frame():
 						frames_decoded += 1
-						# Limit to prevent spending too long in one iteration
-						if frames_decoded > 3:
-							break
+						parsed_this_iteration += 1
 		
 		# Log stats every 5 seconds
 		var now := Time.get_ticks_msec()
@@ -383,7 +364,7 @@ func _stream_loop() -> void:
 			frames_decoded = 0
 			last_log = now
 		
-		OS.delay_msec(1)  # Reduced from 5ms for lower latency
+		OS.delay_msec(5)
 	
 	print("[CameraView] Stream thread ended")
 
