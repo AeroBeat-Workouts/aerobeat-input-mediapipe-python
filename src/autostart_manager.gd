@@ -147,10 +147,13 @@ func stop_server() -> void:
 
 func _is_process_alive(pid: int) -> bool:
 	if pid <= 1:
+		print("[AutoStartManager] _is_process_alive: PID %d <= 1, returning false" % pid)
 		return false
 	var output: Array = []
 	# Use negative PID to check process group
-	var exit_code := OS.execute("/bin/kill", ["-0", "-" + str(pid)], output, true)
+	print("[AutoStartManager] _is_process_alive: Running kill -0 -%d" % pid)
+	var exit_code := OS.execute("/bin/kill", ["-0", "-" + str(pid)], output, false)
+	print("[AutoStartManager] _is_process_alive: kill returned exit code %d" % exit_code)
 	return exit_code == 0
 
 ## Main entry point - check and start
@@ -318,13 +321,23 @@ func _start_detached_server() -> int:
 	var bash_pid: int = OS.create_process("/bin/bash", ["-c", bash_cmd])
 	
 	if bash_pid <= 0:
+		print("[AutoStartManager] ERROR: Failed to create bash process")
 		return -1
 	
+	print("[AutoStartManager] Bash process created, PID: %d" % bash_pid)
+	
 	# Wait briefly for setsid to complete and PID file to be written
+	print("[AutoStartManager] Waiting 0.5s for PID file...")
+	if get_tree() == null:
+		print("[AutoStartManager] ERROR: get_tree() is null!")
+		return -1
 	await get_tree().create_timer(0.5).timeout
+	print("[AutoStartManager] Wait complete, reading PID file...")
 	
 	# Read the actual Python process group ID
 	var pgid := _read_pid_file(pid_file)
+	print("[AutoStartManager] Read PGID from file: %d" % pgid)
+	
 	if pgid > 0:
 		print("[AutoStartManager] Started Python in process group ", pgid)
 	else:
@@ -332,11 +345,19 @@ func _start_detached_server() -> int:
 		pgid = bash_pid
 	
 	# Wait for server to fully start
+	print("[AutoStartManager] Waiting 2.5s for server to start...")
+	if get_tree() == null:
+		print("[AutoStartManager] ERROR: get_tree() is null before 2.5s wait!")
+		return -1
 	await get_tree().create_timer(2.5).timeout
+	print("[AutoStartManager] 2.5s wait complete")
 	
 	# Verify server is actually running
 	print("[AutoStartManager] Checking if PGID %d is alive..." % pgid)
-	if _is_process_alive(pgid):
+	var is_alive := _is_process_alive(pgid)
+	print("[AutoStartManager] _is_process_alive returned: %s" % str(is_alive))
+	
+	if is_alive:
 		print("[AutoStartManager] PGID %d is alive, returning success" % pgid)
 		return pgid
 	
