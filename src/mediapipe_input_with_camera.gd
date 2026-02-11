@@ -69,7 +69,21 @@ func _input(event):
 		toggle_camera()
 
 func _exit_tree():
+	print("[MediaPipeInputWithCamera] _exit_tree() called")
 	stop()
+
+func _notification(what: int) -> void:
+	# Ensure cleanup happens even if _exit_tree isn't called
+	match what:
+		NOTIFICATION_PREDELETE:
+			print("[MediaPipeInputWithCamera] PREDELETE notification - stopping")
+			stop()
+		NOTIFICATION_EXIT_TREE:
+			print("[MediaPipeInputWithCamera] EXIT_TREE notification - stopping")
+			stop()
+		NOTIFICATION_WM_CLOSE_REQUEST:
+			print("[MediaPipeInputWithCamera] WM_CLOSE_REQUEST notification - stopping")
+			stop()
 
 ## Public API
 
@@ -81,7 +95,7 @@ func start() -> bool:
 	if not _provider:
 		_create_provider()
 	
-	var success = _provider.start()
+	var success: bool = _provider.start()
 	if success:
 		_is_running = true
 		tracking_started.emit()
@@ -95,6 +109,8 @@ func stop():
 	"""Stop tracking and streaming"""
 	if not _is_running:
 		return
+	
+	print("[MediaPipeInputWithCamera] Stopping...")
 	
 	if _camera_view:
 		_camera_view.stop_stream()

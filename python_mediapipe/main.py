@@ -3,6 +3,7 @@
 
 import signal
 import sys
+import os
 import socket
 import json
 import time
@@ -29,6 +30,9 @@ args = parse_args()
 
 # Global flag for graceful shutdown
 _running = True
+_heartbeat_last_time = time.time()
+_heartbeat_lock = threading.Lock()
+_heartbeat_timeout_sec = 3.0  # Exit if no heartbeat for 3 seconds
 
 # Model paths for different complexity levels
 MODEL_PATHS = {
@@ -48,6 +52,34 @@ POSE_CONNECTIONS = [
     (23, 25), (25, 27), (27, 29), (29, 31),  # Left leg
     (24, 26), (26, 28), (28, 30), (30, 32),  # Right leg
 ]
+
+
+def update_heartbeat():
+    """Update the last heartbeat timestamp"""
+    global _heartbeat_last_time
+    with _heartbeat_lock:
+        _heartbeat_last_time = time.time()
+
+
+def check_heartbeat() -> bool:
+    """Check if heartbeat is still valid"""
+    with _heartbeat_lock:
+        elapsed = time.time() - _heartbeat_last_time
+        return elapsed < _heartbeat_timeout_sec
+
+
+def heartbeat_monitor():
+    """Monitor heartbeat and trigger shutdown if Godot stops responding"""
+    global _running
+    print(f"[Heartbeat] Monitor started - timeout: {_heartbeat_timeout_sec}s")
+    while _running:
+        time.sleep(0.5)
+        if not check_heartbeat():
+            print(f"[Heartbeat] Timeout - no heartbeat for {time.time() - _heartbeat_last_time:.1f}s, shutting down...")
+            _running = False
+            break
+    print("[Heartbeat] Monitor stopped")
+
 
 def draw_landmarks_on_frame(frame, landmarks, connections=True, pose_id=0):
     """Draw landmarks and skeleton on frame for debug visualization"""
@@ -103,6 +135,7 @@ def draw_landmarks_on_frame(frame, landmarks, connections=True, pose_id=0):
     
     return output
 
+
 # Threaded frame capture
 class FrameCapture:
     """Threaded frame capture to always get the latest frame"""
@@ -152,6 +185,7 @@ class FrameCapture:
         self._running = False
         self._thread.join(timeout=1.0)
         self.cap.release()
+
 
 # UDP Sender with batching support
 class UDPSender:
@@ -269,13 +303,52 @@ class LatencyTracker:
               f"serialization={avg_serialization:.2f}ms | "
               f"TOTAL={avg_total:.2f}ms")
 
+
 def signal_handler(sig, frame):
     global _running
-    print("\nShutting down gracefully...")
+    print(f"\n[Signal] Received signal {sig} ({signal.Signals(sig).name if hasattr(signal, 'Signals') else 'unknown'}), initiating shutdown...")
     _running = False
+    
+    # Force exit immediately using os._exit - bypasses all cleanup
+    # This is necessary because OpenCV VideoCapture can block in uninterruptible sleep
+    def force_exit():
+        time.sleep(0.2)  # Short delay to let signal handler complete
+        print("[Signal] Force exiting with os._exit(0)...")
+        os._exit(0)
+    
+    # Start force-exit thread as non-daemon so it won't be waited on
+    import threading
+    exit_thread = threading.Thread(target=force_exit, name="force_exit_thread")
+    exit_thread.daemon = False
+    exit_thread.start()
+    
+    # Also schedule a self-SIGKILL as absolute last resort
+    def suicide():
+        time.sleep(0.8)
+        # Only if we're still running (force_exit didn't complete)
+        if _running or True:  # Always try as last resort
+            print("[Signal] Sending SIGKILL to self...")
+            try:
+                os.kill(os.getpid(), signal.SIGKILL)
+            except:
+                pass
+    
+    suicide_thread = threading.Thread(target=suicide, name="suicide_thread")
+    suicide_thread.daemon = True
+    suicide_thread.start()
+    
+    # Also try to interrupt any blocking I/O by closing file descriptors
+    try:
+        import sys
+        sys.stderr.flush()
+        sys.stdout.flush()
+    except:
+        pass
+
 
 signal.signal(signal.SIGTERM, signal_handler)
 signal.signal(signal.SIGINT, signal_handler)
+
 
 def create_pose_detector(model_complexity: int = 0, 
                         min_detection_confidence: float = 0.3,
@@ -295,6 +368,7 @@ def create_pose_detector(model_complexity: int = 0,
     )
     
     return vision.PoseLandmarker.create_from_options(options)
+
 
 def preprocess_frame(frame, target_size):
     """Resize frame before MediaPipe for faster inference"""
@@ -341,6 +415,7 @@ def serialize_landmarks_binary(landmarks, timestamp, capture_ms=0.0, inference_m
                                        filter_ms, serialization_ms, frame_count,
                                        processing_fps, skip_frames)
 
+
 def serialize_landmarks_json(landmarks, timestamp, capture_ms=0.0, inference_ms=0.0,
                              filter_ms=0.0, serialization_ms=0.0, frame_count=0, 
                              processing_fps=60.0, skip_frames=1, all_poses=None):
@@ -380,6 +455,7 @@ def serialize_landmarks_json(landmarks, timestamp, capture_ms=0.0, inference_ms=
     
     return json.dumps(payload).encode()
 
+
 def main():
     global _running
     
@@ -387,6 +463,19 @@ def main():
     setup_platform_optimizations()
     
     latency_tracker = LatencyTracker()
+    
+    # Initialize heartbeat socket (receives heartbeat from Godot)
+    heartbeat_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    heartbeat_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    heartbeat_sock.setblocking(False)
+    try:
+        # Bind to heartbeat port (main port + 2, avoiding conflict with stream port at +1)
+        heartbeat_port = args.port + 2
+        heartbeat_sock.bind((args.host, heartbeat_port))
+        print(f"[Heartbeat] Listening on port {heartbeat_port}")
+    except Exception as e:
+        print(f"[Heartbeat] Warning: Could not bind heartbeat port: {e}")
+        heartbeat_sock = None
     
     # Initialize UDP socket with tuned buffer size for low latency
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -465,7 +554,7 @@ def main():
     print(f"Multi-pose: 2 people max (Player 1 = Green, Player 2 = Magenta)")
     print(f"Binary protocol: {args.binary_protocol}")
     print(f"UDP buffer size: {args.udp_buffer_size} bytes")
-    print(f"Frame skipping: {skip_frames} (capture: {args.max_fps}fps → process: {processing_fps:.1f}fps)")
+    print(f"Frame skipping: {skip_frames} (capture: {args.max_fps}fps -> process: {processing_fps:.1f}fps)")
     if args.stream_camera:
         print(f"Camera streaming: enabled at http://127.0.0.1:{args.stream_port}/camera")
     else:
@@ -475,6 +564,28 @@ def main():
         print("Press 'q' in the window to quit")
     else:
         print("Debug window: disabled (use --show-window to enable)")
+    
+    # Start heartbeat monitor thread
+    heartbeat_thread = threading.Thread(target=heartbeat_monitor, daemon=True)
+    heartbeat_thread.start()
+    
+    # Start watchdog thread to ensure clean exit
+    # This is needed because OpenCV VideoCapture can block in uninterruptible sleep
+    def watchdog():
+        shutdown_start = None
+        while True:
+            if not _running:
+                if shutdown_start is None:
+                    shutdown_start = time.time()
+                    print("[Watchdog] Shutdown requested, monitoring...")
+                elif time.time() - shutdown_start > 2.0:
+                    # Process should have exited by now, force kill
+                    print("[Watchdog] Shutdown timeout reached, forcing exit...")
+                    os._exit(1)
+            time.sleep(0.5)
+    
+    watchdog_thread = threading.Thread(target=watchdog, daemon=True)
+    watchdog_thread.start()
     
     # Create debug window if enabled
     if args.show_window:
@@ -488,6 +599,18 @@ def main():
     
     while _running:
         frame_start = time.time()
+        
+        # Check for heartbeat messages from Godot
+        if heartbeat_sock:
+            try:
+                while True:
+                    data, addr = heartbeat_sock.recvfrom(1024)
+                    if data:
+                        update_heartbeat()
+            except BlockingIOError:
+                pass  # No data available
+            except Exception as e:
+                pass  # Ignore other errors
         
         # Capture frame
         if frame_capture:
@@ -626,6 +749,7 @@ def main():
             time.sleep(sleep_time)
     
     # Cleanup
+    print("[Main] Cleaning up...")
     if args.show_window:
         cv2.destroyAllWindows()
     if frame_capture:
@@ -634,9 +758,11 @@ def main():
         cap.release()
     if mjpeg_streamer:
         mjpeg_streamer.stop()
-    # Close the detector (no explicit close method in Tasks API, let garbage collector handle it)
+    if heartbeat_sock:
+        heartbeat_sock.close()
     sock.close()
     print("MediaPipe stopped")
+
 
 if __name__ == "__main__":
     main()

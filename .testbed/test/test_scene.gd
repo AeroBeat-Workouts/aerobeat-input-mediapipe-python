@@ -38,8 +38,10 @@ func _setup_auto_start() -> void:
 	auto_start_manager.installation_progress.connect(_on_install_progress)
 	auto_start_manager.installation_complete.connect(_on_install_complete)
 	
-	# Start server (async)
-	await auto_start_manager.start_server()
+	# Only start server manually if auto_start is disabled
+	# Otherwise AutoStartManager._ready() will handle it
+	if not auto_start_manager.auto_start:
+		await auto_start_manager.start_server()
 
 func _on_check_progress(percentage: int, message: String) -> void:
 	update_status(str(percentage) + "% - " + message, Color.YELLOW)
@@ -217,14 +219,36 @@ func _notification(what: int) -> void:
 	elif what == NOTIFICATION_EXIT_TREE:
 		print("[TestScene] Exit tree, stopping everything...")
 		_stop_everything()
+	elif what == NOTIFICATION_PREDELETE:
+		print("[TestScene] Pre-delete, stopping everything...")
+		_stop_everything()
 
 func _stop_everything() -> void:
+	print("[TestScene] Stopping everything...")
+	
+	# Stop camera view FIRST to disconnect from HTTP stream
+	# This prevents XServer errors from MJPEG stream
 	if camera_view and camera_view.is_streaming():
 		print("[TestScene] Stopping camera stream...")
 		camera_view.stop_stream()
+		camera_view = null
+	
+	# Small delay to let TCP connections close
+	OS.delay_msec(50)
+	
+	# Stop provider (UDP server)
 	if provider:
 		print("[TestScene] Stopping provider...")
 		provider.stop()
+		provider = null
+	
+	# Stop auto-start manager last (kills Python process)
 	if auto_start_manager:
 		print("[TestScene] Stopping auto-start manager...")
 		auto_start_manager.stop_server()
+		auto_start_manager = null
+	
+	# Give processes time to clean up
+	OS.delay_msec(200)
+	
+	print("[TestScene] Cleanup complete")

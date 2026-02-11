@@ -12,8 +12,8 @@ signal tracking_restored()
 
 @onready var _server: MediaPipeServer = $MediaPipeServer
 
-var _last_update_time: float = 0.0
-var _tracking_timeout: float = 0.5  # seconds
+var _last_update_time_ms: int = 0
+var _tracking_timeout_ms: int = 500  # milliseconds
 var _landmarks: Dictionary = {}  # id -> landmark data (primary pose)
 var _all_poses: Array = []  # Array of {pose_id, landmarks}
 var _was_tracking := false
@@ -69,12 +69,12 @@ func get_landmark_position_for_pose(pose_idx: int, landmark_id: int,
 	if not pose_data is Dictionary:
 		return null
 	
-	var landmarks = pose_data.get("landmarks", [])
+	var landmarks: Variant = pose_data.get("landmarks", [])
 	if not landmarks is Array:
 		return null
 	
 	# Find landmark by id
-	for lm in landmarks:
+	for lm: Variant in landmarks:
 		if lm is Dictionary and lm.get("id") == landmark_id:
 			if lm.has("v") and lm.v > config.min_visibility:
 				return _convert_landmark_to_position(lm, mode)
@@ -115,8 +115,9 @@ func _get_landmark_position(landmark_id: int, mode: TrackingMode) -> Variant:
 	return get_landmark_position_for_pose(0, landmark_id, mode)
 
 func _convert_landmark_to_position(lm: Dictionary, mode: TrackingMode) -> Variant:
-	var x = lm.x
-	var y = 1.0 - lm.y  # Flip Y axis
+	var x: float = lm.get("x", 0.0)
+	var y: float = 1.0 - lm.get("y", 0.0)  # Flip Y axis
+	var z: float = lm.get("z", 0.0)
 	
 	if config and config.flip_horizontal:
 		x = 1.0 - x
@@ -124,11 +125,11 @@ func _convert_landmark_to_position(lm: Dictionary, mode: TrackingMode) -> Varian
 	if mode == TrackingMode.MODE_2D:
 		return Vector2(x, y)
 	else:
-		return Vector3(x, y, lm.z)
+		return Vector3(x, y, z)
 
 func is_tracking() -> bool:
-	var current_time = Time.get_time_dict_from_system()["second"]
-	var is_currently_tracking = (current_time - _last_update_time) < _tracking_timeout
+	var current_time_ms: int := Time.get_ticks_msec()
+	var is_currently_tracking: bool = (current_time_ms - _last_update_time_ms) < _tracking_timeout_ms
 	
 	# Emit signals on state change
 	if is_currently_tracking and not _was_tracking:
@@ -147,28 +148,35 @@ func is_tracking_player(player_idx: int) -> bool:
 	if not pose_data is Dictionary:
 		return false
 	
-	var landmarks = pose_data.get("landmarks", [])
+	var landmarks: Variant = pose_data.get("landmarks", [])
 	return landmarks is Array and landmarks.size() > 0
 
 func _on_landmarks_received(landmarks: Array):
 	_landmarks.clear()
-	for lm in landmarks:
-		if lm.has("v") and lm.v > config.min_visibility:
-			_landmarks[lm.id] = lm
+	for landmark: Dictionary in landmarks:
+		# Use >= for visibility check so exact threshold matches
+		var visibility: float = landmark.get("v", 1.0)
+		if visibility >= config.min_visibility:
+			_landmarks[landmark.get("id", 0)] = landmark
 	
-	_last_update_time = Time.get_time_dict_from_system()["second"]
+	_last_update_time_ms = Time.get_ticks_msec()
 	pose_updated.emit(landmarks)
 
 func _on_multi_pose_received(poses: Array):
 	_all_poses = poses
 	
 	# Update primary landmarks from first pose
-	if poses.size() > 0 and poses[0] is Dictionary:
-		var primary_landmarks = poses[0].get("landmarks", [])
-		_on_landmarks_received(primary_landmarks)
+	if poses.size() > 0:
+		var first_pose: Variant = poses[0]
+		if first_pose is Dictionary:
+			var first_pose_dict: Dictionary = first_pose
+			var primary_landmarks: Variant = first_pose_dict.get("landmarks", [])
+			if primary_landmarks is Array:
+				_on_landmarks_received(primary_landmarks)
 	
 	multi_pose_updated.emit(poses)
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_EXIT_TREE:
+		print("[MediaPipeProvider] EXIT_TREE - stopping server")
 		stop()

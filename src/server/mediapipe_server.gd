@@ -23,7 +23,7 @@ func start() -> bool:
 	
 	var bind_result: int = _udp.bind(port, "127.0.0.1")
 	if bind_result != OK:
-		push_warning("MediaPipeServer: Failed to bind to port %d, trying auto-select" % port)
+		print("[MediaPipeServer] Port %d in use, auto-selecting alternative..." % port)
 		bind_result = _udp.bind(0, "127.0.0.1")
 		if bind_result != OK:
 			push_error("MediaPipeServer: Failed to bind UDP socket")
@@ -125,5 +125,89 @@ func _parse_json_packet(data_bytes: PackedByteArray) -> void:
 	
 	landmarks_received.emit(landmarks_array)
 
-func _parse_binary_packet(_data_bytes: PackedByteArray) -> void:
-	parse_error.emit("Binary protocol not yet supported")
+func _parse_binary_packet(data_bytes: PackedByteArray) -> void:
+	if data_bytes.size() < 54:  # Minimum header size
+		parse_error.emit("Binary packet too small: " + str(data_bytes.size()))
+		return
+	
+	var offset := 0
+	
+	# Read header
+	var version := data_bytes[offset]
+	offset += 1
+	
+	if version != 1:
+		parse_error.emit("Unknown binary protocol version: " + str(version))
+		return
+	
+	# Skip timestamp and timing data (we don't need it for landmarks)
+	offset += 8 * 6  # 6 doubles
+	
+	# Skip frame count, fps, skip frames
+	offset += 4 * 3  # 3 ints/floats
+	
+	# Read number of poses
+	var num_poses := data_bytes[offset]
+	offset += 1
+	
+	if num_poses == 0:
+		return
+	
+	var all_poses: Array = []
+	
+	for pose_idx in range(num_poses):
+		if offset >= data_bytes.size():
+			break
+		
+		var pose_id := data_bytes[offset]
+		offset += 1
+		
+		if offset >= data_bytes.size():
+			break
+		
+		var num_landmarks := data_bytes[offset]
+		offset += 1
+		
+		var landmarks: Array = []
+		
+		for lm_idx in range(num_landmarks):
+			if offset + 17 > data_bytes.size():  # Each landmark is 17 bytes
+				break
+			
+			var lm_id := data_bytes[offset]
+			offset += 1
+			
+			# Read floats (4 bytes each, little-endian)
+			var x := data_bytes.decode_float(offset)
+			offset += 4
+			var y := data_bytes.decode_float(offset)
+			offset += 4
+			var z := data_bytes.decode_float(offset)
+			offset += 4
+			var v := data_bytes.decode_float(offset)
+			offset += 4
+			
+			landmarks.append({
+				"id": lm_id,
+				"x": x,
+				"y": y,
+				"z": z,
+				"v": v
+			})
+		
+		all_poses.append({
+			"pose_id": pose_id,
+			"landmarks": landmarks
+		})
+	
+	# Emit multi-pose data
+	if all_poses.size() > 0:
+		multi_pose_received.emit(all_poses)
+		
+		# Also emit legacy landmarks from first pose
+		var first_pose: Variant = all_poses[0]
+		if first_pose is Dictionary:
+			var first_pose_dict: Dictionary = first_pose
+			var landmarks: Variant = first_pose_dict.get("landmarks", [])
+			if landmarks is Array:
+				landmarks_received.emit(landmarks)
