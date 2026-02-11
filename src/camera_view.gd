@@ -366,9 +366,13 @@ func _stream_loop() -> void:
 						_mjpeg_buffer = _mjpeg_buffer.slice(header_end + 4)
 						header_parsed = true
 				
-				# Parse all available complete frames
+				# Parse only the most recent complete frame for lowest latency
+				# Skip older frames to prevent stuttering from processing backlog
 				if header_parsed:
-					while _parse_mjpeg_frame():
+					# Skip to last frame if we have multiple buffered
+					_skip_to_last_frame()
+					# Now parse the single frame (or none if incomplete)
+					if _parse_mjpeg_frame():
 						frames_decoded += 1
 		
 		# Log stats every 5 seconds
@@ -473,6 +477,27 @@ func _parse_mjpeg_frame() -> bool:
 	
 	_mjpeg_buffer = _mjpeg_buffer.slice(next_boundary)
 	return false
+
+## Skip to the last complete frame in buffer for lowest latency
+func _skip_to_last_frame() -> void:
+	## Find all frame boundaries and keep only the last complete frame
+	var boundary_bytes := PackedByteArray([0x2D, 0x2D, 0x66, 0x72, 0x61, 0x6D, 0x65, 0x2D, 0x62, 0x6F, 0x75, 0x6E, 0x64, 0x61, 0x72, 0x79])  # "--frame-boundary"
+	
+	var boundaries: Array[int] = []
+	var search_pos := 0
+	
+	while search_pos < _mjpeg_buffer.size() - boundary_bytes.size():
+		var pos := _find_byte_pattern(_mjpeg_buffer.slice(search_pos), boundary_bytes)
+		if pos == -1:
+			break
+		boundaries.append(search_pos + pos)
+		search_pos += pos + boundary_bytes.size()
+	
+	# Need at least 2 boundaries to have a complete frame
+	if boundaries.size() >= 3:
+		# Keep from second-to-last boundary (gives us last complete frame)
+		var keep_from := boundaries[boundaries.size() - 2]
+		_mjpeg_buffer = _mjpeg_buffer.slice(keep_from)
 
 func _update_texture() -> void:
 	_frame_mutex.lock()
