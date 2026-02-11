@@ -72,11 +72,22 @@ func is_server_running() -> bool:
 	if server_pid <= 1:
 		return false
 	
-	# Check if process group is alive using negative PGID
-	# kill -0 returns 0 if process exists, non-zero if it doesn't
+	# Method 1: Check if process group is alive using negative PGID
 	var output: Array = []
 	var exit_code: int = OS.execute("/bin/kill", ["-0", "-" + str(server_pid)], output, false)
-	return exit_code == 0
+	if exit_code == 0:
+		return true
+	
+	# Method 2: Check server log for recent activity (more reliable during startup)
+	# This handles the case where process group detection fails but server is actually running
+	output.clear()
+	OS.execute("grep", ["-c", "MediaPipe started", "/tmp/aerobeat_server.log"], output, false)
+	if output.size() > 0:
+		var count_str: String = output[0].strip_edges()
+		if count_str.is_valid_int() and int(count_str) > 0:
+			return true
+	
+	return false
 
 ## Start the server (public API)
 func start_server() -> bool:
@@ -382,19 +393,17 @@ func _setup_heartbeat(heartbeat_port: int) -> void:
 
 func _send_heartbeat() -> void:
 	if _heartbeat_udp == null:
-		print("[AutoStartManager] Heartbeat: UDP socket is null")
 		return
 	
-	var running := is_server_running()
-	if not running:
-		print("[AutoStartManager] Heartbeat: Server not running (PID: %d)" % server_pid)
+	# Always send heartbeat if we have a valid PID
+	# Don't check is_server_running() here - it can fail during startup
+	# Python will self-terminate if it doesn't receive heartbeats
+	if server_pid <= 1:
 		return
 	
 	var packet := PackedByteArray()
 	packet.append(0x01)  # Heartbeat marker
-	var err := _heartbeat_udp.put_packet(packet)
-	if err != OK:
-		print("[AutoStartManager] Heartbeat: Failed to send packet, error: %d" % err)
+	_heartbeat_udp.put_packet(packet)
 
 func _stop_heartbeat() -> void:
 	if _heartbeat_timer:
