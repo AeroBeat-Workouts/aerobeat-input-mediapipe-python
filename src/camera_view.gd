@@ -353,12 +353,10 @@ func _stream_loop() -> void:
 						_mjpeg_buffer = _mjpeg_buffer.slice(header_end + 4)
 						header_parsed = true
 				
-				# Try to parse frames - but limit to prevent frame buildup
+				# Parse all available complete frames
 				if header_parsed:
-					var parsed_count := 0
-					while parsed_count < MAX_BUFFERED_FRAMES and _parse_mjpeg_frame():
+					while _parse_mjpeg_frame():
 						frames_decoded += 1
-						parsed_count += 1
 		
 		# Log stats every 5 seconds
 		var now := Time.get_ticks_msec()
