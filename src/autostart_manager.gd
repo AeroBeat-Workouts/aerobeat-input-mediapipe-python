@@ -335,9 +335,12 @@ func _start_detached_server() -> int:
 	await get_tree().create_timer(2.5).timeout
 	
 	# Verify server is actually running
+	print("[AutoStartManager] Checking if PGID %d is alive..." % pgid)
 	if _is_process_alive(pgid):
+		print("[AutoStartManager] PGID %d is alive, returning success" % pgid)
 		return pgid
 	
+	print("[AutoStartManager] PGID %d is NOT alive, returning failure" % pgid)
 	return -1
 
 func _read_pid_file(path: String) -> int:
@@ -421,8 +424,12 @@ func _poll_for_server_pid() -> int:
 
 ## Start the MediaPipe server with proper arguments
 func _start_server() -> bool:
+	print("[AutoStartManager] _start_server() called")
+	
 	# Try detached mode first (prevents stdout pipe blocking)
+	print("[AutoStartManager] Calling _start_detached_server()...")
 	var detached_pid: int = await _start_detached_server()
+	print("[AutoStartManager] _start_detached_server() returned PID: %d" % detached_pid)
 	
 	if detached_pid > 0:
 		server_pid = detached_pid
