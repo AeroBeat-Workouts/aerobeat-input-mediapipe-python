@@ -341,7 +341,7 @@ func _stream_loop() -> void:
 				if _mjpeg_buffer.size() > MAX_BUFFER_SIZE:
 					print("[CameraView] Buffer overflow (", _mjpeg_buffer.size(), " bytes), dropping stale frames")
 					# Keep only the most recent data (last 8KB which likely contains a partial frame)
-					var keep_size := min(8192, _mjpeg_buffer.size())
+					var keep_size: int = mini(8192, _mjpeg_buffer.size())
 					_mjpeg_buffer = _mjpeg_buffer.slice(_mjpeg_buffer.size() - keep_size)
 					header_parsed = false  # Reset header parsing
 				
