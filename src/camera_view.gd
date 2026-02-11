@@ -25,6 +25,7 @@ var _stream_thread: Thread
 var _thread_running: bool = false
 var _current_frame: Image
 var _frame_mutex: Mutex
+var _update_timer: float = 0.0
 var _mjpeg_buffer: PackedByteArray
 var _is_starting: bool = false  # Guard against concurrent start_stream calls
 
@@ -59,13 +60,13 @@ func _exit_tree() -> void:
 	# Stop the stream properly to ensure thread cleanup
 	stop_stream()
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if not _is_streaming:
 		return
-	
-	# Update texture every frame for lowest latency (was capped at 30 FPS)
-	# This ensures we display the latest decoded frame immediately
-	_update_texture()
+	_update_timer += delta * 1000.0
+	if _update_timer >= update_interval_ms:
+		_update_timer = 0.0
+		_update_texture()
 	
 	# Queue overlay redraw
 	if show_overlay and _overlay_canvas:
