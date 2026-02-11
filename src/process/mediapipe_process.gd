@@ -251,6 +251,7 @@ func _is_process_group_alive(pgid: int) -> bool:
 		return false
 	
 	var output: Array = []
+	# Use negative PGID to check entire process group
 	var exit_code: int = OS.execute("/bin/kill", PackedStringArray(["-0", "-" + str(pgid)]), output, true)
 	# kill -0 returns 0 if process exists, non-zero if it doesn't
 	return exit_code == 0
@@ -261,6 +262,11 @@ func is_running() -> bool:
 		return true
 	if _pgid > 0 and _is_process_group_alive(_pgid):
 		return true
+	# Also check if heartbeat was recently sent (for process group tracking)
+	if _pgid > 0:
+		var output: Array = []
+		var exit_code := OS.execute("/bin/kill", ["-0", "-" + str(_pgid)], output, true)
+		return exit_code == 0
 	return false
 
 func get_pid() -> int:

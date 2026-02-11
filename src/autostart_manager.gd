@@ -72,9 +72,10 @@ func is_server_running() -> bool:
 	if server_pid <= 1:
 		return false
 	
-	# Check if process is alive (Linux/Mac) - non-blocking
+	# Check if process group is alive using negative PGID
+	# kill -0 returns 0 if process exists, non-zero if it doesn't
 	var output: Array = []
-	var exit_code: int = OS.execute("kill", ["-0", str(server_pid)], output, false)
+	var exit_code: int = OS.execute("/bin/kill", ["-0", "-" + str(server_pid)], output, true)
 	return exit_code == 0
 
 ## Start the server (public API)
@@ -148,7 +149,8 @@ func _is_process_alive(pid: int) -> bool:
 	if pid <= 1:
 		return false
 	var output: Array = []
-	var exit_code := OS.execute("/bin/kill", ["-0", str(pid)], output, true)
+	# Use negative PID to check process group
+	var exit_code := OS.execute("/bin/kill", ["-0", "-" + str(pid)], output, true)
 	return exit_code == 0
 
 ## Main entry point - check and start
