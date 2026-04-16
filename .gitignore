@@ -32,3 +32,8 @@ test_report*.json
 
 # MediaPipe model files (downloaded separately)
 *.task
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key
