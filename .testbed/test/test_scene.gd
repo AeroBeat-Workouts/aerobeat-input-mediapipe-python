@@ -71,9 +71,8 @@ func _on_server_failed(error: String) -> void:
 
 You can start Python manually:
 
-1. Open terminal
+1. Open terminal in the aerobeat-input-mediapipe-python repo root
 2. Run:
-cd /home/derrick/.openclaw/workspace/addons/aerobeat-input-mediapipe
 python3 python_mediapipe/main.py --camera 0 --show-window
 
 3. Press F5 in Godot to restart this scene
