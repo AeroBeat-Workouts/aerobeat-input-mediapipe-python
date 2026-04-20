@@ -116,7 +116,7 @@ func set_body_track_flags(flags: int) -> void:
 func _ensure_provider() -> void:
 	if _provider != null:
 		return
-	var provider_script: GDScript = _load_local_script("src/providers/mediapipe_provider.gd")
+	var provider_script: GDScript = _load_local_script("providers/mediapipe_provider.gd")
 	_provider = provider_script.new()
 	_provider.name = "MediaPipeProvider"
 	add_child(_provider)
@@ -153,7 +153,7 @@ func _load_local_script(relative_path: String) -> GDScript:
 	return script
 
 func _new_local_config() -> Variant:
-	var config_script: GDScript = _load_local_script("src/config/mediapipe_config.gd")
+	var config_script: GDScript = _load_local_script("config/mediapipe_config.gd")
 	return config_script.new()
 
 func _resolve_local_path(relative_path: String) -> String:
