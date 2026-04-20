@@ -29,8 +29,9 @@ jobs:
         # -gdir: Test directory
         # -gcov_export_json: Export coverage report
         run: |
-          godot --headless --script addons/gut/gut_cmdln.gd \
-            -gdir=res://test/unit \
+          godot --headless --path .testbed \
+            --script addons/aerobeat-core/.testbed/addons/gut/gut_cmdln.gd \
+            -gdir=res://tests/unit \
             -ginclude_subdirs \
             -gexit \
             -gcov_export_json=res://coverage.json
@@ -43,11 +44,12 @@ jobs:
           import sys
           import os
 
-          if not os.path.exists('coverage.json'):
-              print("::error::Coverage report not found!")
+          coverage_path = os.path.join('.testbed', 'coverage.json')
+          if not os.path.exists(coverage_path):
+              print(f"::error::Coverage report not found at {coverage_path}!")
               sys.exit(1)
 
-          with open('coverage.json', 'r') as f:
+          with open(coverage_path, 'r') as f:
               data = json.load(f)
           
           # Parse coverage percentage (Structure depends on GUT version)

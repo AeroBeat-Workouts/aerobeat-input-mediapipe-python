@@ -1,7 +1,7 @@
 extends "res://addons/aerobeat-core/src/interfaces/input_provider.gd"
 ## Assembly-facing AeroInputProvider adapter for this addon.
 ##
-## This root entrypoint is for consuming projects that mount this repo under
+## This addon entrypoint is for consuming projects that mount this repo under
 ## `res://addons/aerobeat-input-mediapipe-python/` alongside `aerobeat-core`.
 ## The standalone repo testbed continues to exercise `src/providers/mediapipe_provider.gd`
 ## directly so this repo can still be worked on without hiding assembly wiring here.

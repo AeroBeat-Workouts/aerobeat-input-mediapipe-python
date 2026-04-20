@@ -97,7 +97,7 @@ func _on_mediapipe_not_found() -> void:
 	info_label.text = "Installing MediaPipe...\nThis may take 2-5 minutes."
 
 func _start_provider() -> void:
-	var provider_script: GDScript = load("res://test/mediapipe_provider_test.gd")
+	var provider_script: GDScript = load("res://scenes/mediapipe_provider_test.gd")
 	if provider_script:
 		provider = provider_script.new()
 		provider.name = "MediaPipeProvider"

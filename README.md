@@ -4,18 +4,18 @@ MediaPipe pose tracking for AeroBeat using a Python sidecar plus Godot glue.
 
 This repo is **partially migrated** into the broader AeroBeat input-provider contract:
 
-- it now has a root addon entrypoint at `input_provider.gd`
+- it now has an addon entrypoint at `src/input_provider.gd`
 - it includes a thin assembly-facing `AeroInputProvider` adapter for lifecycle + polling access
 - it **does not** yet implement the full contract surface such as gesture callbacks, haptics, velocity, or 6DOF transforms
 - provider registration / consumer wiring in `aerobeat-assembly-community` remains follow-on work in that repo, not hidden here
 
 ## Repo layout
 
-- `input_provider.gd` — assembly-facing addon entrypoint
+- `src/input_provider.gd` — assembly-facing addon entrypoint
 - `src/` — Godot-side implementation used by the local testbed
 - `python_mediapipe/` — Python sidecar and Python-only test scripts
 - `.testbed/` — local Godot testbed project with relative repo-local symlinks
-- `tests/` — repo-local Godot test scripts
+- `.testbed/tests/` — repo-local Godot automated test scripts
 
 ## Current truthful runtime state
 
@@ -31,7 +31,7 @@ This repo is **partially migrated** into the broader AeroBeat input-provider con
 - **MediaPipe task model files are not bundled or auto-downloaded by this repo**
 - the Godot auto-start flow installs Python packages, but it still expects the required `pose_landmarker_*.task` file to already exist in the repo root
 - the assembly-community repo still owns addon registration / consumer wiring
-- the root `input_provider.gd` is an adapter layer, not a claim that the full contract is finished
+- `src/input_provider.gd` is an adapter layer, not a claim that the full contract is finished
 
 ## Requirements
 
@@ -128,7 +128,7 @@ The testbed will:
 - fail early with a clear error if the required `.task` model file is missing
 - start the Python sidecar and connect the local provider when everything is available
 
-If auto-start fails, the test scene includes manual recovery guidance that points back to this repo root.
+If auto-start fails, the test scene under `.testbed/scenes/` includes manual recovery guidance that points back to this repo root.
 
 ## Test assets
 
@@ -153,6 +153,8 @@ The older tracked `.testbed/videos/` layout is no longer the canonical location.
 
 ### Python filter test
 
+If you use the repo-local testbed environment, prefer `.testbed/venv/bin/python` for Python-side checks.
+
 ```bash
 python3 python_mediapipe/test_filter.py
 ```
@@ -167,7 +169,7 @@ python3 python_mediapipe/test_runner.py \
 
 ## Provider contract stance
 
-This repo now exposes an assembly-facing `input_provider.gd`, but the current implementation is intentionally narrow and honest:
+This repo now exposes an assembly-facing `src/input_provider.gd` via `plugin.cfg`, but the current implementation is intentionally narrow and honest:
 
 - `start()` / `stop()` / `is_tracking()` are adapted
 - head/hand/foot position polling is adapted

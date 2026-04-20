@@ -326,7 +326,7 @@ name="AeroBeat Input Driver For [Input Type]"
 description="Hardware driver for AeroBeat's [Input Type] support."
 author="AeroBeat Workouts"
 version="0.0.1"
-script="input_provider.gd"  # Root-level entry point
+script="src/input_provider.gd"  # Addon entry point inside src/
 ```
 
 ### Main Provider File Structure
@@ -336,7 +336,7 @@ Each input driver follows this structure (shown with MediaPipe Python as referen
 ```
 aerobeat-input-[name]/
 ├── plugin.cfg                          # Godot plugin configuration
-├── input_provider.gd                   # Main entry point (root-level)
+├── src/input_provider.gd               # Main addon entry point referenced by plugin.cfg
 ├── .gdignore                           # Godot ignore file
 ├── README.md                           # Project documentation
 ├── LICENSE.md                          # License file
@@ -371,7 +371,7 @@ aerobeat-input-[name]/
 │   ├── autostart_manager.gd            # Auto-start functionality
 │   └── camera_view.gd                  # Camera view handling
 │
-├── tests/                              # Test suite
+├── .testbed/tests/                     # Test suite
 │   ├── unit/                           # Unit tests directory
 │   ├── mocks/                          # Mock implementations
 │   ├── mediapipe_provider_test.gd      # Provider integration tests
@@ -383,8 +383,9 @@ aerobeat-input-[name]/
     ├── addons/                         # Addons directory (symlinks)
     ├── python_mediapipe → symlink      # Symlink to python_mediapipe/
     ├── src → symlink                   # Symlink to src/
-    ├── test/                           # Test resources
-    ├── videos/                         # Test video files
+    ├── scenes/                         # Manual testbed scenes/resources
+    ├── tests/                          # Automated Godot tests
+    ├── videos/                         # Legacy note; canonical tracked videos now live under assets/videos/
     ├── venv/                           # Python virtual environment
     └── *.task                          # MediaPipe model files
 ```
@@ -643,13 +644,13 @@ func _ready():
 ### Unit Tests (Per Addon)
 
 ```gdscript
-# tests/unit/test_input_provider.gd
+# .testbed/tests/unit/test_input_provider.gd
 extends GutTest
 
 var _provider: AeroInputProvider
 
 func before_each():
-    _provider = preload("../../input_provider.gd").new()
+    _provider = preload("../../src/input_provider.gd").new()
 
 func test_start_stop():
     var settings = JSON.stringify({"port": 9999})
@@ -687,7 +688,7 @@ func test_punch_callback():
 ### Integration Tests (Input Manager)
 
 ```gdscript
-# tests/test_input_manager.gd
+# .testbed/tests/test_input_manager.gd
 extends GutTest
 
 var _manager: InputManager
@@ -759,7 +760,7 @@ To add a new input provider following this architecture:
 
 2. **Symlink Core**: Create symlink to `aerobeat-core` in `addons/`
 
-3. **Create Entry Point**: `input_provider.gd` (root level)
+3. **Create Entry Point**: `src/input_provider.gd` (root level)
    ```gdscript
    extends "res://addons/aerobeat-core/src/input/input_provider.gd"
    class_name MyInputProvider
@@ -775,9 +776,9 @@ To add a new input provider following this architecture:
    - Lifecycle: `started`, `stopped`, `failed`
    - Boxing gestures as supported by hardware
 
-6. **Create `plugin.cfg`** with `script="input_provider.gd"`
+6. **Create `plugin.cfg`** with `script="src/input_provider.gd"`
 
-7. **Add Tests** in `tests/` directory
+7. **Add Tests** in `.testbed/tests/` and keep manual scene assets under `.testbed/scenes/`
 
 ### Using the Mock Server
 
@@ -828,7 +829,7 @@ python python_mediapipe/mock_server.py
 1. **Read**: `aerobeat-core/src/input/input_provider.gd` (base interface)
 2. **Reference**: `aerobeat-input-mediapipe-python/` (complete example)
 3. **Copy**: Create from template following this document
-4. **Test**: Use `tests/` directory with GUT framework
+4. **Test**: Use `.testbed/tests/` directory with GUT framework
 
 ### For Game Developers
 
