@@ -12,24 +12,54 @@ This repo is **partially migrated** into the broader AeroBeat input-provider con
 ## Repo layout
 
 - `src/input_provider.gd` — assembly-facing addon entrypoint
-- `src/` — Godot-side implementation used by the local testbed
+- `src/` — Godot-side implementation used by the local testbed and downstream addon installs
 - `python_mediapipe/` — Python sidecar and Python-only test scripts
-- `.testbed/` — local Godot testbed project with relative repo-local symlinks
+- `.testbed/` — hidden Godot workbench project restored via GodotEnv
 - `.testbed/tests/` — repo-local Godot automated test scripts
+- `.testbed/addons.jsonc` — committed dev/test dependency contract for the workbench
+
+## GodotEnv development flow
+
+This repo now uses the AeroBeat GodotEnv package convention for the local workbench.
+
+- Canonical dev/test manifest: `.testbed/addons.jsonc`
+- Installed dev/test addons: `.testbed/addons/`
+- GodotEnv cache: `.testbed/.addons/`
+- Hidden workbench project: `.testbed/project.godot`
+- Repo-local unit tests: `.testbed/tests/`
+
+The repo root remains the package/published boundary for downstream consumers. Day-to-day development, debugging, and validation happen from the hidden `.testbed/` workbench with GodotEnv restoring this repo itself, `aerobeat-core`, and GUT.
+
+### Restore dev/test dependencies
+
+From the repo root:
+
+```bash
+cd .testbed
+godotenv addons install
+```
+
+That restores:
+
+- `aerobeat-input-mediapipe-python` from `..` as a local symlinked package
+- `aerobeat-core` from `../../aerobeat-core` as a local symlinked package
+- `gut` from its upstream Git source into `.testbed/addons/gut`
+
+Manual `.testbed/src`, `.testbed/python_mediapipe`, and `.testbed/addons/aerobeat-core` links are no longer the repo contract and should not be recreated.
 
 ## Current truthful runtime state
 
 ### What the repo can do today
 
 - run the Python sidecar directly from this repo
-- auto-create a local `venv/` and install `python_mediapipe/requirements.txt` from the Godot testbed
+- auto-create a local `.testbed/venv/` and install `python_mediapipe/requirements.txt` from the Godot workbench
 - receive pose landmarks in Godot and expose head/hand/foot polling helpers
 - use either a webcam (`--camera 0`) or a video path (`--camera path/to/file.mp4`) when launching the Python sidecar directly
 
 ### What is still manual / partial
 
 - **MediaPipe task model files are not bundled or auto-downloaded by this repo**
-- the Godot auto-start flow installs Python packages, but it still expects the required `pose_landmarker_*.task` file to already exist in the repo root
+- the Godot auto-start flow installs Python packages, but it still expects the required `pose_landmarker_*.task` file to already exist in the repo root/package root
 - the assembly-community repo still owns addon registration / consumer wiring
 - `src/input_provider.gd` is an adapter layer, not a claim that the full contract is finished
 
@@ -67,10 +97,10 @@ pip install -r python_mediapipe/requirements.txt
 
 ### Testbed auto-install
 
-The `.testbed/` Godot project can create `./venv/` automatically and install Python packages from:
+The `.testbed/` Godot project can create `.testbed/venv/` automatically and install Python packages from the package payload at:
 
 ```text
-python_mediapipe/requirements.txt
+addons/aerobeat-input-mediapipe-python/python_mediapipe/requirements.txt
 ```
 
 That auto-install does **not** fetch the MediaPipe `.task` model files for you.
@@ -105,34 +135,36 @@ python3 python_mediapipe/main.py --camera 0 --binary-protocol
 
 > Note: the current tracked CLI/runtime defaults still lean toward JSON unless you explicitly opt into binary behavior in code or launch flags. Keep docs and runtime expectations aligned with the repo you actually have checked out.
 
-## Running the Godot testbed
+## Running the Godot workbench
 
-The local testbed lives under `.testbed/`.
+The local workbench lives under `.testbed/`.
 
-It expects these repo-local links:
+Restore its dependencies first:
 
-- `.testbed/src -> ../src`
-- `.testbed/python_mediapipe -> ../python_mediapipe`
-- `.testbed/addons/aerobeat-core -> ../../../aerobeat-core`
+```bash
+cd .testbed
+godotenv addons install
+cd ..
+```
 
-Open the testbed in Godot 4.6:
+Then open it in Godot 4.6:
 
 ```bash
 godot --path .testbed
 ```
 
-The testbed will:
+The workbench will:
 
-- look for Python
-- auto-install Python dependencies into `./venv/` if needed
+- load this repo from `res://addons/aerobeat-input-mediapipe-python/`
+- auto-install Python dependencies into `.testbed/venv/` if needed
 - fail early with a clear error if the required `.task` model file is missing
 - start the Python sidecar and connect the local provider when everything is available
 
-If auto-start fails, the test scene under `.testbed/scenes/` includes manual recovery guidance that points back to this repo root.
+If auto-start fails, the test scene under `.testbed/scenes/` includes manual recovery guidance that points back to this repo root and the required `.task` prerequisite.
 
 ## Test assets
 
-Canonical repo-local test videos now live under:
+Canonical repo-local test videos live under:
 
 ```text
 .testbed/assets/videos/
@@ -153,7 +185,7 @@ The older tracked `.testbed/videos/` layout is no longer the canonical location.
 
 ### Python filter test
 
-If you use the repo-local testbed environment, prefer `.testbed/venv/bin/python` for Python-side checks.
+If you use the repo-local workbench environment, prefer `.testbed/venv/bin/python` for Python-side checks.
 
 ```bash
 python3 python_mediapipe/test_filter.py
@@ -189,6 +221,13 @@ Do not silently hide these in this repo:
 - cross-repo validation that the adapter is used correctly in an assembly project
 
 Those belong in consuming repos such as `aerobeat-assembly-community`.
+
+## Validation notes
+
+- `.testbed/addons.jsonc` is the committed dev/test dependency contract.
+- The workbench consumes this package from the repo root (`subfolder: "/"`) via GodotEnv rather than manual `.testbed` symlinks.
+- CI follows the same GodotEnv restore/import/GUT flow as local workbench validation.
+- The repo still truthfully depends on a separately provided `pose_landmarker_*.task` asset for actual MediaPipe runtime startup.
 
 ## License
 

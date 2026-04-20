@@ -1,0 +1,23 @@
+{
+  "$schema": "https://chickensoft.games/schemas/addons.schema.json",
+  "addons": {
+    // This workbench consumes the current repo package from the repo root.
+    "aerobeat-input-mediapipe-python": {
+      "url": "..",
+      "source": "symlink",
+      "subfolder": "/"
+    },
+    // Core is linked locally in AeroBeat workspace development.
+    "aerobeat-core": {
+      "url": "../../aerobeat-core",
+      "source": "symlink",
+      "subfolder": "/"
+    },
+    // GUT drives the repo-local test suite inside the hidden testbed/workbench.
+    "gut": {
+      "url": "git@github.com:bitwes/Gut.git",
+      "checkout": "main",
+      "subfolder": "/addons/gut"
+    }
+  }
+}

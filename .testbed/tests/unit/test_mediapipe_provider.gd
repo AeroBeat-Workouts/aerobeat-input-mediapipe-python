@@ -2,9 +2,9 @@ extends RefCounted
 ## Unit tests for MediaPipeProvider
 ## Compatible with GUT if available, otherwise runs basic checks
 
-const MediaPipeProvider = preload("res://src/providers/mediapipe_provider.gd")
-const MediaPipeConfig = preload("res://src/config/mediapipe_config.gd")
-const MediaPipeServer = preload("res://src/server/mediapipe_server.gd")
+const MediaPipeProvider = preload("res://addons/aerobeat-input-mediapipe-python/src/providers/mediapipe_provider.gd")
+const MediaPipeConfig = preload("res://addons/aerobeat-input-mediapipe-python/src/config/mediapipe_config.gd")
+const MediaPipeServer = preload("res://addons/aerobeat-input-mediapipe-python/src/server/mediapipe_server.gd")
 
 var provider = null
 

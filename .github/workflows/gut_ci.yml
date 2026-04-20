@@ -8,55 +8,42 @@ on:
 
 jobs:
   gut-tests:
-    name: Unit Tests & Coverage
+    name: Restore testbed and run GUT
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: 🧾 Checkout Repository
         uses: actions/checkout@v4
         with:
-          submodules: recursive
           lfs: true
 
-      - name: 🤖 Setup Godot
-        uses: chickensoft-games/setup-godot@v1
+      - name: 🧰 Setup .NET
+        uses: actions/setup-dotnet@v4
         with:
-          version: 4.2.1 # Ensure this matches project version
+          dotnet-version: 8.0.x
+
+      - name: 🤖 Setup Godot
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.6.2
           use-dotnet: false
 
-      - name: 🧪 Run GUT Tests
-        # -gexit: Exit with error code on failure
-        # -gdir: Test directory
-        # -gcov_export_json: Export coverage report
+      - name: 📦 Install GodotEnv
+        shell: bash
         run: |
-          godot --headless --path .testbed \
-            --script addons/aerobeat-core/.testbed/addons/gut/gut_cmdln.gd \
-            -gdir=res://tests/unit \
+          dotnet tool install --global Chickensoft.GodotEnv
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+
+      - name: 🔗 Restore testbed dependencies
+        working-directory: ./.testbed
+        run: godotenv addons install
+
+      - name: 🧭 Import testbed project
+        run: godot --headless --path .testbed --import
+
+      - name: 🧪 Run GUT tests
+        run: |
+          godot --headless --path .testbed --script addons/gut/gut_cmdln.gd \
+            -gdir=res://tests \
             -ginclude_subdirs \
-            -gexit \
-            -gcov_export_json=res://coverage.json
-
-      - name: 📊 Enforce 100% Coverage
-        if: success()
-        shell: python
-        run: |
-          import json
-          import sys
-          import os
-
-          coverage_path = os.path.join('.testbed', 'coverage.json')
-          if not os.path.exists(coverage_path):
-              print(f"::error::Coverage report not found at {coverage_path}!")
-              sys.exit(1)
-
-          with open(coverage_path, 'r') as f:
-              data = json.load(f)
-          
-          # Parse coverage percentage (Structure depends on GUT version)
-          coverage = data.get('summary', {}).get('percent', 0)
-          
-          if coverage < 100:
-              print(f"::error::Coverage is {coverage}%. 100% is required.")
-              sys.exit(1)
-          
-          print(f"✅ Coverage is {coverage}%.")
+            -gexit

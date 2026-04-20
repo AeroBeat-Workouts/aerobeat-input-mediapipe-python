@@ -122,7 +122,7 @@ Make sure you're in a well-lit area."""
 
 func _start_camera_feed() -> void:
 	# Create camera view for MJPEG stream
-	var CameraViewClass: GDScript = load("res://src/camera_view.gd")
+	var CameraViewClass: GDScript = load("res://addons/aerobeat-input-mediapipe-python/src/camera_view.gd")
 	if CameraViewClass == null:
 		push_error("[TestScene] Failed to load camera_view.gd")
 		return

@@ -271,7 +271,7 @@ func _ensure_venv_and_install() -> void:
 	emit_signal("installation_progress", 25, "Installing dependencies from requirements.txt...")
 
 	# Install packages from requirements.txt
-	var requirements_path: String = ProjectSettings.globalize_path("res://python_mediapipe/requirements.txt")
+	var requirements_path: String = ProjectSettings.globalize_path(_resolve_package_path("../python_mediapipe/requirements.txt"))
 	var args: PackedStringArray = ["-m", "pip", "install", "-r", requirements_path]
 	var pid: int = OS.execute(python_path, args, [], false)
 	install_pid = pid
@@ -321,7 +321,7 @@ func _start_detached_server() -> int:
 
 	var python: String = "/usr/bin/python3"
 	# Use project-relative paths instead of hardcoded absolute paths
-	var script: String = ProjectSettings.globalize_path("res://python_mediapipe/main.py")
+	var script: String = ProjectSettings.globalize_path(_resolve_package_path("../python_mediapipe/main.py"))
 	var venv_packages: String = ProjectSettings.globalize_path("res://venv/lib/python3.12/site-packages")
 	var project_dir: String = ProjectSettings.globalize_path("res://")
 
@@ -383,6 +383,9 @@ func _start_detached_server() -> int:
 	# The caller (_start_server) will handle waiting and verification
 	print("[AutoStartManager] Returning PGID %d immediately for heartbeat" % pgid)
 	return pgid
+
+func _resolve_package_path(relative_path: String) -> String:
+	return "%s/%s" % [get_script().resource_path.get_base_dir(), relative_path]
 
 func _read_pid_file(path: String) -> int:
 	var file: FileAccess = FileAccess.open(path, FileAccess.READ)

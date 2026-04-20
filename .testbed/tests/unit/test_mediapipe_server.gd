@@ -2,8 +2,8 @@ extends RefCounted
 ## Unit tests for MediaPipeServer
 ## Compatible with GUT if available, otherwise runs basic checks
 
-const MediaPipeServer = preload("res://src/server/mediapipe_server.gd")
-const MediaPipeConfig = preload("res://src/config/mediapipe_config.gd")
+const MediaPipeServer = preload("res://addons/aerobeat-input-mediapipe-python/src/server/mediapipe_server.gd")
+const MediaPipeConfig = preload("res://addons/aerobeat-input-mediapipe-python/src/config/mediapipe_config.gd")
 
 var server = null
 var config = null

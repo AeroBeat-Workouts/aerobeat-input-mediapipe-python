@@ -163,9 +163,9 @@ func _create_provider():
 		return
 	
 	# Load required scripts
-	var MediaPipeProvider = load("res://src/providers/mediapipe_provider.gd")
-	var MediaPipeConfig = load("res://src/config/mediapipe_config.gd")
-	var MediaPipeServer = load("res://src/server/mediapipe_server.gd")
+	var MediaPipeProvider = load(_resolve_package_path("providers/mediapipe_provider.gd"))
+	var MediaPipeConfig = load(_resolve_package_path("config/mediapipe_config.gd"))
+	var MediaPipeServer = load(_resolve_package_path("server/mediapipe_server.gd"))
 	
 	_provider = MediaPipeProvider.new()
 	_provider.name = "MediaPipeProvider"
@@ -186,7 +186,7 @@ func _create_camera_view():
 	if _camera_view:
 		return
 	
-	var MediaPipeCameraView = load("res://src/camera_view.gd")
+	var MediaPipeCameraView = load(_resolve_package_path("camera_view.gd"))
 	
 	_camera_view = MediaPipeCameraView.new()
 	_camera_view.name = "MediaPipeCameraView"
@@ -222,3 +222,6 @@ func _on_pose_updated(landmarks: Array):
 	# Update tracking overlay on camera view
 	if _camera_view and _camera_view.is_streaming():
 		_camera_view.update_overlay(landmarks)
+
+func _resolve_package_path(relative_path: String) -> String:
+	return "%s/%s" % [get_script().resource_path.get_base_dir(), relative_path]

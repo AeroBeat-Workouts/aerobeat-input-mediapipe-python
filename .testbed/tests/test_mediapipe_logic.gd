@@ -21,28 +21,28 @@ func _run_standalone_tests():
 		print("✗ Math is broken")
 	
 	# Test 2: Verify driver script exists
-	var script = load("res://src/driver.gd")
+	var script = load("res://addons/aerobeat-input-mediapipe-python/src/driver.gd")
 	if script:
 		print("✓ Driver script exists")
 	else:
 		print("✗ Driver script not found")
 	
 	# Test 3: Verify provider script exists
-	var provider_script = load("res://src/providers/mediapipe_provider.gd")
+	var provider_script = load("res://addons/aerobeat-input-mediapipe-python/src/providers/mediapipe_provider.gd")
 	if provider_script:
 		print("✓ Provider script exists")
 	else:
 		print("✗ Provider script not found")
 	
 	# Test 4: Verify server script exists
-	var server_script = load("res://src/server/mediapipe_server.gd")
+	var server_script = load("res://addons/aerobeat-input-mediapipe-python/src/server/mediapipe_server.gd")
 	if server_script:
 		print("✓ Server script exists")
 	else:
 		print("✗ Server script not found")
 	
 	# Test 5: Verify config script exists
-	var config_script = load("res://src/config/mediapipe_config.gd")
+	var config_script = load("res://addons/aerobeat-input-mediapipe-python/src/config/mediapipe_config.gd")
 	if config_script:
 		print("✓ Config script exists")
 	else:
@@ -71,23 +71,23 @@ func test_sanity_check():
 func test_driver_structure():
 	if not _is_gut_available():
 		return
-	var script = load("res://src/driver.gd")
+	var script = load("res://addons/aerobeat-input-mediapipe-python/src/driver.gd")
 	assert_not_null(script, "Driver script should exist")
 
 func test_provider_script_exists():
 	if not _is_gut_available():
 		return
-	var script = load("res://src/providers/mediapipe_provider.gd")
+	var script = load("res://addons/aerobeat-input-mediapipe-python/src/providers/mediapipe_provider.gd")
 	assert_not_null(script, "Provider script should exist")
 
 func test_server_script_exists():
 	if not _is_gut_available():
 		return
-	var script = load("res://src/server/mediapipe_server.gd")
+	var script = load("res://addons/aerobeat-input-mediapipe-python/src/server/mediapipe_server.gd")
 	assert_not_null(script, "Server script should exist")
 
 func test_config_script_exists():
 	if not _is_gut_available():
 		return
-	var script = load("res://src/config/mediapipe_config.gd")
+	var script = load("res://addons/aerobeat-input-mediapipe-python/src/config/mediapipe_config.gd")
 	assert_not_null(script, "Config script should exist")
