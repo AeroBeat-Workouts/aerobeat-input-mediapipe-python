@@ -2,15 +2,13 @@ class_name MediaPipeServer
 extends Node
 ## UDP server that receives landmark data from Python MediaPipe sidecar
 
-const ConfigClass = preload("res://src/config/mediapipe_config.gd")
-
 signal landmarks_received(landmarks: Array)
 signal multi_pose_received(poses: Array)
 signal server_started(port: int)
 signal server_stopped()
 signal parse_error(error: String)
 
-@export var config: ConfigClass
+@export var config = null
 
 var _udp: PacketPeerUDP = PacketPeerUDP.new()
 var _is_running: bool = false

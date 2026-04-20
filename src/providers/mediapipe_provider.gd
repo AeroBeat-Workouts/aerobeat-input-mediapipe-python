@@ -8,9 +8,9 @@ signal multi_pose_updated(poses: Array)  # Array of {pose_id, landmarks}
 signal tracking_lost()
 signal tracking_restored()
 
-@export var config: MediaPipeConfig
+@export var config = null
 
-@onready var _server: MediaPipeServer = $MediaPipeServer
+@onready var _server = $MediaPipeServer
 
 var _last_update_time_ms: int = 0
 var _tracking_timeout_ms: int = 500  # milliseconds
@@ -33,11 +33,11 @@ const LANDMARK_RIGHT_ANKLE = 28
 
 func _ready():
 	if config == null:
-		config = MediaPipeConfig.new()
+		config = _new_local_script_instance("../config/mediapipe_config.gd")
 	
 	# Create server if not present
 	if _server == null:
-		_server = MediaPipeServer.new()
+		_server = _new_local_script_instance("../server/mediapipe_server.gd")
 		_server.name = "MediaPipeServer"
 		add_child(_server)
 	
@@ -60,7 +60,7 @@ func get_all_poses() -> Array:
 	return _all_poses.duplicate()
 
 ## Get position for a specific pose and landmark
-func get_landmark_position_for_pose(pose_idx: int, landmark_id: int, 
+func get_landmark_position_for_pose(pose_idx: int, landmark_id: int,
 									mode: TrackingMode = TrackingMode.MODE_2D) -> Variant:
 	if pose_idx < 0 or pose_idx >= _all_poses.size():
 		return null
@@ -128,7 +128,7 @@ func _convert_landmark_to_position(lm: Dictionary, mode: TrackingMode) -> Varian
 		return Vector3(x, y, z)
 
 func is_tracking() -> bool:
-	var current_time_ms: int := Time.get_ticks_msec()
+	var current_time_ms: int = Time.get_ticks_msec()
 	var is_currently_tracking: bool = (current_time_ms - _last_update_time_ms) < _tracking_timeout_ms
 	
 	# Emit signals on state change
@@ -180,3 +180,11 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_EXIT_TREE:
 		print("[MediaPipeProvider] EXIT_TREE - stopping server")
 		stop()
+
+func _new_local_script_instance(relative_path: String) -> Variant:
+	var script_path := "%s/%s" % [get_script().resource_path.get_base_dir(), relative_path]
+	var script: Variant = load(script_path)
+	if script == null:
+		push_error("Failed to load MediaPipe provider dependency: %s" % script_path)
+		return null
+	return script.new()

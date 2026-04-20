@@ -11,11 +11,8 @@ extends "res://addons/aerobeat-core/src/interfaces/input_provider.gd"
 ## - tracking state + basic confidence queries
 ## - no gesture callbacks, haptics, velocity, or 6DOF transform output yet
 
-const MediaPipeProviderScript := preload("res://src/providers/mediapipe_provider.gd")
-const MediaPipeConfigScript := preload("res://src/config/mediapipe_config.gd")
-
 var _provider = null
-var _config: MediaPipeConfig = null
+var _config = null
 var _tracking_mode: TrackingMode = TrackingMode.MODE_2D
 var _body_track_flags: int = BodyTrackFlags.ALL
 
@@ -119,14 +116,15 @@ func set_body_track_flags(flags: int) -> void:
 func _ensure_provider() -> void:
 	if _provider != null:
 		return
-	_provider = MediaPipeProviderScript.new()
+	var provider_script: GDScript = _load_local_script("src/providers/mediapipe_provider.gd")
+	_provider = provider_script.new()
 	_provider.name = "MediaPipeProvider"
 	add_child(_provider)
 	_provider.tracking_lost.connect(func() -> void:
 		failed.emit("Tracking lost")
 	)
 	if _provider.config == null:
-		_provider.config = MediaPipeConfigScript.new()
+		_provider.config = _new_local_config()
 	_config = _provider.config
 
 func _apply_settings(settings_json: String) -> void:
@@ -137,7 +135,7 @@ func _apply_settings(settings_json: String) -> void:
 		return
 	var settings: Dictionary = parsed
 	if _provider.config == null:
-		_provider.config = MediaPipeConfigScript.new()
+		_provider.config = _new_local_config()
 	_config = _provider.config
 	if settings.has("udp_port"):
 		_config.udp_port = int(settings["udp_port"])
@@ -145,6 +143,21 @@ func _apply_settings(settings_json: String) -> void:
 		_config.min_visibility = float(settings["min_visibility"])
 	if settings.has("flip_horizontal"):
 		_config.flip_horizontal = bool(settings["flip_horizontal"])
+
+func _load_local_script(relative_path: String) -> GDScript:
+	var script_path := _resolve_local_path(relative_path)
+	var script: Variant = load(script_path)
+	if script == null:
+		push_error("Failed to load MediaPipe addon script: %s" % script_path)
+		return null
+	return script
+
+func _new_local_config() -> Variant:
+	var config_script: GDScript = _load_local_script("src/config/mediapipe_config.gd")
+	return config_script.new()
+
+func _resolve_local_path(relative_path: String) -> String:
+	return "%s/%s" % [get_script().resource_path.get_base_dir(), relative_path]
 
 func _to_provider_mode(mode: TrackingMode) -> int:
 	return 1 if mode == TrackingMode.MODE_3D else 0
