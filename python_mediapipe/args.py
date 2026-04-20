@@ -1,9 +1,15 @@
 import argparse
 from one_euro_filter import FILTER_PRESETS
 
+
+def _parse_camera(value: str):
+    return int(value) if value.isdigit() else value
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description="MediaPipe Pose Tracker")
-    parser.add_argument("--camera", type=int, default=0, help="Camera device ID")
+    parser.add_argument("--camera", type=_parse_camera, default=0,
+                       help="Camera device ID or path to a video file")
     parser.add_argument("--port", type=int, default=4242, help="UDP port")
     parser.add_argument("--host", type=str, default="127.0.0.1", help="UDP host")
     parser.add_argument("--detection-confidence", type=float, default=0.3,
@@ -17,7 +23,7 @@ def parse_args():
     parser.add_argument("--height", type=int, default=480, help="Camera height")
     parser.add_argument("--binary-protocol", action="store_true",
                        help="Use binary serialization (faster than JSON)")
-    parser.add_argument("--json-protocol", action="store_true", default=True,
+    parser.add_argument("--json-protocol", action="store_true",
                        help="Use JSON serialization (slower, for debugging)")
     parser.add_argument("--skip-frames", type=int, default=1,
                        help="Process every Nth frame (1 = all frames, 2 = every 2nd, etc.)")

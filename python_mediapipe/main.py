@@ -23,7 +23,7 @@ try:
     import numpy as np
 except ImportError as e:
     print(f"Error: Missing dependency - {e}")
-    print("Install with: pip install -r requirements.txt")
+    print("Install with: pip install -r python_mediapipe/requirements.txt")
     sys.exit(1)
 
 args = parse_args()

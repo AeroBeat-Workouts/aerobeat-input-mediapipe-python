@@ -36,7 +36,7 @@ var _heartbeat_timer: Timer = null
 func _ready() -> void:
 	add_child(progress_timer)
 	progress_timer.timeout.connect(_check_install_progress)
-	
+
 	# Auto-start if configured (with delay to prevent race conditions)
 	if auto_start:
 		# Use call_deferred to ensure node is fully in tree first
@@ -52,14 +52,14 @@ func _find_python() -> String:
 	var repo_venv: String = ProjectSettings.globalize_path("res://venv/bin/python")
 	if FileAccess.file_exists(repo_venv):
 		return repo_venv
-	
+
 	# Check for system python3
 	var output: Array = []
 	var exit_code: int = OS.execute("which", ["python3"], output, true)
 	if exit_code == 0 and output.size() > 0:
 		var system_python: String = output[0].strip_edges()
 		return system_python
-	
+
 	return "python3"
 
 ## Get the server PID for display
@@ -71,13 +71,13 @@ func is_server_running() -> bool:
 	# Safety: PID 0 and 1 are never valid for our server
 	if server_pid <= 1:
 		return false
-	
+
 	# Method 1: Check if process group is alive using negative PGID
 	var output: Array = []
 	var exit_code: int = OS.execute("/bin/kill", ["-0", "-" + str(server_pid)], output, false)
 	if exit_code == 0:
 		return true
-	
+
 	# Method 2: Check server log for recent activity (more reliable during startup)
 	# This handles the case where process group detection fails but server is actually running
 	output.clear()
@@ -86,7 +86,7 @@ func is_server_running() -> bool:
 		var count_str: String = output[0].strip_edges()
 		if count_str.is_valid_int() and int(count_str) > 0:
 			return true
-	
+
 	return false
 
 ## Start the server (public API)
@@ -97,7 +97,7 @@ func start_server() -> bool:
 	if _is_starting:
 		print("[AutoStartManager] Server start already in progress")
 		return false
-	
+
 	_is_starting = true
 	var result: bool = await _check_and_start()
 	_is_starting = false
@@ -106,51 +106,51 @@ func start_server() -> bool:
 ## Stop the server
 func stop_server() -> void:
 	print("[AutoStartManager] stop_server() called, PID: ", server_pid)
-	
+
 	# Stop heartbeat first (Python will self-terminate if no heartbeat)
 	_stop_heartbeat()
-	
+
 	# Small delay to let Python detect missing heartbeat
 	OS.delay_msec(200)
-	
+
 	var output: Array = []
-	
+
 	# Use process group termination for reliable cleanup
 	# This handles the case where OpenCV VideoCapture is in uninterruptible sleep (D state)
-	
+
 	# Step 1: Graceful SIGTERM to process group
 	if server_pid > 1:
 		print("[AutoStartManager] Sending SIGTERM to process group...")
 		OS.execute("/bin/kill", ["-TERM", "-" + str(server_pid)], output, false)
 		OS.delay_msec(300)
-	
+
 	# Step 2: Force kill with SIGKILL if still running
 	if server_pid > 1 and _is_process_alive(server_pid):
 		print("[AutoStartManager] Process still alive, sending SIGKILL...")
 		OS.execute("/bin/kill", ["-KILL", "-" + str(server_pid)], output, false)
 		OS.delay_msec(200)
-	
+
 	# Step 3: Fallback pkill patterns
 	print("[AutoStartManager] Running cleanup patterns...")
 	OS.execute("pkill", ["-9", "-f", "python_mediapipe/main.py"], output, false)
 	OS.delay_msec(100)
 	OS.execute("pkill", ["-9", "-f", "main.py"], output, false)
 	OS.delay_msec(100)
-	
+
 	# Release camera as last resort
 	OS.execute("fuser", ["-k", "-9", "/dev/video0"], output, false)
 	OS.delay_msec(100)
-	
+
 	# Cleanup PID file
 	var pid_file: String = "/tmp/aerobeat_autostart.pid"
 	if FileAccess.file_exists(pid_file):
 		DirAccess.remove_absolute(pid_file)
-	
+
 	# Close heartbeat socket
 	if _heartbeat_udp:
 		_heartbeat_udp.close()
 		_heartbeat_udp = null
-	
+
 	server_pid = -1
 	_is_running = false
 	emit_signal("server_stopped")
@@ -170,15 +170,18 @@ func _is_process_alive(pid: int) -> bool:
 ## Main entry point - check and start
 func _check_and_start() -> bool:
 	_emit_progress(0, "Starting dependency check...")
-	
+
 	if not check_python_installed():
 		emit_signal("server_failed", "Python 3 not found")
 		return false
-	
+
 	if not check_mediapipe_installed():
 		install_dependencies()
 		return false  # Will restart after install
-	
+
+	if not check_model_asset_available():
+		return false
+
 	# All good, start server
 	var result: bool = await _start_server()
 	return result
@@ -187,10 +190,10 @@ func _check_and_start() -> bool:
 func check_python_installed() -> bool:
 	_emit_progress(25, "Looking for Python...")
 	python_path = _find_python()
-	
+
 	var output: Array = []
 	var exit_code: int = OS.execute(python_path, ["--version"], output, true)
-	
+
 	if exit_code == 0:
 		_emit_progress(50, "Python found at " + python_path)
 		return true
@@ -202,56 +205,77 @@ func check_python_installed() -> bool:
 ## Check if MediaPipe is installed
 func check_mediapipe_installed() -> bool:
 	_emit_progress(75, "Checking MediaPipe installation...")
-	
+
 	var output: Array = []
 	var exit_code: int = OS.execute(python_path, ["-c", "import mediapipe; print('OK')"], output, true)
-	
+
 	if exit_code == 0 and output.size() > 0 and "OK" in output[0]:
-		_emit_progress(100, "All dependencies ready - starting server...")
+		_emit_progress(100, "Python dependencies ready")
 		return true
 	else:
 		_emit_progress(100, "MediaPipe not found - will attempt auto-install")
 		emit_signal("mediapipe_not_found")
 		return false
 
+func check_model_asset_available() -> bool:
+	var model_name := _get_required_model_name()
+	var model_path := ProjectSettings.globalize_path("res://" + model_name)
+	if FileAccess.file_exists(model_path):
+		_emit_progress(100, "Model asset ready - starting server...")
+		return true
+
+	var message := "Missing MediaPipe model asset: %s" % model_name
+	_emit_progress(100, message)
+	emit_signal("server_failed", message)
+	return false
+
+func _get_required_model_name() -> String:
+	match model_complexity:
+		2:
+			return "pose_landmarker_heavy.task"
+		1:
+			return "pose_landmarker_full.task"
+		_:
+			return "pose_landmarker_lite.task"
+
 ## Install dependencies automatically
 func install_dependencies() -> void:
 	if is_installing:
 		return
-	
+
 	is_installing = true
 	python_path = _find_python()
-	
+
 	emit_signal("installation_progress", 0, "Starting installation...")
-	
+
 	# Install using pip directly
 	_ensure_venv_and_install()
 
 func _ensure_venv_and_install() -> void:
 	emit_signal("installation_progress", 10, "Creating virtual environment...")
-	
+
 	# Create venv in repo location (not workspace - sandbox issues)
 	var venv_path: String = ProjectSettings.globalize_path("res://venv")
 	var output: Array = []
 	var exit_code: int = OS.execute("python3", ["-m", "venv", venv_path], output, true)
-	
+
 	if exit_code != 0:
 		is_installing = false
 		emit_signal("installation_complete", false)
 		emit_signal("server_failed", "Failed to create virtual environment")
 		return
-	
+
 	# Update python path after venv creation
 	python_path = _find_python()
-	
+
 	emit_signal("installation_progress", 25, "Installing dependencies from requirements.txt...")
-	
+
 	# Install packages from requirements.txt
 	var requirements_path: String = ProjectSettings.globalize_path("res://python_mediapipe/requirements.txt")
 	var args: PackedStringArray = ["-m", "pip", "install", "-r", requirements_path]
 	var pid: int = OS.execute(python_path, args, [], false)
 	install_pid = pid
-	
+
 	if pid > 0:
 		progress_timer.start(2.0)
 	else:
@@ -263,17 +287,17 @@ func _check_install_progress() -> void:
 	if install_pid <= 0:
 		progress_timer.stop()
 		return
-	
+
 	emit_signal("installation_progress", 50, "Installing packages (this may take a few minutes)...")
 	progress_timer.stop()
-	
+
 	var timer: SceneTreeTimer = get_tree().create_timer(5.0)
 	timer.timeout.connect(_finish_install_check)
 
 func _finish_install_check() -> void:
 	is_installing = false
 	install_pid = -1
-	
+
 	if check_mediapipe_installed():
 		emit_signal("installation_complete", true)
 		await _start_server()
@@ -294,49 +318,49 @@ func _kill_existing_servers() -> void:
 func _start_detached_server() -> int:
 	# First kill any existing servers
 	await _kill_existing_servers()
-	
+
 	var python: String = "/usr/bin/python3"
 	# Use project-relative paths instead of hardcoded absolute paths
 	var script: String = ProjectSettings.globalize_path("res://python_mediapipe/main.py")
 	var venv_packages: String = ProjectSettings.globalize_path("res://venv/lib/python3.12/site-packages")
 	var project_dir: String = ProjectSettings.globalize_path("res://")
-	
+
 	# Store PID file for cleanup tracking
 	var pid_file: String = "/tmp/aerobeat_autostart.pid"
-	
+
 	# Build the command with setsid for process group isolation
 	# setsid creates a new session, making Python the session leader
 	# This allows us to kill the entire group with kill -PID
 	var bash_cmd: String = ""
-	
+
 	# Linux: Auto-detect DISPLAY environment variable
 	if OS.get_name() == "Linux":
 		bash_cmd += 'export DISPLAY=:1; xdpyinfo >/dev/null 2>&1 || export DISPLAY=:0; xdpyinfo >/dev/null 2>&1 || export DISPLAY=:2; xdpyinfo >/dev/null 2>&1 || export DISPLAY=:1; '
-	
+
 	bash_cmd += "export HOME=/home/derrick && cd " + project_dir + " && "
 	bash_cmd += "PYTHONPATH=" + venv_packages + " "
-	
+
 	# Use setsid to create new session/process group
 	# This is KEY for reliable termination even when OpenCV blocks
 	bash_cmd += "setsid nohup " + python + " -u " + script + " "
 	bash_cmd += "--camera 0 --port 4242 --model-complexity 1 --preprocess-size 480 --stream-camera --stream-port 4243 --no-filter"
 	bash_cmd += " > /tmp/aerobeat_server.log 2>&1 &"
-	
+
 	# Capture the PGID (process group ID) for later cleanup
 	bash_cmd += " PGID=$!; "
 	bash_cmd += " echo $PGID > " + pid_file + "; "
 	bash_cmd += " wait $PGID; "
 	bash_cmd += " rm -f " + pid_file
-	
+
 	# NON-BLOCKING execute - returns immediately (bash forks and continues)
 	var bash_pid: int = OS.create_process("/bin/bash", ["-c", bash_cmd])
-	
+
 	if bash_pid <= 0:
 		print("[AutoStartManager] ERROR: Failed to create bash process")
 		return -1
-	
+
 	print("[AutoStartManager] Bash process created, PID: %d" % bash_pid)
-	
+
 	# Wait briefly for setsid to complete and PID file to be written
 	print("[AutoStartManager] Waiting 0.5s for PID file...")
 	if get_tree() == null:
@@ -344,17 +368,17 @@ func _start_detached_server() -> int:
 		return -1
 	await get_tree().create_timer(0.5).timeout
 	print("[AutoStartManager] Wait complete, reading PID file...")
-	
+
 	# Read the actual Python process group ID
 	var pgid := _read_pid_file(pid_file)
 	print("[AutoStartManager] Read PGID from file: %d" % pgid)
-	
+
 	if pgid > 0:
 		print("[AutoStartManager] Started Python in process group ", pgid)
 	else:
 		print("[AutoStartManager] Warning: Could not read PGID, using bash PID ", bash_pid)
 		pgid = bash_pid
-	
+
 	# Server is starting - return PGID immediately so heartbeats can begin
 	# The caller (_start_server) will handle waiting and verification
 	print("[AutoStartManager] Returning PGID %d immediately for heartbeat" % pgid)
@@ -372,7 +396,7 @@ func _read_pid_file(path: String) -> int:
 ## Setup heartbeat to keep Python process alive
 func _setup_heartbeat(heartbeat_port: int) -> void:
 	print("[AutoStartManager] Setting up heartbeat on port %d" % heartbeat_port)
-	
+
 	if _heartbeat_udp == null:
 		_heartbeat_udp = PacketPeerUDP.new()
 		var err := _heartbeat_udp.set_dest_address("127.0.0.1", heartbeat_port)
@@ -380,7 +404,7 @@ func _setup_heartbeat(heartbeat_port: int) -> void:
 			print("[AutoStartManager] ERROR: Failed to set heartbeat destination, error: %d" % err)
 		else:
 			print("[AutoStartManager] Heartbeat target: 127.0.0.1:%d" % heartbeat_port)
-	
+
 	if _heartbeat_timer == null:
 		_heartbeat_timer = Timer.new()
 		_heartbeat_timer.wait_time = heartbeat_interval_ms / 1000.0
@@ -394,13 +418,13 @@ func _setup_heartbeat(heartbeat_port: int) -> void:
 func _send_heartbeat() -> void:
 	if _heartbeat_udp == null:
 		return
-	
+
 	# Always send heartbeat if we have a valid PID
 	# Don't check is_server_running() here - it can fail during startup
 	# Python will self-terminate if it doesn't receive heartbeats
 	if server_pid <= 1:
 		return
-	
+
 	var packet := PackedByteArray()
 	packet.append(0x01)  # Heartbeat marker
 	_heartbeat_udp.put_packet(packet)
@@ -416,14 +440,14 @@ func _poll_for_server_pid() -> int:
 		# Check if server log shows it's running (more reliable than pgrep)
 		var log_check: Array = []
 		OS.execute("grep", ["-c", "Initializing MediaPipe", "/tmp/aerobeat_server.log"], log_check, true)
-		
+
 		if log_check.size() > 0:
 			var count_str: String = log_check[0].strip_edges()
 			if count_str.is_valid_int() and int(count_str) > 0:
 				# Server is running! Now get the PID
 				var pgrep_output: Array = []
 				OS.execute("pgrep", ["-f", "python_mediapipe/main.py"], pgrep_output, true)
-				
+
 				if pgrep_output.size() > 0:
 					var lines: PackedStringArray = pgrep_output[0].split("\n")
 					for line: String in lines:
@@ -432,43 +456,43 @@ func _poll_for_server_pid() -> int:
 							var found_pid: int = int(line)
 							if found_pid > 0:
 								return found_pid
-		
+
 		await get_tree().create_timer(0.5).timeout
-	
+
 	return -1
 
 ## Start the MediaPipe server with proper arguments
 func _start_server() -> bool:
 	print("[AutoStartManager] _start_server() called")
-	
+
 	# Try detached mode first (prevents stdout pipe blocking)
 	print("[AutoStartManager] Calling _start_detached_server()...")
-	
+
 	# Start server and get PGID immediately
 	var detached_pid: int = await _start_detached_server()
 	print("[AutoStartManager] _start_detached_server() returned PID: %d" % detached_pid)
-	
+
 	if detached_pid <= 0:
 		emit_signal("server_failed", "Failed to start detached server")
 		return false
-	
+
 	server_pid = detached_pid
 	_is_running = true
-	
+
 	# CRITICAL: Start heartbeat IMMEDIATELY before Python times out (3s timeout)
 	print("[AutoStartManager] Starting heartbeat immediately...")
 	_setup_heartbeat(server_port + 2)
-	
+
 	# Send first heartbeat right away
 	_send_heartbeat()
 	print("[AutoStartManager] First heartbeat sent")
-	
+
 	emit_signal("server_started", detached_pid)
-	
+
 	# Now wait for server to fully initialize (but heartbeats are already flowing)
 	print("[AutoStartManager] Waiting 2.0s for server to stabilize...")
 	await get_tree().create_timer(2.0).timeout
-	
+
 	if is_server_running():
 		print("[AutoStartManager] Server is running after wait!")
 		return true
@@ -510,25 +534,25 @@ func _stop_sync() -> void:
 	## Synchronous stop for notifications
 	_stop_heartbeat()
 	OS.delay_msec(200)  # Let Python detect missing heartbeat
-	
+
 	if server_pid > 1:
 		var output: Array = []
 		OS.execute("/bin/kill", ["-TERM", "-" + str(server_pid)], output, true)
 		OS.delay_msec(300)
-		
+
 		if _is_process_alive(server_pid):
 			OS.execute("/bin/kill", ["-KILL", "-" + str(server_pid)], output, true)
 			OS.delay_msec(100)
-	
+
 	# Cleanup PID file
 	var pid_file: String = "/tmp/aerobeat_autostart.pid"
 	if FileAccess.file_exists(pid_file):
 		DirAccess.remove_absolute(pid_file)
-	
+
 	# Close UDP
 	if _heartbeat_udp:
 		_heartbeat_udp.close()
 		_heartbeat_udp = null
-	
+
 	_is_running = false
 	server_pid = -1

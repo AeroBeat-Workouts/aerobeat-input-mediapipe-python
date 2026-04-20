@@ -404,13 +404,13 @@ func check_dependencies() -> Dictionary:
 	var exit: int = OS.execute(python, PackedStringArray(["-c", "import mediapipe; print('ok')"]), output, true)
 	result.mediapipe_installed = (exit == 0 and output.size() > 0 and output[0].strip_edges() == "ok")
 	if not result.mediapipe_installed:
-		result.errors.append("MediaPipe not installed. Run: pip install -r requirements.txt")
+		result.errors.append("MediaPipe not installed. Run: pip install -r python_mediapipe/requirements.txt")
 	
 	# Check for opencv
 	output.clear()
 	exit = OS.execute(python, PackedStringArray(["-c", "import cv2; print('ok')"]), output, true)
 	result.opencv_installed = (exit == 0 and output.size() > 0 and output[0].strip_edges() == "ok")
 	if not result.opencv_installed:
-		result.errors.append("OpenCV not installed. Run: pip install -r requirements.txt")
+		result.errors.append("OpenCV not installed. Run: pip install -r python_mediapipe/requirements.txt")
 	
 	return result

@@ -4,7 +4,7 @@ Video Input Module for Automated Testing
 Provides OpenCV VideoCapture wrapper with multiple playback modes
 for deterministic and real-time testing scenarios.
 
-This script is located in .testbed/videos/ and can test videos in this folder
+This script is located in .testbed/assets/videos/ and can test videos in this folder
 or serve as a utility for the Python sidecar.
 """
 
@@ -17,8 +17,8 @@ from dataclasses import dataclass
 from typing import Optional, Iterator, List
 
 # Add python_mediapipe to path for imports
-# This script is in: .testbed/videos/
-# python_mediapipe is at: ../../python_mediapipe/
+# This script is in: .testbed/assets/videos/
+# python_mediapipe is at: ../../../python_mediapipe/
 PYTHON_MEDIAPIPE_PATH = Path(__file__).parent.parent.parent / "python_mediapipe"
 if PYTHON_MEDIAPIPE_PATH.exists():
     sys.path.insert(0, str(PYTHON_MEDIAPIPE_PATH))
