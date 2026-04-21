@@ -1,7 +1,9 @@
 extends Node
-class_name MediaPipeProviderTest
 ## Standalone test version of MediaPipeProvider
 ## Extends Node instead of AeroInputProvider for independent testing
+
+const MediaPipeConfig = preload("res://addons/aerobeat-input-mediapipe-python/src/config/mediapipe_config.gd")
+const MediaPipeServer = preload("res://addons/aerobeat-input-mediapipe-python/src/server/mediapipe_server.gd")
 
 signal pose_updated(landmarks: Array)
 signal tracking_lost()
