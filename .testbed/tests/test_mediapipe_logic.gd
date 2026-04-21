@@ -20,12 +20,12 @@ func _run_standalone_tests():
 	else:
 		print("✗ Math is broken")
 	
-	# Test 2: Verify driver script exists
-	var script = load("res://addons/aerobeat-input-mediapipe-python/src/driver.gd")
+	# Test 2: Verify assembly-facing addon entrypoint exists
+	var script = load("res://addons/aerobeat-input-mediapipe-python/src/input_provider.gd")
 	if script:
-		print("✓ Driver script exists")
+		print("✓ Input provider script exists")
 	else:
-		print("✗ Driver script not found")
+		print("✗ Input provider script not found")
 	
 	# Test 3: Verify provider script exists
 	var provider_script = load("res://addons/aerobeat-input-mediapipe-python/src/providers/mediapipe_provider.gd")
@@ -68,11 +68,11 @@ func test_sanity_check():
 		return
 	assert_eq(1, 1, "Math should work")
 
-func test_driver_structure():
+func test_input_provider_script_exists():
 	if not _is_gut_available():
 		return
-	var script = load("res://addons/aerobeat-input-mediapipe-python/src/driver.gd")
-	assert_not_null(script, "Driver script should exist")
+	var script = load("res://addons/aerobeat-input-mediapipe-python/src/input_provider.gd")
+	assert_not_null(script, "Input provider script should exist")
 
 func test_provider_script_exists():
 	if not _is_gut_available():

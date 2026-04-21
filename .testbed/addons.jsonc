@@ -7,9 +7,10 @@
       "source": "symlink",
       "subfolder": "/"
     },
-    // Core is linked locally in AeroBeat workspace development.
+    // The input-core repo is mounted under the historical addon key/path
+    // `aerobeat-core` so current repo runtime references keep working.
     "aerobeat-core": {
-      "url": "../../aerobeat-core",
+      "url": "../../aerobeat-input-core",
       "source": "symlink",
       "subfolder": "/"
     },
