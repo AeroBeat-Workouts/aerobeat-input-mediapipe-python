@@ -22,6 +22,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from one_euro_filter import LandmarkFilterBank, get_preset_params
 from roi_tracker import PredictiveROITracker
+from runtime_paths import get_model_path
 
 try:
     import mediapipe as mp
@@ -80,13 +81,13 @@ def scale_landmarks(landmarks: List[Dict], scale: float) -> List[Dict]:
 
 def create_pose_detector(model_complexity: int = 0):
     """Create MediaPipe pose detector using new Tasks API."""
-    model_paths = {
-        0: "pose_landmarker_lite.task",
-        1: "pose_landmarker_full.task", 
-        2: "pose_landmarker_heavy.task"
-    }
+    model_path = get_model_path(model_complexity)
+    if not model_path.exists():
+        raise FileNotFoundError(
+            f"Missing MediaPipe model asset: {model_path.name} (expected at {model_path})"
+        )
     
-    base_options = BaseOptions(model_asset_path=model_paths.get(model_complexity, model_paths[0]))
+    base_options = BaseOptions(model_asset_path=str(model_path))
     
     options = vision.PoseLandmarkerOptions(
         base_options=base_options,

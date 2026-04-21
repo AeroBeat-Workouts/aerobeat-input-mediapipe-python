@@ -14,6 +14,8 @@ from args import parse_args
 from one_euro_filter import LandmarkFilterBank, get_preset_params
 from platform_utils import setup_platform_optimizations
 from camera_streamer import MJPEGStreamer
+from roi_tracker import PredictiveROITracker
+from runtime_paths import get_model_filename, get_model_path
 
 try:
     import cv2
@@ -34,11 +36,11 @@ _heartbeat_last_time = time.time()
 _heartbeat_lock = threading.Lock()
 _heartbeat_timeout_sec = 3.0  # Exit if no heartbeat for 3 seconds
 
-# Model paths for different complexity levels
+# Model filenames for different complexity levels (stored under python_mediapipe/assets/models/)
 MODEL_PATHS = {
-    0: 'pose_landmarker_lite.task',
-    1: 'pose_landmarker_full.task',
-    2: 'pose_landmarker_heavy.task'
+    0: get_model_filename(0),
+    1: get_model_filename(1),
+    2: get_model_filename(2)
 }
 
 # Pose connections for drawing skeleton
@@ -85,35 +87,35 @@ def draw_landmarks_on_frame(frame, landmarks, connections=True, pose_id=0):
     """Draw landmarks and skeleton on frame for debug visualization"""
     if not landmarks:
         return frame
-    
+
     h, w = frame.shape[:2]
     output = frame.copy()
-    
+
     # Different colors for different poses
     pose_colors = [
         (0, 255, 0),    # Green - Player 1
         (255, 0, 255),  # Magenta - Player 2
     ]
     skeleton_color = pose_colors[pose_id % len(pose_colors)]
-    
+
     # Draw connections (skeleton)
     if connections:
         for start_idx, end_idx in POSE_CONNECTIONS:
             if start_idx < len(landmarks) and end_idx < len(landmarks):
                 start_lm = landmarks[start_idx]
                 end_lm = landmarks[end_idx]
-                
+
                 # Only draw if both landmarks are visible
                 if start_lm.get('v', 1.0) > 0.5 and end_lm.get('v', 1.0) > 0.5:
                     x1, y1 = int(start_lm['x'] * w), int(start_lm['y'] * h)
                     x2, y2 = int(end_lm['x'] * w), int(end_lm['y'] * h)
                     cv2.line(output, (x1, y1), (x2, y2), skeleton_color, 2)
-    
+
     # Draw landmark points
     for lm in landmarks:
         x, y = int(lm['x'] * w), int(lm['y'] * h)
         visibility = lm.get('v', 1.0)
-        
+
         # Color based on visibility
         if visibility > 0.8:
             color = skeleton_color
@@ -121,9 +123,9 @@ def draw_landmarks_on_frame(frame, landmarks, connections=True, pose_id=0):
             color = (0, 255, 255)  # Yellow - medium confidence
         else:
             color = (0, 0, 255)  # Red - low confidence
-        
+
         cv2.circle(output, (x, y), 4, color, -1)
-    
+
     # Draw pose ID label above head (landmark 0 is nose, move up further)
     if landmarks and len(landmarks) > 0:
         nose = landmarks[0]
@@ -132,7 +134,7 @@ def draw_landmarks_on_frame(frame, landmarks, connections=True, pose_id=0):
         # Move label 40px above nose to avoid facial landmarks
         cv2.putText(output, label, (x - 15, y - 40),
                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, skeleton_color, 2)
-    
+
     return output
 
 
@@ -143,29 +145,29 @@ class FrameCapture:
         self.cap = cv2.VideoCapture(camera_id)
         if not self.cap.isOpened():
             raise RuntimeError(f"Could not open camera {camera_id}")
-        
+
         # Set camera properties
         self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
         self.cap.set(cv2.CAP_PROP_FPS, fps)
-        
+
         self.frame = None
         self.lock = threading.Lock()
         self._running = True
         self._ready = False  # Flag to indicate first frame captured
         self._thread = threading.Thread(target=self._capture_loop, daemon=True)
         self._thread.start()
-        
+
         # Wait for first frame with timeout
         timeout = 5.0  # 5 seconds
         start_time = time.time()
         while not self._ready and time.time() - start_time < timeout:
             time.sleep(0.01)
-        
+
         if not self._ready:
             raise RuntimeError("Camera failed to capture first frame within timeout")
-        
+
     def _capture_loop(self):
         """Continuously capture frames in background thread"""
         while self._running:
@@ -175,12 +177,12 @@ class FrameCapture:
                     self.frame = frame
                     if not self._ready:
                         self._ready = True
-    
+
     def get_frame(self):
         """Get the latest frame"""
         with self.lock:
             return self.frame.copy() if self.frame is not None else None
-    
+
     def stop(self):
         self._running = False
         self._thread.join(timeout=1.0)
@@ -199,10 +201,10 @@ class UDPSender:
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, buffer_size)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, buffer_size)
         self.frames_in_batch = 0
-        
+
     def send(self, landmarks, timestamp, capture_ms=0.0, inference_ms=0.0,
              filter_ms=0.0, serialization_ms=0.0, frame_count=0,
-             processing_fps=60.0, skip_frames=1, binary=True):
+             processing_fps=60.0, skip_frames=1, binary=True, all_poses=None):
         """Queue a frame for sending (flushes if batch is full)"""
         # Serialize this frame
         if binary:
@@ -212,31 +214,31 @@ class UDPSender:
                 processing_fps, skip_frames
             )
         else:
-            payload = {
-                "timestamp": timestamp,
-                "capture_ms": capture_ms,
-                "inference_ms": inference_ms,
-                "filter_ms": filter_ms,
-                "serialization_ms": serialization_ms,
-                "frame_count": frame_count,
-                "processing_fps": processing_fps,
-                "skip_frames": skip_frames,
-                "landmarks": landmarks
-            }
-            frame_data = json.dumps(payload).encode()
-        
+            frame_data = serialize_landmarks_json(
+                landmarks,
+                timestamp,
+                capture_ms,
+                inference_ms,
+                filter_ms,
+                serialization_ms,
+                frame_count,
+                processing_fps,
+                skip_frames,
+                all_poses=all_poses,
+            )
+
         self.batch.append(frame_data)
         self.frames_in_batch += 1
-        
+
         # Flush if batch is full
         if self.frames_in_batch >= self.batch_size:
             self.flush(binary)
-            
+
     def flush(self, binary=True):
         """Send all queued frames"""
         if not self.batch:
             return
-            
+
         try:
             if self.batch_size == 1:
                 # Single frame - send directly with protocol marker
@@ -255,10 +257,10 @@ class UDPSender:
                 self.sock.sendto(packet, self.addr)
         except Exception as e:
             print(f"UDP send error: {e}")
-        
+
         self.batch = []
         self.frames_in_batch = 0
-        
+
     def close(self):
         self.flush()
         self.sock.close()
@@ -274,7 +276,7 @@ class LatencyTracker:
         self.serialization_times = deque(maxlen=window_size)
         self.filter_times = deque(maxlen=window_size)
         self.total_times = deque(maxlen=window_size)
-        
+
     def record_frame(self, capture_ms, inference_ms, serialization_ms, filter_ms, total_ms):
         self.capture_times.append(capture_ms)
         self.inference_times.append(inference_ms)
@@ -282,11 +284,11 @@ class LatencyTracker:
         self.filter_times.append(filter_ms)
         self.total_times.append(total_ms)
         self.frame_count += 1
-        
+
         # Log every 60 frames
         if self.frame_count % 60 == 0:
             self._log_stats()
-    
+
     def _log_stats(self):
         if len(self.total_times) == 0:
             return
@@ -295,7 +297,7 @@ class LatencyTracker:
         avg_serialization = sum(self.serialization_times) / len(self.serialization_times)
         avg_filter = sum(self.filter_times) / len(self.filter_times)
         avg_total = sum(self.total_times) / len(self.total_times)
-        
+
         print(f"[LATENCY] Frame {self.frame_count}: "
               f"capture={avg_capture:.2f}ms | "
               f"inference={avg_inference:.2f}ms | "
@@ -308,20 +310,20 @@ def signal_handler(sig, frame):
     global _running
     print(f"\n[Signal] Received signal {sig} ({signal.Signals(sig).name if hasattr(signal, 'Signals') else 'unknown'}), initiating shutdown...")
     _running = False
-    
+
     # Force exit immediately using os._exit - bypasses all cleanup
     # This is necessary because OpenCV VideoCapture can block in uninterruptible sleep
     def force_exit():
         time.sleep(0.2)  # Short delay to let signal handler complete
         print("[Signal] Force exiting with os._exit(0)...")
         os._exit(0)
-    
+
     # Start force-exit thread as non-daemon so it won't be waited on
     import threading
     exit_thread = threading.Thread(target=force_exit, name="force_exit_thread")
     exit_thread.daemon = False
     exit_thread.start()
-    
+
     # Also schedule a self-SIGKILL as absolute last resort
     def suicide():
         time.sleep(0.8)
@@ -332,11 +334,11 @@ def signal_handler(sig, frame):
                 os.kill(os.getpid(), signal.SIGKILL)
             except:
                 pass
-    
+
     suicide_thread = threading.Thread(target=suicide, name="suicide_thread")
     suicide_thread.daemon = True
     suicide_thread.start()
-    
+
     # Also try to interrupt any blocking I/O by closing file descriptors
     try:
         import sys
@@ -350,14 +352,18 @@ signal.signal(signal.SIGTERM, signal_handler)
 signal.signal(signal.SIGINT, signal_handler)
 
 
-def create_pose_detector(model_complexity: int = 0, 
+def create_pose_detector(model_complexity: int = 0,
                         min_detection_confidence: float = 0.3,
                         min_tracking_confidence: float = 0.3):
     """Create MediaPipe pose detector using new Tasks API."""
-    model_path = MODEL_PATHS.get(model_complexity, MODEL_PATHS[0])
-    
-    base_options = BaseOptions(model_asset_path=model_path)
-    
+    model_path = get_model_path(model_complexity)
+    if not model_path.exists():
+        raise FileNotFoundError(
+            f"Missing MediaPipe model asset: {model_path.name} (expected at {model_path})"
+        )
+
+    base_options = BaseOptions(model_asset_path=str(model_path))
+
     options = vision.PoseLandmarkerOptions(
         base_options=base_options,
         running_mode=vision.RunningMode.VIDEO,
@@ -366,7 +372,7 @@ def create_pose_detector(model_complexity: int = 0,
         min_pose_presence_confidence=min_detection_confidence,
         min_tracking_confidence=min_tracking_confidence
     )
-    
+
     return vision.PoseLandmarker.create_from_options(options)
 
 
@@ -374,7 +380,7 @@ def preprocess_frame(frame, target_size):
     """Resize frame before MediaPipe for faster inference"""
     if target_size <= 0 or frame.shape[0] <= target_size:
         return frame, 1.0
-    
+
     scale = target_size / frame.shape[0]
     new_width = int(frame.shape[1] * scale)
     small_frame = cv2.resize(frame, (new_width, target_size))
@@ -389,6 +395,28 @@ def scale_landmarks(landmarks, scale_x, scale_y):
     return landmarks
 
 
+def remap_landmarks_from_roi(all_landmarks, roi, frame_shape):
+    """Map ROI-relative normalized landmarks back to full-frame normalized coordinates."""
+    if not roi:
+        return all_landmarks
+
+    roi_x, roi_y, roi_w, roi_h = roi
+    frame_h, frame_w = frame_shape[:2]
+    if roi_w <= 0 or roi_h <= 0 or frame_w <= 0 or frame_h <= 0:
+        return all_landmarks
+
+    remapped = []
+    for pose_id, pose_landmarks in all_landmarks:
+        pose_copy = []
+        for lm in pose_landmarks:
+            mapped = dict(lm)
+            mapped['x'] = (roi_x + (lm['x'] * roi_w)) / frame_w
+            mapped['y'] = (roi_y + (lm['y'] * roi_h)) / frame_h
+            pose_copy.append(mapped)
+        remapped.append((pose_id, pose_copy))
+    return remapped
+
+
 def serialize_single_landmarks(landmarks, timestamp, capture_ms=0.0, inference_ms=0.0,
                                 filter_ms=0.0, serialization_ms=0.0, frame_count=0,
                                 processing_fps=60.0, skip_frames=1):
@@ -399,16 +427,16 @@ def serialize_single_landmarks(landmarks, timestamp, capture_ms=0.0, inference_m
     data += struct.pack('!f', processing_fps)  # 4 bytes for processing FPS
     data += struct.pack('!B', skip_frames)  # 1 byte for skip frames
     data += struct.pack('!H', len(landmarks))  # 2 bytes for count
-    
+
     for lm in landmarks:
         data += struct.pack('!B', lm['id'])  # 1 byte for id
         data += struct.pack('!ffff', lm['x'], lm['y'], lm['z'], lm['v'])  # 16 bytes per landmark
-    
+
     return data
 
 
-def serialize_landmarks_binary(landmarks, timestamp, capture_ms=0.0, inference_ms=0.0, 
-                               filter_ms=0.0, serialization_ms=0.0, frame_count=0, 
+def serialize_landmarks_binary(landmarks, timestamp, capture_ms=0.0, inference_ms=0.0,
+                               filter_ms=0.0, serialization_ms=0.0, frame_count=0,
                                processing_fps=60.0, skip_frames=1):
     """Serialize landmarks using binary format for lower latency"""
     return serialize_single_landmarks(landmarks, timestamp, capture_ms, inference_ms,
@@ -417,10 +445,10 @@ def serialize_landmarks_binary(landmarks, timestamp, capture_ms=0.0, inference_m
 
 
 def serialize_landmarks_json(landmarks, timestamp, capture_ms=0.0, inference_ms=0.0,
-                             filter_ms=0.0, serialization_ms=0.0, frame_count=0, 
+                             filter_ms=0.0, serialization_ms=0.0, frame_count=0,
                              processing_fps=60.0, skip_frames=1, all_poses=None):
     """Serialize landmarks using JSON (fallback)
-    
+
     Args:
         landmarks: Primary pose landmarks (for backward compatibility)
         all_poses: List of (pose_id, landmarks) tuples for multi-pose support
@@ -438,7 +466,7 @@ def serialize_landmarks_json(landmarks, timestamp, capture_ms=0.0, inference_ms=
         "num_poses": len(all_poses) if all_poses else (1 if landmarks else 0),
         "poses": []
     }
-    
+
     # Add all poses
     if all_poses:
         for pose_id, pose_landmarks in all_poses:
@@ -452,18 +480,18 @@ def serialize_landmarks_json(landmarks, timestamp, capture_ms=0.0, inference_ms=
             "pose_id": 0,
             "landmarks": landmarks
         })
-    
+
     return json.dumps(payload).encode()
 
 
 def main():
     global _running
-    
+
     # Platform-specific setup for optimal performance
     setup_platform_optimizations()
-    
+
     latency_tracker = LatencyTracker()
-    
+
     # Initialize heartbeat socket (receives heartbeat from Godot)
     heartbeat_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     heartbeat_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -476,20 +504,25 @@ def main():
     except Exception as e:
         print(f"[Heartbeat] Warning: Could not bind heartbeat port: {e}")
         heartbeat_sock = None
-    
-    # Initialize UDP socket with tuned buffer size for low latency
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, args.udp_buffer_size)
-    sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, args.udp_buffer_size)
-    
+
+    # Initialize UDP sender with tuned buffer size for low latency
+    binary_mode = args.binary_protocol and not args.json_protocol
+    udp_sender = UDPSender(
+        args.host,
+        args.port,
+        batch_size=max(1, min(args.udp_batch_size, 10)),
+        buffer_size=args.udp_buffer_size,
+    )
+
     # Initialize MediaPipe Pose Landmarker with new Tasks API
-    print(f"Initializing MediaPipe Pose Landmarker (model: {MODEL_PATHS.get(args.model_complexity, MODEL_PATHS[0])})...")
+    model_path = get_model_path(args.model_complexity)
+    print(f"Initializing MediaPipe Pose Landmarker (model: {model_path})...")
     detector = create_pose_detector(
         model_complexity=args.model_complexity,
         min_detection_confidence=args.detection_confidence,
         min_tracking_confidence=args.tracking_confidence
     )
-    
+
     # Initialize MJPEG streamer if enabled
     mjpeg_streamer = None
     if args.stream_camera:
@@ -499,18 +532,18 @@ def main():
         else:
             print("Warning: Failed to start camera streamer")
             mjpeg_streamer = None
-    
+
     # Initialize One-Euro filter bank
     filter_bank = None
     if args.use_filter:
         # Get preset parameters
         preset_params = get_preset_params(args.filter_preset)
-        
+
         # Override with CLI arguments if provided
         min_cutoff = args.filter_min_cutoff if args.filter_min_cutoff is not None else preset_params['min_cutoff']
         beta = args.filter_beta if args.filter_beta is not None else preset_params['beta']
         d_cutoff = args.filter_d_cutoff if args.filter_d_cutoff is not None else preset_params['d_cutoff']
-        
+
         filter_bank = LandmarkFilterBank(
             num_landmarks=33,
             min_cutoff=min_cutoff,
@@ -521,7 +554,17 @@ def main():
               f"min_cutoff={min_cutoff}Hz, beta={beta}, d_cutoff={d_cutoff}Hz")
     else:
         print("One-Euro filter disabled")
-    
+
+    roi_tracker = None
+    if args.use_roi:
+        roi_tracker = PredictiveROITracker(
+            target_size=args.roi_size,
+            padding=args.roi_padding,
+        )
+        print(f"Predictive ROI enabled: size={args.roi_size}, padding={args.roi_padding}")
+    else:
+        print("Predictive ROI disabled")
+
     # Initialize camera (with or without threading)
     if args.threaded_capture:
         print("Using threaded frame capture")
@@ -532,29 +575,30 @@ def main():
         if not cap.isOpened():
             print(f"Error: Could not open camera {args.camera}")
             sys.exit(1)
-        
+
         # Set camera buffer size to 1 for minimal latency
         cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, args.width)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, args.height)
         cap.set(cv2.CAP_PROP_FPS, args.max_fps)
         frame_capture = None
-    
+
     # Frame skipping for performance
     skip_frames = args.skip_frames
     if skip_frames < 1:
         skip_frames = 1
-    
+
     # Calculate processing FPS based on skip ratio
     processing_fps = args.max_fps / skip_frames
-    
+
     print(f"MediaPipe started - Camera: {args.camera}, UDP: {args.host}:{args.port}")
-    print(f"Resolution: {args.width}x{args.height}, Model: {args.model_complexity}, "
+    print(f"Resolution: {args.width}x{args.height}, Model: {args.model_complexity} ({model_path.name}), "
           f"Detection: {args.detection_confidence}, Tracking: {args.tracking_confidence}")
     print(f"Multi-pose: 2 people max (Player 1 = Green, Player 2 = Magenta)")
-    print(f"Binary protocol: {args.binary_protocol}")
-    print(f"UDP buffer size: {args.udp_buffer_size} bytes")
+    print(f"Protocol: {'binary' if binary_mode else 'json'}")
+    print(f"UDP buffer size: {args.udp_buffer_size} bytes | batch size: {max(1, min(args.udp_batch_size, 10))}")
     print(f"Frame skipping: {skip_frames} (capture: {args.max_fps}fps -> process: {processing_fps:.1f}fps)")
+    print(f"Preprocess size: {args.preprocess_size if args.preprocess_size > 0 else 'disabled'}")
     if args.stream_camera:
         print(f"Camera streaming: enabled at http://127.0.0.1:{args.stream_port}/camera")
     else:
@@ -564,11 +608,11 @@ def main():
         print("Press 'q' in the window to quit")
     else:
         print("Debug window: disabled (use --show-window to enable)")
-    
+
     # Start heartbeat monitor thread
     heartbeat_thread = threading.Thread(target=heartbeat_monitor, daemon=True)
     heartbeat_thread.start()
-    
+
     # Start watchdog thread to ensure clean exit
     # This is needed because OpenCV VideoCapture can block in uninterruptible sleep
     def watchdog():
@@ -583,23 +627,23 @@ def main():
                     print("[Watchdog] Shutdown timeout reached, forcing exit...")
                     os._exit(1)
             time.sleep(0.5)
-    
+
     watchdog_thread = threading.Thread(target=watchdog, daemon=True)
     watchdog_thread.start()
-    
+
     # Create debug window if enabled
     if args.show_window:
         cv2.namedWindow("MediaPipe Pose", cv2.WINDOW_NORMAL)
         if args.window_scale != 1.0:
             cv2.resizeWindow("MediaPipe Pose", int(args.width * args.window_scale), int(args.height * args.window_scale))
-    
+
     # Frame counter for skipping and timestamp calculation
     frame_counter = 0
     start_time_ms = int(time.time() * 1000)
-    
+
     while _running:
         frame_start = time.time()
-        
+
         # Check for heartbeat messages from Godot
         if heartbeat_sock:
             try:
@@ -611,24 +655,24 @@ def main():
                 pass  # No data available
             except Exception as e:
                 pass  # Ignore other errors
-        
+
         # Capture frame
         if frame_capture:
             frame = frame_capture.get_frame()
             ret = frame is not None
         else:
             ret, frame = cap.read()
-        
+
         if not ret or frame is None:
             print("Warning: Failed to capture frame")
             continue
-        
+
         # Update MJPEG streamer with raw frame (before any processing)
         if mjpeg_streamer and mjpeg_streamer.is_running():
             mjpeg_streamer.update_frame(frame)
-        
+
         capture_time = (time.time() - frame_start) * 1000  # ms
-        
+
         # Frame skipping: process every Nth frame
         frame_counter += 1
         if frame_counter % skip_frames != 0:
@@ -643,21 +687,30 @@ def main():
                     _running = False
                     break
             continue
-        
+
         # Process frame with new Tasks API
         inference_start = time.time()
-        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        
+        inference_frame = frame
+        active_roi = None
+        if roi_tracker and roi_tracker.roi is not None:
+            roi_x, roi_y, roi_w, roi_h = roi_tracker.roi
+            if roi_w > 0 and roi_h > 0:
+                inference_frame = frame[roi_y:roi_y + roi_h, roi_x:roi_x + roi_w]
+                active_roi = roi_tracker.roi
+
+        inference_frame, _preprocess_scale = preprocess_frame(inference_frame, args.preprocess_size)
+        frame_rgb = cv2.cvtColor(inference_frame, cv2.COLOR_BGR2RGB)
+
         # Create MediaPipe Image object
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame_rgb)
-        
+
         # Calculate timestamp in milliseconds for VIDEO running mode
         timestamp_ms = int((time.time() * 1000) - start_time_ms)
-        
+
         # Run detection
         detection_result = detector.detect_for_video(mp_image, timestamp_ms)
         inference_time = (time.time() - inference_start) * 1000  # ms
-        
+
         # Extract landmarks for all detected poses
         all_landmarks = []  # List of (pose_id, landmarks) tuples
         num_poses_detected = 0
@@ -674,80 +727,83 @@ def main():
                         "v": landmark.visibility if hasattr(landmark, 'visibility') else 1.0
                     })
                 all_landmarks.append((pose_idx, pose_landmarks_list))
-        
+
+        if active_roi is not None:
+            all_landmarks = remap_landmarks_from_roi(all_landmarks, active_roi, frame.shape)
+
         # For now, use first pose for UDP (Godot side needs update for multi-pose)
         landmarks = all_landmarks[0][1] if all_landmarks else []
-        
+
         # Apply One-Euro filtering (only to first pose for now)
         filter_start = time.time()
         if filter_bank and landmarks:
             timestamp = time.time()
             landmarks = filter_bank.filter_landmarks(landmarks, timestamp)
         filter_time = (time.time() - filter_start) * 1000  # ms
-        
+
+        if all_landmarks:
+            all_landmarks[0] = (all_landmarks[0][0], landmarks)
+        if roi_tracker:
+            roi_tracker.update(landmarks, frame.shape)
+
         # Serialize and send
         serialization_start = time.time()
         timestamp = time.time()
-        
+
         try:
-            if args.binary_protocol and not args.json_protocol:
-                # Binary mode: for now just send primary pose (multi-pose binary needs protocol update)
-                packet = serialize_landmarks_binary(
-                    landmarks, timestamp, capture_time, inference_time, 
-                    filter_time, 0.0, latency_tracker.frame_count, 
-                    processing_fps, skip_frames
-                )
-                packet = b'\x01' + packet  # Binary marker
-            else:
-                # JSON mode: send all poses
-                packet = serialize_landmarks_json(
-                    landmarks, timestamp, capture_time, inference_time,
-                    filter_time, 0.0, latency_tracker.frame_count, 
-                    processing_fps, skip_frames, all_landmarks
-                )
-                packet = b'\x00' + packet  # JSON marker
-            
-            sock.sendto(packet, (args.host, args.port))
+            udp_sender.send(
+                landmarks,
+                timestamp,
+                capture_ms=capture_time,
+                inference_ms=inference_time,
+                filter_ms=filter_time,
+                serialization_ms=0.0,
+                frame_count=latency_tracker.frame_count,
+                processing_fps=processing_fps,
+                skip_frames=skip_frames,
+                binary=binary_mode,
+                all_poses=all_landmarks,
+            )
         except Exception as e:
             print(f"UDP send error: {e}")
-        
+
         serialization_time = (time.time() - serialization_start) * 1000  # ms
         total_time = (time.time() - frame_start) * 1000  # ms
-        
+
         # Record latency metrics
-        latency_tracker.record_frame(capture_time, inference_time, serialization_time, 
+        latency_tracker.record_frame(capture_time, inference_time, serialization_time,
                                      filter_time, total_time)
-        
+
         # Show debug window with landmarks
         if args.show_window:
             display_frame = frame.copy()
-            
+
             # Draw all detected poses
             for pose_id, pose_landmarks in all_landmarks:
                 display_frame = draw_landmarks_on_frame(display_frame, pose_landmarks, pose_id=pose_id)
-            
+
             # Add FPS and pose count overlay
             total_landmarks = sum(len(lm) for _, lm in all_landmarks)
             status_text = f"Poses: {num_poses_detected} | Total Landmarks: {total_landmarks} | Press 'q' to quit"
             cv2.putText(display_frame, status_text, (10, 30),
                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-            
+
             # Add inference time
             time_text = f"Inference: {inference_time:.1f}ms"
             cv2.putText(display_frame, time_text, (10, 60),
                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-            
+
             cv2.imshow("MediaPipe Pose", display_frame)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 _running = False
                 break
-        
+
         # Cap FPS
         elapsed = time.time() - frame_start
         sleep_time = max(0, (1.0 / args.max_fps) - elapsed)
         if sleep_time > 0:
             time.sleep(sleep_time)
-    
+
     # Cleanup
     print("[Main] Cleaning up...")
     if args.show_window:
@@ -760,7 +816,7 @@ def main():
         mjpeg_streamer.stop()
     if heartbeat_sock:
         heartbeat_sock.close()
-    sock.close()
+    udp_sender.close()
     print("MediaPipe stopped")
 
 

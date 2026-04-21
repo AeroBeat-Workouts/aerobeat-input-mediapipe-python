@@ -46,12 +46,11 @@ func _start_if_not_running() -> void:
 	if not _is_running and not _is_starting:
 		_check_and_start()
 
-## Find Python - prefer project venv in repo, fallback to system
+## Find Python - prefer the sidecar-owned venv under python_mediapipe/assets/venv, fallback to system
 func _find_python() -> String:
-	# Prefer project venv in the repo (not workspace - sandbox issues)
-	var repo_venv: String = ProjectSettings.globalize_path("res://venv/bin/python")
-	if FileAccess.file_exists(repo_venv):
-		return repo_venv
+	var sidecar_python: String = _get_sidecar_python_path()
+	if FileAccess.file_exists(sidecar_python):
+		return sidecar_python
 
 	# Check for system python3
 	var output: Array = []
@@ -61,6 +60,21 @@ func _find_python() -> String:
 		return system_python
 
 	return "python3"
+
+func _get_sidecar_assets_dir() -> String:
+	return ProjectSettings.globalize_path(_resolve_package_path("../python_mediapipe/assets"))
+
+func _get_sidecar_venv_dir() -> String:
+	return ProjectSettings.globalize_path(_resolve_package_path("../python_mediapipe/assets/venv"))
+
+func _get_sidecar_python_path() -> String:
+	return ProjectSettings.globalize_path(_resolve_package_path("../python_mediapipe/assets/venv/bin/python"))
+
+func _get_requirements_path() -> String:
+	return ProjectSettings.globalize_path(_resolve_package_path("../python_mediapipe/requirements.txt"))
+
+func _get_model_asset_path() -> String:
+	return ProjectSettings.globalize_path(_resolve_package_path("../python_mediapipe/assets/models/" + _get_required_model_name()))
 
 ## Get the server PID for display
 func get_server_pid() -> int:
@@ -219,12 +233,12 @@ func check_mediapipe_installed() -> bool:
 
 func check_model_asset_available() -> bool:
 	var model_name := _get_required_model_name()
-	var model_path := ProjectSettings.globalize_path("res://" + model_name)
+	var model_path := _get_model_asset_path()
 	if FileAccess.file_exists(model_path):
 		_emit_progress(100, "Model asset ready - starting server...")
 		return true
 
-	var message := "Missing MediaPipe model asset: %s" % model_name
+	var message := "Missing MediaPipe model asset: %s (expected at %s)" % [model_name, model_path]
 	_emit_progress(100, message)
 	emit_signal("server_failed", message)
 	return false
@@ -252,10 +266,19 @@ func install_dependencies() -> void:
 	_ensure_venv_and_install()
 
 func _ensure_venv_and_install() -> void:
-	emit_signal("installation_progress", 10, "Creating virtual environment...")
+	emit_signal("installation_progress", 10, "Creating sidecar virtual environment...")
 
-	# Create venv in repo location (not workspace - sandbox issues)
-	var venv_path: String = ProjectSettings.globalize_path("res://venv")
+	var assets_dir := _get_sidecar_assets_dir()
+	DirAccess.make_dir_recursive_absolute(assets_dir)
+
+	# Create venv under the sidecar-owned assets path
+	var venv_path: String = _get_sidecar_venv_dir()
+	var gdignore_path: String = venv_path.path_join(".gdignore")
+	if not FileAccess.file_exists(gdignore_path):
+		var gdignore := FileAccess.open(gdignore_path, FileAccess.WRITE)
+		if gdignore:
+			gdignore.store_string("# Prevent Godot from importing the generated Python virtualenv.\n")
+			gdignore.close()
 	var output: Array = []
 	var exit_code: int = OS.execute("python3", ["-m", "venv", venv_path], output, true)
 
@@ -268,10 +291,10 @@ func _ensure_venv_and_install() -> void:
 	# Update python path after venv creation
 	python_path = _find_python()
 
-	emit_signal("installation_progress", 25, "Installing dependencies from requirements.txt...")
+	emit_signal("installation_progress", 25, "Installing dependencies into sidecar virtual environment...")
 
 	# Install packages from requirements.txt
-	var requirements_path: String = ProjectSettings.globalize_path(_resolve_package_path("../python_mediapipe/requirements.txt"))
+	var requirements_path: String = _get_requirements_path()
 	var args: PackedStringArray = ["-m", "pip", "install", "-r", requirements_path]
 	var pid: int = OS.execute(python_path, args, [], false)
 	install_pid = pid
@@ -319,11 +342,10 @@ func _start_detached_server() -> int:
 	# First kill any existing servers
 	await _kill_existing_servers()
 
-	var python: String = "/usr/bin/python3"
-	# Use project-relative paths instead of hardcoded absolute paths
+	var python: String = _find_python()
+	# Use package-relative paths instead of hardcoded absolute paths
 	var script: String = ProjectSettings.globalize_path(_resolve_package_path("../python_mediapipe/main.py"))
-	var venv_packages: String = ProjectSettings.globalize_path("res://venv/lib/python3.12/site-packages")
-	var project_dir: String = ProjectSettings.globalize_path("res://")
+	var project_dir: String = ProjectSettings.globalize_path(_resolve_package_path(".."))
 
 	# Store PID file for cleanup tracking
 	var pid_file: String = "/tmp/aerobeat_autostart.pid"
@@ -338,13 +360,18 @@ func _start_detached_server() -> int:
 		bash_cmd += 'export DISPLAY=:1; xdpyinfo >/dev/null 2>&1 || export DISPLAY=:0; xdpyinfo >/dev/null 2>&1 || export DISPLAY=:2; xdpyinfo >/dev/null 2>&1 || export DISPLAY=:1; '
 
 	bash_cmd += "export HOME=/home/derrick && cd " + project_dir + " && "
-	bash_cmd += "PYTHONPATH=" + venv_packages + " "
 
 	# Use setsid to create new session/process group
 	# This is KEY for reliable termination even when OpenCV blocks
 	bash_cmd += "setsid nohup " + python + " -u " + script + " "
-	bash_cmd += "--camera 0 --port 4242 --model-complexity 1 --preprocess-size 480 --stream-camera --stream-port 4243 --no-filter"
-	bash_cmd += " > /tmp/aerobeat_server.log 2>&1 &"
+	bash_cmd += "--camera 0 --port %d --model-complexity %d " % [server_port, model_complexity]
+	if preprocess_size > 0:
+		bash_cmd += "--preprocess-size %d " % preprocess_size
+	if use_camera_stream:
+		bash_cmd += "--stream-camera --stream-port %d " % stream_port
+	if no_filter:
+		bash_cmd += "--no-filter "
+	bash_cmd += "> /tmp/aerobeat_server.log 2>&1 &"
 
 	# Capture the PGID (process group ID) for later cleanup
 	bash_cmd += " PGID=$!; "

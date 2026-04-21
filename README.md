@@ -14,6 +14,8 @@ This repo is **partially migrated** into the broader AeroBeat input-provider con
 - `src/input_provider.gd` — assembly-facing addon entrypoint
 - `src/` — Godot-side implementation used by the local testbed and downstream addon installs
 - `python_mediapipe/` — Python sidecar and Python-only test scripts
+- `python_mediapipe/assets/models/` — committed MediaPipe `.task` model assets used by the sidecar
+- `python_mediapipe/assets/venv/` — sidecar-owned local virtualenv location created on demand, **not committed**
 - `.testbed/` — hidden Godot workbench project restored via GodotEnv
 - `.testbed/tests/` — repo-local Godot automated test scripts
 - `.testbed/addons.jsonc` — committed dev/test dependency contract for the workbench
@@ -52,88 +54,89 @@ Manual `.testbed/src`, `.testbed/python_mediapipe`, and repo-owned `.testbed/add
 ### What the repo can do today
 
 - run the Python sidecar directly from this repo
-- auto-create a local `.testbed/venv/` and install `python_mediapipe/requirements.txt` from the Godot workbench
+- create and reuse a repo-owned sidecar environment at `python_mediapipe/assets/venv/`
 - receive pose landmarks in Godot and expose head/hand/foot polling helpers
 - use either a webcam (`--camera 0`) or a video path (`--camera path/to/file.mp4`) when launching the Python sidecar directly
+- look up MediaPipe models from committed assets under `python_mediapipe/assets/models/`
 
 ### What is still manual / partial
 
-- **MediaPipe task model files are not bundled or auto-downloaded by this repo**
-- the Godot auto-start flow installs Python packages, but it still expects the required `pose_landmarker_*.task` file to already exist in the repo root/package root
 - the assembly-community repo still owns addon registration / consumer wiring
 - `src/input_provider.gd` is an adapter layer, not a claim that the full contract is finished
+- full end-to-end runtime still depends on legitimate local prerequisites such as a working camera / display stack and Python package install success
 
 ## Requirements
 
 - Python 3.8+
-- a local virtual environment or system Python capable of installing:
-  - `mediapipe>=0.10.0`
-  - `opencv-python`
-  - `numpy`
-- one of the following model files in the **repo root**:
+- ability to create a local virtual environment for the sidecar at `python_mediapipe/assets/venv/`
+- committed MediaPipe model assets under `python_mediapipe/assets/models/`:
   - `pose_landmarker_lite.task`
   - `pose_landmarker_full.task`
   - `pose_landmarker_heavy.task`
 
-The testbed defaults to `model_complexity = 1`, so by default it expects:
+The testbed defaults to `model_complexity = 1`, so by default it uses:
 
 ```text
-pose_landmarker_full.task
+python_mediapipe/assets/models/pose_landmarker_full.task
 ```
 
-## Python setup
+## Python environment ownership
 
-There is **no** `./install_deps.sh` in the current tracked repo state.
+This repo now treats the Python runtime as a **sidecar-owned asset**, not a random user-managed environment.
+
+- canonical repo-managed venv path: `python_mediapipe/assets/venv/`
+- durable committed assets: Python code + `.task` models
+- non-durable generated asset: the venv itself
+
+The venv is intentionally gitignored. Auto-start from Godot will create it on demand if dependencies are missing.
 
 ### Manual setup
 
 From the repo root:
 
 ```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install -r python_mediapipe/requirements.txt
+python3 -m venv python_mediapipe/assets/venv
+python_mediapipe/assets/venv/bin/pip install -r python_mediapipe/requirements.txt
 ```
-
-### Testbed auto-install
-
-The `.testbed/` Godot project can create `.testbed/venv/` automatically and install Python packages from the package payload at:
-
-```text
-addons/aerobeat-input-mediapipe-python/python_mediapipe/requirements.txt
-```
-
-That auto-install does **not** fetch the MediaPipe `.task` model files for you.
 
 ## Running the Python sidecar directly
 
 From the repo root:
 
 ```bash
-source venv/bin/activate
-python3 python_mediapipe/main.py --camera 0 --show-window
+python_mediapipe/assets/venv/bin/python python_mediapipe/main.py --camera 0 --show-window
 ```
 
 Run against a video file instead of a live camera:
 
 ```bash
-source venv/bin/activate
-python3 python_mediapipe/main.py --camera .testbed/assets/videos/boxing.mp4 --show-window
+python_mediapipe/assets/venv/bin/python python_mediapipe/main.py --camera .testbed/assets/videos/boxing.mp4 --show-window
 ```
 
 Useful options:
 
 ```bash
-# Use a different model file already present in the repo root
-python3 python_mediapipe/main.py --camera 0 --model-complexity 0
-python3 python_mediapipe/main.py --camera 0 --model-complexity 1
-python3 python_mediapipe/main.py --camera 0 --model-complexity 2
+# Switch model asset selection (loaded from python_mediapipe/assets/models/)
+python_mediapipe/assets/venv/bin/python python_mediapipe/main.py --camera 0 --model-complexity 0
+python_mediapipe/assets/venv/bin/python python_mediapipe/main.py --camera 0 --model-complexity 1
+python_mediapipe/assets/venv/bin/python python_mediapipe/main.py --camera 0 --model-complexity 2
 
-# Enable binary UDP output explicitly
-python3 python_mediapipe/main.py --camera 0 --binary-protocol
+# Serialization mode
+python_mediapipe/assets/venv/bin/python python_mediapipe/main.py --camera 0 --binary-protocol
+python_mediapipe/assets/venv/bin/python python_mediapipe/main.py --camera 0 --json-protocol
+
+# Runtime optimization flags that are now wired into the sidecar
+python_mediapipe/assets/venv/bin/python python_mediapipe/main.py --camera 0 --preprocess-size 480
+python_mediapipe/assets/venv/bin/python python_mediapipe/main.py --camera 0 --udp-batch-size 2
+python_mediapipe/assets/venv/bin/python python_mediapipe/main.py --camera 0 --use-roi --roi-size 320 --roi-padding 50
 ```
 
-> Note: the current tracked CLI/runtime defaults still lean toward JSON unless you explicitly opt into binary behavior in code or launch flags. Keep docs and runtime expectations aligned with the repo you actually have checked out.
+Notes:
+
+- the sidecar defaults to JSON output unless you opt into `--binary-protocol`
+- `--preprocess-size` resizes frames before inference
+- `--udp-batch-size` uses the built-in batched UDP sender
+- `--use-roi` enables predictive ROI cropping based on recent pose history
 
 ## Running the Godot workbench
 
@@ -156,11 +159,11 @@ godot --path .testbed
 The workbench will:
 
 - load this repo from `res://addons/aerobeat-input-mediapipe-python/`
-- auto-install Python dependencies into `.testbed/venv/` if needed
-- fail early with a clear error if the required `.task` model file is missing
+- auto-install Python dependencies into `python_mediapipe/assets/venv/` if needed
+- fail early with a clear error if the required `.task` model file is missing from `python_mediapipe/assets/models/`
 - start the Python sidecar and connect the local provider when everything is available
 
-If auto-start fails, the test scene under `.testbed/scenes/` includes manual recovery guidance that points back to this repo root and the required `.task` prerequisite.
+If auto-start fails, the test scene under `.testbed/scenes/` includes manual recovery guidance that points back to the repo root and the sidecar-owned runtime paths.
 
 ## Test assets
 
@@ -185,16 +188,16 @@ The older tracked `.testbed/videos/` layout is no longer the canonical location.
 
 ### Python filter test
 
-If you use the repo-local workbench environment, prefer `.testbed/venv/bin/python` for Python-side checks.
+If you use the repo-local sidecar environment, prefer `python_mediapipe/assets/venv/bin/python` for Python-side checks.
 
 ```bash
-python3 python_mediapipe/test_filter.py
+python_mediapipe/assets/venv/bin/python python_mediapipe/test_filter.py
 ```
 
 ### Python performance test runner
 
 ```bash
-python3 python_mediapipe/test_runner.py \
+python_mediapipe/assets/venv/bin/python python_mediapipe/test_runner.py \
   --video .testbed/assets/videos/boxing.mp4 \
   --output test_report.json
 ```
@@ -228,7 +231,7 @@ Those belong in consuming repos such as `aerobeat-assembly-community`.
 - The workbench consumes this package from the repo root (`subfolder: "/"`) via GodotEnv rather than manual `.testbed` symlinks.
 - The local core contract currently comes from the sibling `aerobeat-input-core` repo while still mounting under `res://addons/aerobeat-core/` for compatibility with current repo code.
 - CI follows the same GodotEnv restore/import/GUT flow as local workbench validation.
-- The repo still truthfully depends on a separately provided `pose_landmarker_*.task` asset for actual MediaPipe runtime startup.
+- The repo now commits the required `.task` model assets instead of expecting them to appear separately in the repo root.
 
 ## License
 

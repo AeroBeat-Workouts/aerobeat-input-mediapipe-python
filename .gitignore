@@ -32,6 +32,9 @@ __pycache__/
 venv/
 env/
 .testbed/venv/
+!python_mediapipe/assets/venv/
+python_mediapipe/assets/venv/*
+!python_mediapipe/assets/venv/.gdignore
 
 # Build artifacts
 build/
@@ -39,8 +42,9 @@ dist/
 *.tmp
 test_report*.json
 
-# MediaPipe model files (downloaded separately)
+# MediaPipe model files are committed under python_mediapipe/assets/models/
 *.task
+!python_mediapipe/assets/models/*.task
 
 # GodotEnv package workbench
 .testbed/addons/*

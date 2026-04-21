@@ -72,10 +72,10 @@ func _on_server_failed(error: String) -> void:
 You can start Python manually:
 
 1. Open terminal in the aerobeat-input-mediapipe-python repo root
-2. Make sure pose_landmarker_full.task exists in the repo root
-3. Use .testbed/venv/bin/python (or another environment with python_mediapipe/requirements.txt installed)
+2. Make sure pose_landmarker_full.task exists at python_mediapipe/assets/models/
+3. Use python_mediapipe/assets/venv/bin/python (or another environment with python_mediapipe/requirements.txt installed)
 4. Run:
-.testbed/venv/bin/python python_mediapipe/main.py --camera 0 --show-window
+python_mediapipe/assets/venv/bin/python python_mediapipe/main.py --camera 0 --show-window
 
 5. Press F5 in Godot to restart this scene
 
