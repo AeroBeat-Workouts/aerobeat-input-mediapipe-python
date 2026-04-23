@@ -108,7 +108,7 @@ This plan keeps the work honest. Phase 1 establishes the runtime directory contr
 
 ---
 
-### Task 3: Refactor desktop sidecar process management for platform-aware runtime launching
+### Task 4: Refactor desktop sidecar process management for platform-aware runtime launching
 
 **Bead ID:** `oc-7hq`  
 **SubAgent:** `primary`  
@@ -130,7 +130,7 @@ This plan keeps the work honest. Phase 1 establishes the runtime directory contr
 
 ---
 
-### Task 4: Update docs/build guidance to match the implemented runtime system
+### Task 5: Update docs/build guidance to match the implemented runtime system
 
 **Bead ID:** `oc-1sn`  
 **SubAgent:** `primary`  
@@ -165,12 +165,13 @@ This plan keeps the work honest. Phase 1 establishes the runtime directory contr
 - `REF-07` remains honored honestly: only the current host `linux-x64` runtime was prepared and validated in this pass; no Windows/macOS runtime parity is claimed.
 
 **Commits:**
-- `Add unified desktop runtime contract foundation`
-- `Prepare linux-x64 runtime and retire legacy sidecar venv`
+- `438a3aa` - Add unified desktop runtime contract foundation
+- `68f0d22` - Prepare linux-x64 runtime and retire legacy sidecar venv
 
 **Lessons Learned:**
 - The cleanest execution path is still staged: runtime contract first, live host runtime second, resolver third, process-management fourth, broader docs last.
 - Retiring the legacy `assets/venv` before the Godot resolver migration is workable only if the tracked guidance explicitly says direct/manual Linux usage has moved to `assets/runtimes/linux-x64/` while autostart follow-on work is still pending.
+- Immediate next session priority is Task 3 (`oc-49s`): migrate Godot-side autostart/runtime resolution to the new `assets/runtimes/<platform>/` contract and add controlled fail-fast validation before any deeper process-management refactor.
 
 ---
 
