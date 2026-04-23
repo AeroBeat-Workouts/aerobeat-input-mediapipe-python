@@ -60,13 +60,38 @@ This plan keeps the work honest. Phase 1 establishes the runtime directory contr
 
 ---
 
-### Task 2: Implement Godot runtime resolution and fail-fast validation
+### Task 2: Prepare the local linux-x64 dev runtime and retire the legacy `assets/venv`
+
+**Bead ID:** `oc-02o`  
+**SubAgent:** `primary`  
+**Role:** `coder`  
+**References:** `REF-01`, `REF-02`, `REF-05`, `REF-06`, `REF-07`  
+**Prompt:** Claim the bead on start. Using the new unified runtime tooling, prepare the local `python_mediapipe/assets/runtimes/linux-x64/` runtime in `dev` mode so the current Linux host has a real development runtime under the new contract. Then retire the legacy `python_mediapipe/assets/venv/` local environment now that it is no longer the preferred path. Keep the implementation truthful: only remove the legacy env after confirming the new linux runtime is present and validates; do not claim cross-platform runtime prep beyond the current host. Update docs/plan notes if active repo guidance still treats `assets/venv` as canonical local state. Commit and push by default before handoff.
+
+**Folders Created/Deleted/Modified:**
+- `python_mediapipe/assets/runtimes/linux-x64/`
+- `python_mediapipe/assets/venv/` (removed locally after validation)
+- `.testbed/scenes/`
+
+**Files Created/Deleted/Modified:**
+- `.plans/mediapipe-python/2026-04-23-unified-unfrozen-platform-runtimes-implementation.md`
+- `README.md`
+- `.testbed/scenes/test_scene.gd`
+- `python_mediapipe/assets/venv/.gdignore` (deleted with the retired legacy local runtime)
+
+**Status:** ✅ Complete
+
+**Results:** Prepared the current host's real dev runtime under `python_mediapipe/assets/runtimes/linux-x64/` with `python_mediapipe/prepare_runtime.py --platform linux-x64 --mode dev --create-venv --validate`, installed `python_mediapipe/requirements.txt` into that runtime-local venv, and re-ran the contract validator so the linux runtime now exists with a live Python environment plus manifest/sentinel files under the new unified runtime contract. Validation stayed honest and Linux-only: the runtime-contract helper reported no validation errors, the new runtime Python successfully imported `mediapipe`, `cv2`, and `numpy`, and `python_mediapipe/test_filter.py` passed from the new runtime. After that confirmation, the legacy local `python_mediapipe/assets/venv/` directory was removed. Active tracked guidance that still treated `assets/venv` as canonical was updated for truthfulness in `README.md` and `.testbed/scenes/test_scene.gd`; those updates explicitly note that direct/manual local usage should now point at `assets/runtimes/linux-x64/` while Godot-side autostart/runtime resolution still needs its follow-on migration in Task 3. Commit/push details recorded below after handoff.
+
+---
+
+### Task 3: Implement Godot runtime resolution and fail-fast validation
 
 **Bead ID:** `oc-49s`  
 **SubAgent:** `primary`  
 **Role:** `coder`  
 **References:** `REF-01`, `REF-03`, `REF-05`, `REF-06`, `REF-07`  
-**Prompt:** Claim the bead on start. After Task 1 lands, update Godot-side runtime resolution so the sidecar resolves platform-keyed desktop runtimes instead of a generic `assets/venv`. Add explicit platform-key derivation, editor/export-aware runtime mode handling where appropriate, platform-correct Python executable resolution, manifest/runtime validation, and controlled fail-fast behavior when the runtime is missing or invalid. Keep mobile excluded from this runtime path. Commit and push by default before handoff.
+**Prompt:** Claim the bead on start. After the local linux-x64 dev runtime exists and the legacy `assets/venv` is retired, update Godot-side runtime resolution so the sidecar resolves platform-keyed desktop runtimes instead of a generic `assets/venv`. Add explicit platform-key derivation, editor/export-aware runtime mode handling where appropriate, platform-correct Python executable resolution, manifest/runtime validation, and controlled fail-fast behavior when the runtime is missing or invalid. Keep mobile excluded from this runtime path. Commit and push by default before handoff.
 
 **Folders Created/Deleted/Modified:**
 - `src/`
@@ -131,19 +156,21 @@ This plan keeps the work honest. Phase 1 establishes the runtime directory contr
 
 **Status:** ⚠️ In Progress
 
-**What We Built:** Task 1 is complete: the repo now has a first runtime-contract layer for unified desktop runtimes under `python_mediapipe/assets/runtimes/<platform>/`, including Python-side platform-key helpers, manifest/sentinel definitions, runtime-validation utilities, preparation scaffolding, and ignore rules for generated runtime contents. Remaining phases still cover Godot runtime resolution, platform-aware process management, and README/build-doc updates.
+**What We Built:** Tasks 1 and 2 are complete. The repo now has a unified desktop runtime-contract layer under `python_mediapipe/assets/runtimes/<platform>/`, and this Linux host now has a prepared `python_mediapipe/assets/runtimes/linux-x64/` dev runtime with a live venv plus validated manifest/sentinel files. The legacy local `python_mediapipe/assets/venv/` directory has been retired. Remaining phases still cover Godot runtime resolution, platform-aware process management, and the final broader docs/build guidance pass.
 
 **Reference Check:**
-- `REF-01` and `REF-02` are reflected in the new platform-keyed runtime contract and generated runtime-root layout.
-- `REF-05` now defines the minimum Python-side manifest/sentinel/runtime-path expectations for the new architecture.
-- `REF-07` is honored honestly: this pass adds the contract foundation and scaffolding, not full Windows/macOS runtime validation.
+- `REF-01` and `REF-02` are reflected in the new platform-keyed runtime contract and the prepared `linux-x64` runtime root.
+- `REF-05` defines the runtime-manifest/sentinel/runtime-path expectations that were used to validate the prepared Linux runtime.
+- `REF-06` was updated where active guidance still treated `assets/venv` as canonical for local/manual use.
+- `REF-07` remains honored honestly: only the current host `linux-x64` runtime was prepared and validated in this pass; no Windows/macOS runtime parity is claimed.
 
 **Commits:**
 - `Add unified desktop runtime contract foundation`
+- `Prepare linux-x64 runtime and retire legacy sidecar venv`
 
 **Lessons Learned:**
-- The cleanest execution path is staged: runtime contract first, resolver second, process-management third, docs last.
-- The foundation pass is most useful when it defines contract details and validation surfaces without overclaiming cross-platform runtime readiness.
+- The cleanest execution path is still staged: runtime contract first, live host runtime second, resolver third, process-management fourth, broader docs last.
+- Retiring the legacy `assets/venv` before the Godot resolver migration is workable only if the tracked guidance explicitly says direct/manual Linux usage has moved to `assets/runtimes/linux-x64/` while autostart follow-on work is still pending.
 
 ---
 

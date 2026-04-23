@@ -15,7 +15,7 @@ This repo is **partially migrated** into the broader AeroBeat input-provider con
 - `src/` — Godot-side implementation used by the local testbed and downstream addon installs
 - `python_mediapipe/` — Python sidecar and Python-only test scripts
 - `python_mediapipe/assets/models/` — committed MediaPipe `.task` model assets used by the sidecar
-- `python_mediapipe/assets/venv/` — sidecar-owned local virtualenv location created on demand, **not committed**
+- `python_mediapipe/assets/runtimes/linux-x64/` — current host's generated local dev runtime root under the unified runtime contract, **not committed**
 - `.testbed/` — hidden Godot workbench project restored via GodotEnv
 - `.testbed/tests/` — repo-local Godot automated test scripts
 - `.testbed/addons.jsonc` — committed dev/test dependency contract for the workbench
@@ -54,7 +54,7 @@ Manual `.testbed/src`, `.testbed/python_mediapipe`, and repo-owned `.testbed/add
 ### What the repo can do today
 
 - run the Python sidecar directly from this repo
-- create and reuse a repo-owned sidecar environment at `python_mediapipe/assets/venv/`
+- create and reuse the current host's repo-owned dev runtime at `python_mediapipe/assets/runtimes/linux-x64/`
 - receive pose landmarks in Godot and expose head/hand/foot polling helpers
 - use either a webcam (`--camera 0`) or a video path (`--camera path/to/file.mp4`) when launching the Python sidecar directly
 - look up MediaPipe models from committed assets under `python_mediapipe/assets/models/`
@@ -68,7 +68,7 @@ Manual `.testbed/src`, `.testbed/python_mediapipe`, and repo-owned `.testbed/add
 ## Requirements
 
 - Python 3.8+
-- ability to create a local virtual environment for the sidecar at `python_mediapipe/assets/venv/`
+- ability to prepare the current host's local dev runtime under `python_mediapipe/assets/runtimes/linux-x64/`
 - committed MediaPipe model assets under `python_mediapipe/assets/models/`:
   - `pose_landmarker_lite.task`
   - `pose_landmarker_full.task`
@@ -84,19 +84,21 @@ python_mediapipe/assets/models/pose_landmarker_full.task
 
 This repo now treats the Python runtime as a **sidecar-owned asset**, not a random user-managed environment.
 
-- canonical repo-managed venv path: `python_mediapipe/assets/venv/`
+- canonical current-host dev runtime root: `python_mediapipe/assets/runtimes/linux-x64/`
+- runtime-local Python executable: `python_mediapipe/assets/runtimes/linux-x64/venv/bin/python`
 - durable committed assets: Python code + `.task` models
-- non-durable generated asset: the venv itself
+- non-durable generated asset: the platform runtime contents
 
-The venv is intentionally gitignored. Auto-start from Godot will create it on demand if dependencies are missing.
+The generated runtime contents are intentionally gitignored. The new runtime should be prepared with `python_mediapipe/prepare_runtime.py` rather than by hand-creating the legacy `assets/venv` path. Godot-side auto-start/runtime resolution still needs its follow-on migration to the new runtime family; until that lands, direct/manual runtime usage should point at `assets/runtimes/linux-x64/`.
 
 ### Manual setup
 
 From the repo root:
 
 ```bash
-python3 -m venv python_mediapipe/assets/venv
-python_mediapipe/assets/venv/bin/pip install -r python_mediapipe/requirements.txt
+python3 python_mediapipe/prepare_runtime.py --platform linux-x64 --mode dev --create-venv --validate
+python_mediapipe/assets/runtimes/linux-x64/venv/bin/pip install -r python_mediapipe/requirements.txt
+python3 python_mediapipe/prepare_runtime.py --platform linux-x64 --mode dev --create-venv --validate
 ```
 
 ## Running the Python sidecar directly
@@ -104,31 +106,31 @@ python_mediapipe/assets/venv/bin/pip install -r python_mediapipe/requirements.tx
 From the repo root:
 
 ```bash
-python_mediapipe/assets/venv/bin/python python_mediapipe/main.py --camera 0 --show-window
+python_mediapipe/assets/runtimes/linux-x64/venv/bin/python python_mediapipe/main.py --camera 0 --show-window
 ```
 
 Run against a video file instead of a live camera:
 
 ```bash
-python_mediapipe/assets/venv/bin/python python_mediapipe/main.py --camera .testbed/assets/videos/boxing.mp4 --show-window
+python_mediapipe/assets/runtimes/linux-x64/venv/bin/python python_mediapipe/main.py --camera .testbed/assets/videos/boxing.mp4 --show-window
 ```
 
 Useful options:
 
 ```bash
 # Switch model asset selection (loaded from python_mediapipe/assets/models/)
-python_mediapipe/assets/venv/bin/python python_mediapipe/main.py --camera 0 --model-complexity 0
-python_mediapipe/assets/venv/bin/python python_mediapipe/main.py --camera 0 --model-complexity 1
-python_mediapipe/assets/venv/bin/python python_mediapipe/main.py --camera 0 --model-complexity 2
+python_mediapipe/assets/runtimes/linux-x64/venv/bin/python python_mediapipe/main.py --camera 0 --model-complexity 0
+python_mediapipe/assets/runtimes/linux-x64/venv/bin/python python_mediapipe/main.py --camera 0 --model-complexity 1
+python_mediapipe/assets/runtimes/linux-x64/venv/bin/python python_mediapipe/main.py --camera 0 --model-complexity 2
 
 # Serialization mode
-python_mediapipe/assets/venv/bin/python python_mediapipe/main.py --camera 0 --binary-protocol
-python_mediapipe/assets/venv/bin/python python_mediapipe/main.py --camera 0 --json-protocol
+python_mediapipe/assets/runtimes/linux-x64/venv/bin/python python_mediapipe/main.py --camera 0 --binary-protocol
+python_mediapipe/assets/runtimes/linux-x64/venv/bin/python python_mediapipe/main.py --camera 0 --json-protocol
 
 # Runtime optimization flags that are now wired into the sidecar
-python_mediapipe/assets/venv/bin/python python_mediapipe/main.py --camera 0 --preprocess-size 480
-python_mediapipe/assets/venv/bin/python python_mediapipe/main.py --camera 0 --udp-batch-size 2
-python_mediapipe/assets/venv/bin/python python_mediapipe/main.py --camera 0 --use-roi --roi-size 320 --roi-padding 50
+python_mediapipe/assets/runtimes/linux-x64/venv/bin/python python_mediapipe/main.py --camera 0 --preprocess-size 480
+python_mediapipe/assets/runtimes/linux-x64/venv/bin/python python_mediapipe/main.py --camera 0 --udp-batch-size 2
+python_mediapipe/assets/runtimes/linux-x64/venv/bin/python python_mediapipe/main.py --camera 0 --use-roi --roi-size 320 --roi-padding 50
 ```
 
 Notes:
@@ -159,11 +161,10 @@ godot --path .testbed
 The workbench will:
 
 - load this repo from `res://addons/aerobeat-input-mediapipe-python/`
-- auto-install Python dependencies into `python_mediapipe/assets/venv/` if needed
 - fail early with a clear error if the required `.task` model file is missing from `python_mediapipe/assets/models/`
-- start the Python sidecar and connect the local provider when everything is available
+- still needs a follow-on Godot-side runtime-path migration before auto-start truthfully targets the new unified runtime family
 
-If auto-start fails, the test scene under `.testbed/scenes/` includes manual recovery guidance that points back to the repo root and the sidecar-owned runtime paths.
+For now, treat the prepared linux runtime as the canonical local runtime for direct/manual sidecar use on this host. If auto-start fails, the test scene under `.testbed/scenes/` includes manual recovery guidance that points back to the repo root and `python_mediapipe/assets/runtimes/linux-x64/`.
 
 ## Test assets
 
@@ -188,16 +189,16 @@ The older tracked `.testbed/videos/` layout is no longer the canonical location.
 
 ### Python filter test
 
-If you use the repo-local sidecar environment, prefer `python_mediapipe/assets/venv/bin/python` for Python-side checks.
+If you use the repo-local sidecar runtime on this Linux host, prefer `python_mediapipe/assets/runtimes/linux-x64/venv/bin/python` for Python-side checks.
 
 ```bash
-python_mediapipe/assets/venv/bin/python python_mediapipe/test_filter.py
+python_mediapipe/assets/runtimes/linux-x64/venv/bin/python python_mediapipe/test_filter.py
 ```
 
 ### Python performance test runner
 
 ```bash
-python_mediapipe/assets/venv/bin/python python_mediapipe/test_runner.py \
+python_mediapipe/assets/runtimes/linux-x64/venv/bin/python python_mediapipe/test_runner.py \
   --video .testbed/assets/videos/boxing.mp4 \
   --output test_report.json
 ```
