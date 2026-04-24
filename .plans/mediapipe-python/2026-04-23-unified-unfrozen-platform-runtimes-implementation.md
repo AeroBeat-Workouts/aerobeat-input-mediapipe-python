@@ -102,9 +102,9 @@ This plan keeps the work honest. Phase 1 establishes the runtime directory contr
 - related startup/runtime validation surfaces as needed
 - `python_mediapipe/runtime_paths.py` if follow-on edits are needed
 
-**Status:** ⏳ Pending
+**Status:** ✅ Complete
 
-**Results:** Reserved.
+**Results:** Completed in commit `cd85355` (`Resolve platform-keyed desktop sidecar runtimes`). `src/autostart_manager.gd` now derives an explicit desktop platform key, resolves `python_mediapipe/assets/runtimes/<platform>/`, picks the platform-correct Python executable (`venv/bin/python` vs `venv/Scripts/python.exe`), distinguishes dev/source-checkout runs from exported-template release mode, validates the runtime manifest/sentinel/model inventory before launch, and fails fast with clear preparation guidance instead of falling back to a random system Python or auto-creating a legacy venv. Mobile remains excluded from this desktop runtime path. As a related runtime consumer cleanup, `src/process/mediapipe_process.gd` now resolves the same platform-keyed runtime family and its dependency error messages no longer point at `assets/venv`. `README.md` was updated to match the new truthful startup/runtime behavior. Validation run for this coder pass: `python3 -m py_compile python_mediapipe/*.py`; `python3 python_mediapipe/prepare_runtime.py --platform linux-x64 --mode dev --validate`; `python_mediapipe/assets/runtimes/linux-x64/venv/bin/python python_mediapipe/test_filter.py`; `godot --headless --path .testbed --import`; and `godot --headless --path .testbed --quit`. Limitation: validation was performed on the local Linux dev runtime only; Windows/macOS path handling is scaffolded in code but not runtime-verified in this pass.
 
 ---
 
