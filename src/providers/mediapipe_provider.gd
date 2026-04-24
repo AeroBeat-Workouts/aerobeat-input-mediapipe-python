@@ -10,7 +10,7 @@ signal tracking_restored()
 
 @export var config = null
 
-@onready var _server = $MediaPipeServer
+var _server = null
 
 var _last_update_time_ms: int = 0
 var _tracking_timeout_ms: int = 500  # milliseconds
@@ -35,21 +35,24 @@ func _ready():
 	if config == null:
 		config = _new_local_script_instance("../config/mediapipe_config.gd")
 	
-	# Create server if not present
+	_ensure_server()
 	if _server == null:
-		_server = _new_local_script_instance("../server/mediapipe_server.gd")
-		_server.name = "MediaPipeServer"
-		add_child(_server)
+		return
 	
 	_server.config = config
-	_server.landmarks_received.connect(_on_landmarks_received)
-	_server.multi_pose_received.connect(_on_multi_pose_received)
+	if not _server.landmarks_received.is_connected(_on_landmarks_received):
+		_server.landmarks_received.connect(_on_landmarks_received)
+	if not _server.multi_pose_received.is_connected(_on_multi_pose_received):
+		_server.multi_pose_received.connect(_on_multi_pose_received)
 
 func start() -> bool:
-	return _server.start()
+	_ensure_server()
+	return _server != null and _server.start()
 
 func stop() -> void:
-	_server.stop()
+	_ensure_server()
+	if _server != null:
+		_server.stop()
 
 ## Get number of detected poses
 func get_num_poses() -> int:
@@ -180,6 +183,22 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_EXIT_TREE:
 		print("[MediaPipeProvider] EXIT_TREE - stopping server")
 		stop()
+
+func _ensure_server() -> void:
+	if _server != null and is_instance_valid(_server):
+		return
+	
+	var existing_server := get_node_or_null("MediaPipeServer")
+	if existing_server != null:
+		_server = existing_server
+		return
+	
+	_server = _new_local_script_instance("../server/mediapipe_server.gd")
+	if _server == null:
+		return
+	
+	_server.name = "MediaPipeServer"
+	add_child(_server)
 
 func _new_local_script_instance(relative_path: String) -> Variant:
 	var script_path := "%s/%s" % [get_script().resource_path.get_base_dir(), relative_path]
