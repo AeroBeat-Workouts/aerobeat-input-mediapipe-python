@@ -32,6 +32,7 @@ var _heartbeat_udp: PacketPeerUDP = null
 var _heartbeat_timer: Timer = null
 var _launch_info: Dictionary = {}
 var _runtime_validation: Dictionary = {}
+var _is_stopping: bool = false
 
 @onready var progress_timer: Timer = Timer.new()
 
@@ -108,6 +109,12 @@ func start_server() -> bool:
 	return result
 
 func stop_server() -> void:
+	if _is_stopping:
+		return
+	if not _has_active_server_state():
+		return
+
+	_is_stopping = true
 	print("[AutoStartManager] stop_server() called, PID: ", server_pid)
 	_stop_heartbeat()
 	OS.delay_msec(200)
@@ -121,8 +128,12 @@ func stop_server() -> void:
 		await _run_linux_cleanup_patterns()
 
 	_cleanup_server_state()
+	_is_stopping = false
 	emit_signal("server_stopped")
 	print("[AutoStartManager] Server stopped")
+
+func _has_active_server_state() -> bool:
+	return _is_running or server_pid > 1 or not _launch_info.is_empty()
 
 func _run_linux_cleanup_patterns() -> void:
 	var output: Array = []
@@ -141,6 +152,7 @@ func _cleanup_server_state() -> void:
 	_runtime_validation = {}
 	server_pid = -1
 	_is_running = false
+	_is_stopping = false
 
 func _is_process_alive(pid: int) -> bool:
 	if pid <= 1:
@@ -364,10 +376,13 @@ func _emit_progress(percentage: int, message: String) -> void:
 	emit_signal("check_progress", percentage, message)
 
 func _exit_tree() -> void:
-	stop_server()
+	if _has_active_server_state():
+		stop_server()
 	progress_timer.stop()
 
 func _notification(what: int) -> void:
+	if not _has_active_server_state():
+		return
 	match what:
 		NOTIFICATION_PREDELETE:
 			print("[AutoStartManager] PREDELETE - emergency cleanup")
@@ -380,6 +395,8 @@ func _notification(what: int) -> void:
 			_stop_sync()
 
 func _stop_sync() -> void:
+	if _is_stopping or not _has_active_server_state():
+		return
 	_stop_heartbeat()
 	OS.delay_msec(200)
 	DesktopSidecarLauncher.terminate_sync(_launch_info)

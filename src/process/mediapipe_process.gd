@@ -131,7 +131,7 @@ func _stop_heartbeat() -> void:
 func stop() -> void:
 	if _is_shutting_down:
 		return
-	if _pid == -1 and _pgid == -1:
+	if not _has_active_process_state():
 		return
 
 	_is_shutting_down = true
@@ -157,6 +157,9 @@ func _cleanup_process_state() -> void:
 	if _heartbeat_udp:
 		_heartbeat_udp.close()
 		_heartbeat_udp = null
+
+func _has_active_process_state() -> bool:
+	return _pid > 0 or _pgid > 0 or not _launch_info.is_empty()
 
 func is_running() -> bool:
 	if _launch_info.is_empty():
@@ -193,26 +196,30 @@ func _test_python(cmd: String) -> bool:
 	return exit_code == 0
 
 func _notification(what: int) -> void:
+	if not _has_active_process_state():
+		return
 	match what:
 		NOTIFICATION_PREDELETE:
 			print("[MediaPipeProcess] PREDELETE notification - force stopping process")
 			_force_kill_immediate()
 		NOTIFICATION_EXIT_TREE:
 			print("[MediaPipeProcess] EXIT_TREE notification - stopping process")
-			if is_running() or _pid > 0 or _pgid > 0:
-				_stop_sync()
+			_stop_sync()
 		NOTIFICATION_WM_CLOSE_REQUEST:
 			print("[MediaPipeProcess] WM_CLOSE_REQUEST notification - stopping process")
-			if is_running() or _pid > 0 or _pgid > 0:
-				_stop_sync()
+			_stop_sync()
 
 func _stop_sync() -> void:
+	if _is_shutting_down or not _has_active_process_state():
+		return
 	_stop_heartbeat()
 	OS.delay_msec(200)
 	DesktopSidecarLauncher.terminate_sync(_launch_info)
 	_cleanup_process_state()
 
 func _force_kill_immediate() -> void:
+	if not _has_active_process_state():
+		return
 	_stop_heartbeat()
 	DesktopSidecarLauncher.terminate_sync(_launch_info)
 	_cleanup_process_state()
