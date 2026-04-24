@@ -122,11 +122,13 @@ This plan keeps the work honest. Phase 1 establishes the runtime directory contr
 **Files Created/Deleted/Modified:**
 - `src/process/mediapipe_process.gd`
 - `src/autostart_manager.gd`
-- new helper modules if needed
+- `src/process/desktop_sidecar_launcher.gd`
+- `src/runtime/desktop_sidecar_runtime.gd`
+- `README.md`
 
-**Status:** ⏳ Pending
+**Status:** ✅ Complete
 
-**Results:** Reserved.
+**Results:** Completed in commit `1a3950e` (`Refactor sidecar launchers for platform-aware runtimes`). Added shared Godot-side runtime resolution/validation in `src/runtime/desktop_sidecar_runtime.gd` so both `AutoStartManager` and direct `MediaPipeProcess` launches now enforce the same manifest/sentinel/platform/python/model contract before start. Added `src/process/desktop_sidecar_launcher.gd` to isolate the proven Linux detached shell + process-group launcher/teardown path from explicit macOS and Windows direct-PID scaffolding. `src/process/mediapipe_process.gd` now uses the shared runtime validator, resolves the sidecar entrypoint truthfully from the repo/addon package root, and launches through the platform-aware launcher instead of assuming Linux shell behavior everywhere. `src/autostart_manager.gd` now reuses the same shared runtime contract and launcher structure while keeping Linux-only cleanup patterns explicit. `README.md` was updated to document that direct `MediaPipeProcess` now shares runtime-contract validation and that macOS/Windows lifecycle branches are scaffolded, not host-validated. Validation run for this coder pass: `python3 -m py_compile python_mediapipe/*.py`; `python3 python_mediapipe/prepare_runtime.py --platform linux-x64 --mode dev --validate`; `python_mediapipe/assets/runtimes/linux-x64/venv/bin/python python_mediapipe/test_filter.py`; `godot --headless --path .testbed --import && godot --headless --path .testbed --quit`; `godot --headless --path .testbed -s /tmp/mediapipe_process_smoke.gd`; and `godot --headless --path .testbed -s /tmp/autostart_manager_smoke.gd`. Linux start/stop behavior was exercised successfully on this host for both direct `MediaPipeProcess` and `AutoStartManager`; macOS/Windows launch/teardown branches remain code-structured only and unverified here. One remaining nuance for QA: Linux teardown still logs an occasional "could not confirm termination after SIGKILL" warning even though follow-up `ps` checks on this host showed no lingering `python_mediapipe/main.py` processes after the smoke runs.
 
 ---
 
@@ -156,7 +158,7 @@ This plan keeps the work honest. Phase 1 establishes the runtime directory contr
 
 **Status:** ⚠️ In Progress
 
-**What We Built:** Tasks 1 and 2 are complete. The repo now has a unified desktop runtime-contract layer under `python_mediapipe/assets/runtimes/<platform>/`, and this Linux host now has a prepared `python_mediapipe/assets/runtimes/linux-x64/` dev runtime with a live venv plus validated manifest/sentinel files. The legacy local `python_mediapipe/assets/venv/` directory has been retired. Remaining phases still cover Godot runtime resolution, platform-aware process management, and the final broader docs/build guidance pass.
+**What We Built:** Tasks 1 through 4 are complete. The repo now has a unified desktop runtime-contract layer under `python_mediapipe/assets/runtimes/<platform>/`, a prepared `python_mediapipe/assets/runtimes/linux-x64/` dev runtime on this host, Godot-side fail-fast runtime resolution, and shared platform-aware launcher/runtime-validation helpers that keep Linux process-group behavior explicit while scaffolding macOS/Windows-safe launch and teardown paths. The legacy local `python_mediapipe/assets/venv/` directory has been retired. Remaining work is the final broader docs/build guidance pass in Task 5.
 
 **Reference Check:**
 - `REF-01` and `REF-02` are reflected in the new platform-keyed runtime contract and the prepared `linux-x64` runtime root.
@@ -167,6 +169,8 @@ This plan keeps the work honest. Phase 1 establishes the runtime directory contr
 **Commits:**
 - `438a3aa` - Add unified desktop runtime contract foundation
 - `68f0d22` - Prepare linux-x64 runtime and retire legacy sidecar venv
+- `cd85355` - Resolve platform-keyed desktop sidecar runtimes
+- `1a3950e` - Refactor sidecar launchers for platform-aware runtimes
 
 **Lessons Learned:**
 - The cleanest execution path is still staged: runtime contract first, live host runtime second, resolver third, process-management fourth, broader docs last.
