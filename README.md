@@ -13,12 +13,40 @@ This repo is **partially migrated** into the broader AeroBeat input-provider con
 
 - `src/input_provider.gd` — assembly-facing addon entrypoint
 - `src/` — Godot-side implementation used by the local testbed and downstream addon installs
-- `python_mediapipe/` — Python sidecar and Python-only test scripts
+- `python_mediapipe/` — Python sidecar, runtime-preparation helper, and Python-only test scripts
 - `python_mediapipe/assets/models/` — committed MediaPipe `.task` model assets used by the sidecar
-- `python_mediapipe/assets/runtimes/linux-x64/` — current host's generated local dev runtime root under the unified runtime contract, **not committed**
+- `python_mediapipe/assets/runtimes/` — generated desktop runtime roots under the unified runtime contract, **not committed**
+  - `python_mediapipe/assets/runtimes/linux-x64/` — current host's prepared Linux dev runtime on this machine
+  - `python_mediapipe/assets/runtimes/macos-x64/` — scaffolded target location for macOS desktop runtimes
+  - `python_mediapipe/assets/runtimes/windows-x64/` — scaffolded target location for Windows desktop runtimes
 - `.testbed/` — hidden Godot workbench project restored via GodotEnv
 - `.testbed/tests/` — repo-local Godot automated test scripts
 - `.testbed/addons.jsonc` — committed dev/test dependency contract for the workbench
+
+## Unified desktop runtime system
+
+Desktop sidecar execution now uses **one platform-keyed runtime family** instead of a generic `python_mediapipe/assets/venv/` path:
+
+- `python_mediapipe/assets/runtimes/linux-x64/`
+- `python_mediapipe/assets/runtimes/macos-x64/`
+- `python_mediapipe/assets/runtimes/windows-x64/`
+
+These runtime roots are:
+
+- generated locally
+- intentionally gitignored
+- platform-specific
+- still **unfrozen** (Python code + prepared Python environment, not a packaged binary)
+- shared between desktop dev and desktop export concepts by **path family**, with differences expressed through runtime mode / manifest validation rather than unrelated folders
+
+The current runtime contract is enforced by:
+
+- `python_mediapipe/runtime_paths.py` on the Python side
+- `python_mediapipe/prepare_runtime.py` for runtime preparation / scaffolding
+- `src/runtime/desktop_sidecar_runtime.gd` for Godot-side runtime resolution and validation
+- `src/process/desktop_sidecar_launcher.gd` for platform-aware launch / teardown structure
+
+Mobile is intentionally outside this contract and should continue using the native MediaPipe path.
 
 ## GodotEnv development flow
 
@@ -53,22 +81,37 @@ Manual `.testbed/src`, `.testbed/python_mediapipe`, and repo-owned `.testbed/add
 
 ### What the repo can do today
 
-- run the Python sidecar directly from this repo
-- create and reuse the current host's repo-owned dev runtime at `python_mediapipe/assets/runtimes/linux-x64/`
+- run the Python sidecar directly from this repo on Linux using the prepared `linux-x64` runtime
+- create and validate the current host's repo-owned Linux dev runtime at `python_mediapipe/assets/runtimes/linux-x64/`
+- scaffold the macOS and Windows runtime roots / manifests for contract work, without claiming they are host-validated here
 - receive pose landmarks in Godot and expose head/hand/foot polling helpers
 - use either a webcam (`--camera 0`) or a video path (`--camera path/to/file.mp4`) when launching the Python sidecar directly
 - look up MediaPipe models from committed assets under `python_mediapipe/assets/models/`
+- fail fast in Godot when the expected desktop runtime manifest, sentinel, Python executable, or model assets are missing or invalid
 
 ### What is still manual / partial
 
 - the assembly-community repo still owns addon registration / consumer wiring
 - `src/input_provider.gd` is an adapter layer, not a claim that the full contract is finished
+- desktop export/build integration is **not** yet automated here; exported builds are expected to use the same `assets/runtimes/<platform>/` family, but packaging / hydration policy still needs follow-on work
+- macOS and Windows runtime prep / launch branches are present as architecture scaffolding, **not** as validated desktop parity claims
 - full end-to-end runtime still depends on legitimate local prerequisites such as a working camera / display stack and Python package install success
+
+## Platform validation status
+
+Treat the repo as:
+
+- **Linux desktop:** validated on the current host for runtime prep, direct sidecar runs, Godot runtime resolution, and platform-aware launcher integration
+- **macOS desktop:** path/layout/launcher scaffolding exists in code, but runtime prep and lifecycle behavior are **not validated here**
+- **Windows desktop:** path/layout/launcher scaffolding exists in code, but runtime prep and lifecycle behavior are **not validated here**
+- **Mobile:** intentionally excluded from this Python desktop runtime system
+
+That means the repo is currently **Linux-proven, macOS/Windows-scaffolded**.
 
 ## Requirements
 
 - Python 3.8+
-- ability to prepare the current host's local dev runtime under `python_mediapipe/assets/runtimes/linux-x64/`
+- ability to prepare the current host's local desktop runtime under `python_mediapipe/assets/runtimes/<platform>/`
 - committed MediaPipe model assets under `python_mediapipe/assets/models/`:
   - `pose_landmarker_lite.task`
   - `pose_landmarker_full.task`
@@ -80,28 +123,38 @@ The testbed defaults to `model_complexity = 1`, so by default it uses:
 python_mediapipe/assets/models/pose_landmarker_full.task
 ```
 
-## Python environment ownership
+## Runtime preparation expectations
 
-This repo now treats the Python runtime as a **sidecar-owned asset**, not a random user-managed environment.
+This repo now treats the Python runtime as a **sidecar-owned generated asset**, not a random user-managed environment.
 
-- canonical current-host dev runtime root: `python_mediapipe/assets/runtimes/linux-x64/`
-- runtime-local Python executable: `python_mediapipe/assets/runtimes/linux-x64/venv/bin/python`
+Canonical current contract:
+
+- runtime family root: `python_mediapipe/assets/runtimes/`
+- current host dev runtime on this machine: `python_mediapipe/assets/runtimes/linux-x64/`
+- Linux runtime-local Python executable on this machine: `python_mediapipe/assets/runtimes/linux-x64/venv/bin/python`
+- runtime manifest: `python_mediapipe/assets/runtimes/<platform>/runtime-manifest.json`
+- runtime sentinel: `python_mediapipe/assets/runtimes/<platform>/.runtime-ready`
 - durable committed assets: Python code + `.task` models
-- non-durable generated asset: the platform runtime contents
+- non-durable generated assets: prepared platform runtime contents
 
-The generated runtime contents are intentionally gitignored. The new runtime should be prepared with `python_mediapipe/prepare_runtime.py` rather than by hand-creating the legacy `assets/venv` path. Godot-side auto-start now resolves the platform-keyed desktop runtime family and fails fast when the expected runtime manifest, sentinel, Python executable, or model assets are missing or invalid. The direct `MediaPipeProcess` path now uses that same manifest/sentinel/runtime contract instead of validating only the Python binary path. Source-checkout/dev runs expect a prepared local runtime such as `assets/runtimes/linux-x64/` on this host.
+`python_mediapipe/prepare_runtime.py` is the canonical helper for preparing or scaffolding a runtime root.
 
-Linux launch/teardown remains the only runtime path validated end-to-end on this host: it still uses detached shell + process-group handling for reliable cleanup. macOS and Windows launcher/teardown branches now exist explicitly in code, but they are scaffolding for future parity work rather than a claim that cross-platform sidecar lifecycle behavior is already proven.
-
-### Manual setup
+### Linux dev preparation on this host
 
 From the repo root:
 
 ```bash
 python3 python_mediapipe/prepare_runtime.py --platform linux-x64 --mode dev --create-venv --validate
 python_mediapipe/assets/runtimes/linux-x64/venv/bin/pip install -r python_mediapipe/requirements.txt
-python3 python_mediapipe/prepare_runtime.py --platform linux-x64 --mode dev --create-venv --validate
+python3 python_mediapipe/prepare_runtime.py --platform linux-x64 --mode dev --validate
 ```
+
+Notes:
+
+- `--create-venv` only creates a real venv for the **current host platform**
+- the helper may scaffold foreign-platform manifest/sentinel files, but that is **not** the same as producing a working foreign-platform runtime on this Linux host
+- source-checkout/dev runs expect a prepared local runtime for the current platform
+- release/export flows should also resolve the same `assets/runtimes/<platform>/` family, but this repo does not yet automate final packaging/bundling policy
 
 ## Running the Python sidecar directly
 
@@ -164,9 +217,20 @@ The workbench will:
 
 - load this repo from `res://addons/aerobeat-input-mediapipe-python/`
 - fail early with a clear error if the required `.task` model file is missing from `python_mediapipe/assets/models/`
-- now resolves the unified platform-keyed desktop runtime family and fails fast if the prepared runtime is missing or invalid
+- resolve the unified platform-keyed desktop runtime family and fail fast if the prepared runtime is missing or invalid
+- use the Linux launcher path that is validated on this host; other desktop launcher branches exist in code but are not claimed as validated here
 
-For now, treat the prepared linux runtime as the canonical local runtime for direct/manual sidecar use on this host. If auto-start fails, the test scene under `.testbed/scenes/` includes manual recovery guidance that points back to the repo root and `python_mediapipe/assets/runtimes/linux-x64/`.
+If auto-start fails on this host, the test scene under `.testbed/scenes/` includes manual recovery guidance pointing back to the repo root and `python_mediapipe/assets/runtimes/linux-x64/`.
+
+## Desktop build/export guidance
+
+Current truthful guidance:
+
+- desktop exports should conceptually use the same runtime family under `python_mediapipe/assets/runtimes/<platform>/`
+- runtime selection is platform-keyed (`linux-x64`, `macos-x64`, `windows-x64`) and mode-aware (`dev` vs `release`)
+- release mode should validate the runtime manifest / sentinel / platform match before launch rather than silently falling back to system Python
+- this repo does **not** yet provide a finished export-packaging pipeline that prepares and bundles each desktop runtime automatically
+- do **not** describe macOS or Windows desktop export support as verified until those runtime branches are actually prepared and tested on those hosts
 
 ## Test assets
 

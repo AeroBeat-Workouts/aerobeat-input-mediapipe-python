@@ -33,11 +33,6 @@ venv/
 env/
 .testbed/venv/
 
-# Legacy local sidecar venv path (kept ignored during runtime-contract migration)
-!python_mediapipe/assets/venv/
-python_mediapipe/assets/venv/*
-!python_mediapipe/assets/venv/.gdignore
-
 # Unified generated desktop runtimes
 !python_mediapipe/assets/runtimes/
 python_mediapipe/assets/runtimes/*
