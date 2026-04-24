@@ -58,7 +58,7 @@ This repo now uses the AeroBeat GodotEnv package convention for the local workbe
 - Hidden workbench project: `.testbed/project.godot`
 - Repo-local unit tests: `.testbed/tests/`
 
-The repo root remains the package/published boundary for downstream consumers. Day-to-day development, debugging, and validation happen from the hidden `.testbed/` workbench with GodotEnv restoring this repo itself, the sibling `aerobeat-input-core` repo (mounted under the historical addon key/path `aerobeat-core` for compatibility), and GUT.
+The repo root remains the package/published boundary for downstream consumers. Day-to-day development, debugging, and validation happen from the hidden `.testbed/` workbench with GodotEnv restoring this repo itself, the sibling `aerobeat-input-core` repo under its truthful addon key/path, and GUT.
 
 ### Restore dev/test dependencies
 
@@ -72,10 +72,10 @@ godotenv addons install
 That restores:
 
 - `aerobeat-input-mediapipe-python` from `..` as a local symlinked package
-- `aerobeat-input-core` from `../../aerobeat-input-core`, mounted under the compatibility addon key/path `aerobeat-core`
+- `aerobeat-input-core` from `../../aerobeat-input-core`, mounted under the truthful addon key/path `aerobeat-input-core`
 - `gut` from its upstream Git source into `.testbed/addons/gut`
 
-Manual `.testbed/src`, `.testbed/python_mediapipe`, and repo-owned `.testbed/addons/aerobeat-core` links are no longer the repo contract and should not be recreated by hand. GodotEnv now restores the compatibility mount from the sibling `aerobeat-input-core` repo.
+Manual `.testbed/src`, `.testbed/python_mediapipe`, and repo-owned `.testbed/addons/aerobeat-input-core` links are no longer the repo contract and should not be recreated by hand. GodotEnv now restores the sibling `aerobeat-input-core` repo at its truthful addon path.
 
 ## Current truthful runtime state
 
@@ -296,7 +296,7 @@ Those belong in consuming repos such as `aerobeat-assembly-community`.
 
 - `.testbed/addons.jsonc` is the committed dev/test dependency contract.
 - The workbench consumes this package from the repo root (`subfolder: "/"`) via GodotEnv rather than manual `.testbed` symlinks.
-- The local core contract currently comes from the sibling `aerobeat-input-core` repo while still mounting under `res://addons/aerobeat-core/` for compatibility with current repo code.
+- The local core contract comes from the sibling `aerobeat-input-core` repo and mounts under `res://addons/aerobeat-input-core/`.
 - CI follows the same GodotEnv restore/import/GUT flow as local workbench validation.
 - The repo now commits the required `.task` model assets instead of expecting them to appear separately in the repo root.
 

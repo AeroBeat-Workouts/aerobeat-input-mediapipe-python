@@ -7,9 +7,8 @@
       "source": "symlink",
       "subfolder": "/"
     },
-    // The input-core repo is mounted under the historical addon key/path
-    // `aerobeat-core` so current repo runtime references keep working.
-    "aerobeat-core": {
+    // The input-core repo is mounted under its truthful addon key/path.
+    "aerobeat-input-core": {
       "url": "../../aerobeat-input-core",
       "source": "symlink",
       "subfolder": "/"

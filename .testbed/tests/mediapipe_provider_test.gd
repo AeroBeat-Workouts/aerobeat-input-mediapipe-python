@@ -1,7 +1,7 @@
 extends Node
 ## Standalone test version of MediaPipeProvider
 ## Extends Node instead of AeroInputProvider for independent testing
-## This allows the addon to be tested without aerobeat-core dependency
+## This allows the addon to be tested without the aerobeat-input-core dependency
 
 class_name MediaPipeProviderTest
 

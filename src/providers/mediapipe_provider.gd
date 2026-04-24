@@ -1,7 +1,7 @@
 class_name MediaPipeProvider
 extends Node
 ## MediaPipe implementation of input provider with multi-pose support
-## Works standalone OR as part of aerobeat-core assembly
+## Works standalone OR as part of the aerobeat-input-core assembly contract
 
 signal pose_updated(landmarks: Array)
 signal multi_pose_updated(poses: Array)  # Array of {pose_id, landmarks}
