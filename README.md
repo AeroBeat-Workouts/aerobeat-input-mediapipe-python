@@ -89,7 +89,7 @@ This repo now treats the Python runtime as a **sidecar-owned asset**, not a rand
 - durable committed assets: Python code + `.task` models
 - non-durable generated asset: the platform runtime contents
 
-The generated runtime contents are intentionally gitignored. The new runtime should be prepared with `python_mediapipe/prepare_runtime.py` rather than by hand-creating the legacy `assets/venv` path. Godot-side auto-start/runtime resolution still needs its follow-on migration to the new runtime family; until that lands, direct/manual runtime usage should point at `assets/runtimes/linux-x64/`.
+The generated runtime contents are intentionally gitignored. The new runtime should be prepared with `python_mediapipe/prepare_runtime.py` rather than by hand-creating the legacy `assets/venv` path. Godot-side auto-start now resolves the platform-keyed desktop runtime family and fails fast when the expected runtime manifest, sentinel, Python executable, or model assets are missing or invalid. Source-checkout/dev runs expect a prepared local runtime such as `assets/runtimes/linux-x64/` on this host.
 
 ### Manual setup
 
@@ -162,7 +162,7 @@ The workbench will:
 
 - load this repo from `res://addons/aerobeat-input-mediapipe-python/`
 - fail early with a clear error if the required `.task` model file is missing from `python_mediapipe/assets/models/`
-- still needs a follow-on Godot-side runtime-path migration before auto-start truthfully targets the new unified runtime family
+- now resolves the unified platform-keyed desktop runtime family and fails fast if the prepared runtime is missing or invalid
 
 For now, treat the prepared linux runtime as the canonical local runtime for direct/manual sidecar use on this host. If auto-start fails, the test scene under `.testbed/scenes/` includes manual recovery guidance that points back to the repo root and `python_mediapipe/assets/runtimes/linux-x64/`.
 

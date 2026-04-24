@@ -33,10 +33,10 @@ func start(config: MediaPipeConfig) -> bool:
 	_config = config
 	_is_shutting_down = false
 
-	# Find Python executable
+	# Find the prepared sidecar runtime Python executable
 	_python_path = _find_python()
 	if _python_path.is_empty():
-		process_error.emit("Python not found. Install Python 3.8+ and ensure it's in PATH")
+		process_error.emit("Prepared sidecar runtime Python not found. Expected runtime root: %s" % _get_sidecar_runtime_root())
 		return false
 
 	# Verify Python script exists
@@ -278,30 +278,59 @@ func get_process_group_id() -> int:
 func _resolve_package_path(relative_path: String) -> String:
 	return "%s/%s" % [get_script().resource_path.get_base_dir(), relative_path]
 
+func _get_platform_arch_key() -> String:
+	if OS.has_feature("x86_64"):
+		return "x64"
+	if OS.has_feature("arm64"):
+		return "arm64"
+	if OS.has_feature("x86_32"):
+		return "x86"
+
+	var processor_name := OS.get_processor_name().to_lower().strip_edges()
+	if processor_name.contains("x86_64") or processor_name.contains("amd64") or processor_name.contains("x64"):
+		return "x64"
+	if processor_name.contains("aarch64") or processor_name.contains("arm64"):
+		return "arm64"
+	if processor_name.contains("i386") or processor_name.contains("i686") or processor_name.contains("x86"):
+		return "x86"
+	return "unknown"
+
+func _get_desktop_platform_key() -> String:
+	var os_key := ""
+	match OS.get_name():
+		"Linux":
+			os_key = "linux"
+		"macOS":
+			os_key = "macos"
+		"Windows":
+			os_key = "windows"
+		_:
+			return ""
+
+	var platform_key := "%s-%s" % [os_key, _get_platform_arch_key()]
+	if platform_key in ["linux-x64", "macos-x64", "windows-x64"]:
+		return platform_key
+	return ""
+
+func _get_sidecar_runtime_root() -> String:
+	var platform_key := _get_desktop_platform_key()
+	if platform_key.is_empty():
+		return ""
+	return ProjectSettings.globalize_path(_resolve_package_path("../python_mediapipe/assets/runtimes/" + platform_key))
+
 func _find_python() -> String:
-	var sidecar_python: String = ProjectSettings.globalize_path(_resolve_package_path("../python_mediapipe/assets/venv/bin/python"))
+	var runtime_root := _get_sidecar_runtime_root()
+	if runtime_root.is_empty():
+		return ""
+
+	var sidecar_python := ""
+	if _get_desktop_platform_key().begins_with("windows-"):
+		sidecar_python = runtime_root.path_join("venv").path_join("Scripts").path_join("python.exe")
+	else:
+		sidecar_python = runtime_root.path_join("venv").path_join("bin").path_join("python")
+
 	if _test_python(sidecar_python):
 		return sidecar_python
-
-	# Check for externally activated virtual environment next
-	if OS.has_environment("VIRTUAL_ENV"):
-		var venv_python: String = OS.get_environment("VIRTUAL_ENV") + "/bin/python"
-		if _test_python(venv_python):
-			return venv_python
-
-	# Try common Python paths
-	var candidates := PackedStringArray([
-		"python3",
-		"python",
-		"/usr/bin/python3",
-		"/usr/local/bin/python3",
-		"py"  # Windows
-	])
-
-	for cmd: String in candidates:
-		if _test_python(cmd):
-			return cmd
-
 	return ""
 
 func _test_python(cmd: String) -> bool:
@@ -395,7 +424,7 @@ func check_dependencies() -> Dictionary:
 
 	var python: String = _find_python()
 	if python.is_empty():
-		result.errors.append("Python not found in PATH")
+		result.errors.append("Prepared sidecar runtime Python not found at %s" % _get_sidecar_runtime_root())
 		return result
 
 	result.python_found = true
@@ -411,13 +440,13 @@ func check_dependencies() -> Dictionary:
 	var exit: int = OS.execute(python, PackedStringArray(["-c", "import mediapipe; print('ok')"]), output, true)
 	result.mediapipe_installed = (exit == 0 and output.size() > 0 and output[0].strip_edges() == "ok")
 	if not result.mediapipe_installed:
-		result.errors.append("MediaPipe not installed in the sidecar environment. Install via AutoStartManager or pip install -r python_mediapipe/requirements.txt into python_mediapipe/assets/venv")
+		result.errors.append("MediaPipe not installed in the prepared sidecar runtime. Rebuild or refresh python_mediapipe/assets/runtimes/<platform>/ with python_mediapipe/prepare_runtime.py and install python_mediapipe/requirements.txt there.")
 
 	# Check for opencv
 	output.clear()
 	exit = OS.execute(python, PackedStringArray(["-c", "import cv2; print('ok')"]), output, true)
 	result.opencv_installed = (exit == 0 and output.size() > 0 and output[0].strip_edges() == "ok")
 	if not result.opencv_installed:
-		result.errors.append("OpenCV not installed in the sidecar environment. Install via AutoStartManager or pip install -r python_mediapipe/requirements.txt into python_mediapipe/assets/venv")
+		result.errors.append("OpenCV not installed in the prepared sidecar runtime. Rebuild or refresh python_mediapipe/assets/runtimes/<platform>/ with python_mediapipe/prepare_runtime.py and install python_mediapipe/requirements.txt there.")
 
 	return result
