@@ -60,7 +60,7 @@ Validation evidence:
 - Additional repo-local `.testbed` script parse check: `~/.local/bin/godot --headless --path .testbed --script addons/aerobeat-input-mediapipe-python/src/providers/mediapipe_provider.gd --check-only --quit --log-file /tmp/mediapipe_provider_check_only.log` exited `0` with no parse/load failures.
 - Best truthful assembly-facing path from sibling `aerobeat-assembly-community`: after publishing this repo update and rerunning `godotenv addons install` there, `~/.local/bin/godot --headless --path . --quit-after 2 --verbose --log-file /tmp/mediapipe_assembly_runtime_after_push.log` exited `0`, logged `AeroBeat Assembly started`, loaded `res://addons/aerobeat-input-mediapipe/src/providers/mediapipe_provider.gd`, bound UDP successfully twice on `127.0.0.1:4242`, logged `Tracking started`, and `Registered MediaPipe addon adapter`. Explicit grep of that log found **no** `Node not found: "MediaPipeServer"` occurrence. Direct file spot-check in the installed addon also confirmed the new payload is present: `addons/aerobeat-input-mediapipe/src/providers/mediapipe_provider.gd` now contains `var _server = null`, and `addons/aerobeat-input-mediapipe/src/input_provider.gd` contains the updated live assembly alias comment.
 
-Files changed in this task: `src/providers/mediapipe_provider.gd`, `src/input_provider.gd`, and this plan file. Implementation commit: `25d5b27` (`Fix MediaPipeServer startup ordering`), pushed to `origin/main`.
+Files changed in this task: `src/providers/mediapipe_provider.gd`, `src/input_provider.gd`, and this plan file. Implementation commit: `cad9ae5` (`Fix MediaPipeServer startup ordering`), pushed to `origin/main`.
 
 ---
 
