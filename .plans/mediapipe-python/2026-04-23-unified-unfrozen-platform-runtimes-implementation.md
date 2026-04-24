@@ -148,35 +148,37 @@ This plan keeps the work honest. Phase 1 establishes the runtime directory contr
 - `README.md`
 - plan updates if needed
 
-**Status:** ⏳ Pending
+**Status:** ✅ Complete
 
-**Results:** Reserved.
+**Results:** Completed the broader docs/build-guidance pass in commit `5dc264d` (`Document unified desktop runtime contract`). `README.md` now truthfully describes the unified desktop runtime family under `python_mediapipe/assets/runtimes/{linux-x64,macos-x64,windows-x64}/`, the generated runtime-manifest/sentinel locations, canonical Linux preparation steps, release/export expectations, and the actual platform-validation stance: Linux validated on this host, macOS/Windows scaffolded in code but not host-verified. `.gitignore` was also cleaned up to remove the stale `python_mediapipe/assets/venv/` migration block so tracked ignore guidance no longer conflicts with the implemented runtime system. Validation for this docs pass re-checked the referenced commands and paths directly against the repo state: `python3 -m py_compile python_mediapipe/*.py`; `python3 python_mediapipe/prepare_runtime.py --platform linux-x64 --mode dev --validate --json`; `python3 python_mediapipe/prepare_runtime.py --platform windows-x64 --mode release --validate --json` (scaffold-only validation, no parity claim); direct file-existence checks for the Linux runtime python/manifest/sentinel and required model asset; `python_mediapipe/assets/runtimes/linux-x64/venv/bin/python python_mediapipe/test_filter.py`; `git diff --check`; `git check-ignore -v` for generated runtime artifacts; and `godot --headless --path .testbed --quit`. The headless Godot run still showed the pre-existing object-leak warning on exit, but runtime resolution/dependency/model validation remained truthful and the updated docs now match that state.
 
 ---
 
 ## Final Results
 
-**Status:** ⚠️ In Progress
+**Status:** ✅ Complete
 
-**What We Built:** Tasks 1 through 4 are complete. The repo now has a unified desktop runtime-contract layer under `python_mediapipe/assets/runtimes/<platform>/`, a prepared `python_mediapipe/assets/runtimes/linux-x64/` dev runtime on this host, Godot-side fail-fast runtime resolution, and shared platform-aware launcher/runtime-validation helpers that keep Linux process-group behavior explicit while scaffolding macOS/Windows-safe launch and teardown paths. The legacy local `python_mediapipe/assets/venv/` directory has been retired. Remaining work is the final broader docs/build guidance pass in Task 5.
+**What We Built:** Completed the first shipping-quality foundation for the unified unfrozen desktop runtime architecture. The repo now has a generated/gitignored desktop runtime-contract layer under `python_mediapipe/assets/runtimes/<platform>/`, a prepared `python_mediapipe/assets/runtimes/linux-x64/` dev runtime on this host, Godot-side fail-fast runtime resolution, shared platform-aware launcher/runtime-validation helpers, and updated repo guidance that truthfully documents runtime locations, preparation expectations, build/export stance, and the current Linux-validated versus macOS/Windows-scaffolded reality. The legacy local `python_mediapipe/assets/venv/` directory has been retired.
 
 **Reference Check:**
 - `REF-01` and `REF-02` are reflected in the new platform-keyed runtime contract and the prepared `linux-x64` runtime root.
 - `REF-05` defines the runtime-manifest/sentinel/runtime-path expectations that were used to validate the prepared Linux runtime.
-- `REF-06` was updated where active guidance still treated `assets/venv` as canonical for local/manual use.
-- `REF-07` remains honored honestly: only the current host `linux-x64` runtime was prepared and validated in this pass; no Windows/macOS runtime parity is claimed.
+- `REF-06` is now updated through the final docs/build-guidance pass: README and ignore guidance match the implemented unified desktop runtime system and no longer treat `assets/venv` as the active contract.
+- `REF-07` remains honored honestly: only the current host `linux-x64` runtime was prepared and validated in this implementation wave; macOS/Windows are documented as scaffolded, not host-verified.
 
 **Commits:**
 - `438a3aa` - Add unified desktop runtime contract foundation
 - `68f0d22` - Prepare linux-x64 runtime and retire legacy sidecar venv
 - `cd85355` - Resolve platform-keyed desktop sidecar runtimes
 - `1a3950e` - Refactor sidecar launchers for platform-aware runtimes
+- `5dc264d` - Document unified desktop runtime contract
 
 **Lessons Learned:**
-- The cleanest execution path is still staged: runtime contract first, live host runtime second, resolver third, process-management fourth, broader docs last.
-- Retiring the legacy `assets/venv` before the Godot resolver migration is workable only if the tracked guidance explicitly says direct/manual Linux usage has moved to `assets/runtimes/linux-x64/` while autostart follow-on work is still pending.
-- Immediate next session priority is Task 3 (`oc-49s`): migrate Godot-side autostart/runtime resolution to the new `assets/runtimes/<platform>/` contract and add controlled fail-fast validation before any deeper process-management refactor.
+- The cleanest execution path was staged correctly: runtime contract first, live host runtime second, resolver third, process-management fourth, broader docs last.
+- Retiring the legacy `assets/venv` before the Godot resolver migration was only safe because the tracked guidance was updated in lockstep to point manual Linux use at `assets/runtimes/linux-x64/`.
+- The final docs pass needed to cover not just direct runtime commands but also export/build expectations and generated-path ownership so the repo would stop implying unsupported desktop parity.
+- Follow-up cleanup after the main runtime migration remains explicitly tracked in separate beads: `oc-b24` for the false-positive Linux teardown warning and `oc-q4j` for shutdown / `AUTO_STOPPED` deduplication.
 
 ---
 
-*Started on 2026-04-23*
+*Completed on 2026-04-23*
