@@ -79,7 +79,7 @@ Work will proceed bead-by-bead through the usual coder → QA → auditor loop. 
 
 **Status:** ✅ Complete
 
-**Results:** Completed with a narrow shutdown-idempotency cleanup in `src/autostart_manager.gd` and `src/process/mediapipe_process.gd`. `AutoStartManager.stop_server()` now returns immediately when teardown is already in progress or no live launch state remains, `_exit_tree()` only calls `stop_server()` when the sidecar is still active, and notification/sync-stop paths now no-op once cleanup has already happened. `MediaPipeProcess` received the same active-state guard on stop/notification cleanup so explicit shutdown no longer produces the extra `EXIT_TREE` / `PREDELETE` shutdown chatter after a successful stop. Validated on this Linux host with focused repo-local sidecar checks: `python3 -m py_compile python_mediapipe/*.py`; `godot --headless --path .testbed -s /tmp/mediapipe_process_smoke.gd`; `godot --headless --path .testbed -s /tmp/autostart_manager_smoke.gd`; and `ps -eo pid,args | grep '[p]ython_mediapipe/main.py' || true` after the smoke runs. In the validated paths, the direct `MediaPipeProcess` smoke no longer logs the extra exit/predelete shutdown messages after explicit stop, the autostart smoke now emits `AUTO_STOPPED` once instead of twice, and no lingering `python_mediapipe/main.py` process remained after validation. Commit: `7f6b7ff`.
+**Results:** Initial cleanup landed in `7f6b7ff`, but QA correctly caught one remaining false-positive Linux teardown warning resurfacing in both validated shutdown paths even though no lingering `python_mediapipe/main.py` process remained. The retry stayed narrow: `src/process/desktop_sidecar_launcher.gd` now gives the Linux post-`SIGKILL` process-group confirmation loop a slightly longer settle window before warning, preserving the already-validated idempotency/dedup behavior from `src/autostart_manager.gd` and `src/process/mediapipe_process.gd` without reopening broader lifecycle logic. Revalidated on this Linux host with focused repo-local shutdown checks: `python3 -m py_compile python_mediapipe/*.py`; `godot --headless --path .testbed res://tmp_mediapipe_process_smoke.tscn`; `godot --headless --path .testbed res://tmp_autostart_manager_smoke.tscn`; and `ps -eo pid,args | grep '[p]ython_mediapipe/main.py' || true` after each smoke run. In the retry validation, the direct `MediaPipeProcess` path emitted a single `PROCESS_STOPPED`, stayed free of extra `EXIT_TREE` / `PREDELETE` chatter, no longer logged `Linux process-group teardown could not confirm termination after SIGKILL.`, and left no lingering `python_mediapipe/main.py` process. The `AutoStartManager` path emitted `AUTO_STOPPED` once, stayed free of extra shutdown chatter, no longer logged the Linux teardown warning, and likewise left no lingering `python_mediapipe/main.py` process. Retry commit: `20f5678`. Initial idempotency commit: `7f6b7ff`. 
 
 ---
 
@@ -87,15 +87,16 @@ Work will proceed bead-by-bead through the usual coder → QA → auditor loop. 
 
 **Status:** ✅ Complete
 
-**What We Built:** Landed both scoped post-migration sidecar cleanup fixes: (1) truthful Linux teardown confirmation for process-group shutdown, and (2) idempotent stop-path cleanup that removes duplicate shutdown signaling/logging in the validated MediaPipe sidecar paths.
+**What We Built:** Landed both scoped post-migration sidecar cleanup fixes: (1) truthful Linux teardown confirmation for process-group shutdown, plus a retry that keeps the post-`SIGKILL` confirmation window honest to real Linux settle time, and (2) idempotent stop-path cleanup that removes duplicate shutdown signaling/logging in the validated MediaPipe sidecar paths.
 
 **Reference Check:** `REF-01`, `REF-03`, `REF-04`, and `REF-05` satisfied. The launcher/runtime structure from the completed migration plan remains intact; Linux behavior was tightened without broadening into unvalidated cross-platform parity claims.
 
 **Commits:**
 - `64ced48` - Fix Linux sidecar teardown confirmation
 - `7f6b7ff` - Deduplicate sidecar shutdown teardown noise
+- `20f5678` - Allow extra Linux sidecar teardown settle time
 
-**Lessons Learned:** The remaining shutdown noise was mostly lifecycle re-entry, not a deeper runtime failure. Small active-state/idempotency guards on explicit stop and notification cleanup paths were enough to keep teardown honest and quiet on the validated Linux host.
+**Lessons Learned:** The remaining shutdown noise was mostly lifecycle re-entry plus Linux kill-confirmation timing, not a deeper runtime failure. Small active-state/idempotency guards on explicit stop and notification cleanup paths were necessary, and the final warning cleanup needed the launcher to allow the killed process group a little more time to disappear before claiming teardown failed.
 
 ---
 
