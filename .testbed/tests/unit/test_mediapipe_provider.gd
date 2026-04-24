@@ -87,7 +87,7 @@ func test_returns_vector2_in_2d_mode():
 		return
 	provider._on_landmarks_received([{"id": 15, "x": 0.5, "y": 0.5, "v": 0.99}])
 	var pos = provider.get_left_hand_position()
-	assert_is(pos, Vector2)
+	assert_typeof(pos, TYPE_VECTOR2)
 
 func test_y_axis_is_flipped():
 	if not _is_gut_available():
