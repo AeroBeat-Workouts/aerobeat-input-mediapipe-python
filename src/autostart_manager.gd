@@ -377,7 +377,7 @@ func _emit_progress(percentage: int, message: String) -> void:
 
 func _exit_tree() -> void:
 	if _has_active_server_state():
-		stop_server()
+		_stop_sync()
 	progress_timer.stop()
 
 func _notification(what: int) -> void:

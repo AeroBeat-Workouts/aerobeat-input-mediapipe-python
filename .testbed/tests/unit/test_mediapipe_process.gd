@@ -1,4 +1,4 @@
-extends RefCounted
+extends "res://addons/gut/test.gd"
 ## Unit tests for MediaPipeProcess
 ## Compatible with GUT if available, otherwise runs basic checks
 

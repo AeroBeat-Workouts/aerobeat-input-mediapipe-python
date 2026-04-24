@@ -24,6 +24,7 @@ var _is_streaming: bool = false
 var _stream_thread: Thread
 var _thread_running: bool = false
 var _current_frame: Image
+var _frame_texture: ImageTexture
 var _frame_mutex: Mutex
 var _update_timer: float = 0.0
 var _mjpeg_buffer: PackedByteArray
@@ -35,8 +36,9 @@ var _overlay_mutex: Mutex
 var _overlay_canvas: Control
 
 func _ready() -> void:
-	_current_frame = Image.create(640, 480, false, Image.FORMAT_RGB8)
-	self.texture = ImageTexture.create_from_image(_current_frame)
+	_current_frame = Image.create(640, 480, false, Image.FORMAT_RGBA8)
+	_frame_texture = ImageTexture.create_from_image(_current_frame)
+	self.texture = _frame_texture
 	_frame_mutex = Mutex.new()
 	_overlay_mutex = Mutex.new()
 	_mjpeg_buffer = PackedByteArray()
@@ -448,6 +450,8 @@ func _parse_mjpeg_frame() -> bool:
 		var img := Image.new()
 		var err := img.load_jpg_from_buffer(jpeg_data)
 		if err == OK:
+			if img.get_format() != Image.FORMAT_RGBA8:
+				img.convert(Image.FORMAT_RGBA8)
 			_frame_mutex.lock()
 			_current_frame = img
 			_frame_mutex.unlock()
@@ -462,6 +466,14 @@ func _parse_mjpeg_frame() -> bool:
 func _update_texture() -> void:
 	_frame_mutex.lock()
 	var frame := _current_frame
+	var frame_texture := _frame_texture
 	_frame_mutex.unlock()
 	if frame and frame.get_width() > 0:
-		self.texture = ImageTexture.create_from_image(frame)
+		if frame_texture == null:
+			frame_texture = ImageTexture.create_from_image(frame)
+			_frame_mutex.lock()
+			_frame_texture = frame_texture
+			_frame_mutex.unlock()
+			self.texture = frame_texture
+		else:
+			frame_texture.update(frame)

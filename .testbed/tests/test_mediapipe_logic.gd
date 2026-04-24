@@ -1,4 +1,4 @@
-extends RefCounted
+extends "res://addons/gut/test.gd"
 ## Basic logic tests for MediaPipe addon
 ## Compatible with GUT if available, otherwise runs basic checks
 

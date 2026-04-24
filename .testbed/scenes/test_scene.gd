@@ -135,13 +135,18 @@ func _start_camera_feed() -> void:
 	camera_view.position = Vector2(20, 80)
 	camera_view.size = Vector2(640, 480)
 	
-	# Replace the display with camera feed
-	camera_display.replace_by(camera_view)
+	# Replace the placeholder display with the live camera view
+	var previous_camera_display := camera_display
+	previous_camera_display.replace_by(camera_view)
 	camera_display = camera_view
 	
 	# Reconnect landmark drawer to new camera display
 	if landmark_drawer:
 		landmark_drawer.reparent(camera_display)
+	
+	# replace_by() detaches the old placeholder but does not free it
+	if previous_camera_display and previous_camera_display != camera_view:
+		previous_camera_display.queue_free()
 	
 	# Wait a frame for the node to be fully added to the tree
 	await get_tree().process_frame
@@ -234,7 +239,9 @@ func _stop_everything() -> void:
 	if camera_view and camera_view.is_streaming():
 		print("[TestScene] Stopping camera stream...")
 		camera_view.stop_stream()
-		camera_view = null
+	if camera_view and is_instance_valid(camera_view):
+		camera_view.queue_free()
+	camera_view = null
 	
 	# Small delay to let TCP connections close
 	OS.delay_msec(50)
@@ -243,12 +250,15 @@ func _stop_everything() -> void:
 	if provider:
 		print("[TestScene] Stopping provider...")
 		provider.stop()
+		if is_instance_valid(provider):
+			provider.queue_free()
 		provider = null
 	
-	# Stop auto-start manager last (kills Python process)
+	# AutoStartManager handles shutdown from its own exit/close notifications.
+	# Avoid calling its async stop_server() here during teardown, which leaks a
+	# GDScriptFunctionState if the scene is already exiting.
 	if auto_start_manager:
-		print("[TestScene] Stopping auto-start manager...")
-		auto_start_manager.stop_server()
+		print("[TestScene] AutoStartManager will stop itself during scene teardown...")
 		auto_start_manager = null
 	
 	# Give processes time to clean up
