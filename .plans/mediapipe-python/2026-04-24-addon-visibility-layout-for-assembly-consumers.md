@@ -108,9 +108,15 @@ Installed runtime-prep evidence: from `../aerobeat-assembly-community/addons/aer
 **Files Created/Deleted/Modified:**
 - `.plans/mediapipe-python/2026-04-24-addon-visibility-layout-for-assembly-consumers.md`
 
-**Status:** ⏳ Pending
+**Status:** ✅ Complete
 
-**Results:** Pending.
+**Results:** Independent QA/audit passed against the refreshed consumer install at `../aerobeat-assembly-community/addons/aerobeat-input-mediapipe/`. Exact on-disk verification: `addons/aerobeat-input-mediapipe/.gdignore` is absent and `addons/aerobeat-input-mediapipe/python_mediapipe/.gdignore` is absent, while localized hide markers are present at `.beads/.gdignore`, `.github/.gdignore`, `.plans/.gdignore`, `.testbed/.gdignore`, and `python_mediapipe/assets/runtimes/.gdignore`.
+
+Independent Godot scan evidence: after deleting the relevant assembly `.godot/editor/filesystem_cache*` and `.godot/global_script_class_cache.cfg` files and rerunning `~/.local/bin/godot --headless --path . --import --quit-after 1000` from `../aerobeat-assembly-community`, `.godot/editor/filesystem_cache10` contained `res://addons/aerobeat-input-mediapipe/python_mediapipe/`, `.../python_mediapipe/assets/`, `.../python_mediapipe/assets/models/`, `res://addons/aerobeat-input-mediapipe/src/`, and the expected `src/config`, `src/process`, `src/providers`, `src/runtime`, `src/server`, and `src/strategies` subdirectories. `.godot/global_script_class_cache.cfg` also contained addon script-class paths under `res://addons/aerobeat-input-mediapipe/src/...`, including `src/camera_view.gd`, `src/config/mediapipe_config.gd`, and `src/providers/mediapipe_provider.gd`. A direct grep of those same cache files found no entries for `res://addons/aerobeat-input-mediapipe/.beads/`, `.git/`, `.github/`, `.plans/`, or `.testbed/`, so the requested repo-only folders remained out of Godot/editor indexing even though `.git/` still physically exists on disk in the installed checkout.
+
+Runtime-prep verification also passed independently: from `../aerobeat-assembly-community`, I ran `python3 addons/aerobeat-input-mediapipe/python_mediapipe/prepare_runtime.py --platform linux-x64 --mode dev --create-venv --force --validate --json`. It exited `0` and returned `"validation_status": "venv_created"`, `"validation_errors": []`, and `"runtime_root": "/home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-assembly-community/addons/aerobeat-input-mediapipe/python_mediapipe/assets/runtimes/linux-x64"`. The installed runtime tree now contains `runtime-manifest.json`, `.runtime-ready`, and `venv/` under `python_mediapipe/assets/runtimes/linux-x64/`, which confirms Linux dev-mode runtime preparation works from the installed consumer addon path.
+
+Audit judgment: the physical installed `.git/` directory is a tooling caveat from GodotEnv materializing a Git checkout, not a blocker for this slice, because the requested acceptance condition was editor/index visibility and the independent cache check showed no `.git/` scan/index entries. Minor caveat: `python_mediapipe/__pycache__/` is visible in the filesystem cache, so if consumer tree tidiness beyond the requested hidden set matters later, that cache directory should be excluded or cleaned separately.
 
 ---
 
@@ -124,8 +130,9 @@ Installed runtime-prep evidence: from `../aerobeat-assembly-community/addons/aer
 
 **Commits:**
 - `ea26670` - Fix addon selective visibility layout
+- `4064bb9` - Record addon visibility validation
 
-**Lessons Learned:** In Godot, `.gdignore` must live on the exact directories that should be hidden; using it at the addon root or at `python_mediapipe/` hides far more than intended. Also, consumer install tools can still leave `.git/` on disk even when Godot itself no longer scans/indexes that folder, so on-disk payload cleanliness and editor visibility are related but not identical concerns.
+**Lessons Learned:** In Godot, `.gdignore` must live on the exact directories that should be hidden; using it at the addon root or at `python_mediapipe/` hides far more than intended. Also, consumer install tools can still leave `.git/` on disk even when Godot itself no longer scans/indexes that folder, so on-disk payload cleanliness and editor visibility are related but not identical concerns. Separate from the requested hidden set, installed Python cache folders like `python_mediapipe/__pycache__/` can still surface in Godot’s filesystem cache unless they are explicitly excluded or scrubbed during install.
 
 ---
 
