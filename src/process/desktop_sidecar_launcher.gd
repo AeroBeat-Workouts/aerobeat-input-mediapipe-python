@@ -125,6 +125,23 @@ static func launch_detached(context: Node, label: String, command: String, args:
 			info["notes"] = PackedStringArray(["Unsupported host platform for desktop sidecar launch: %s" % OS.get_name()])
 			return info
 
+static func _linux_process_group_has_live_members(group_id: int) -> bool:
+	if group_id <= 0:
+		return false
+
+	var output: Array = []
+	var exit_code := OS.execute("ps", PackedStringArray(["-o", "stat=", "-g", str(group_id)]), output, true)
+	if exit_code != 0:
+		return false
+
+	for line_variant in output:
+		var state := String(line_variant).strip_edges()
+		if state.is_empty():
+			continue
+		if not state.begins_with("Z"):
+			return true
+	return false
+
 static func is_process_alive(info: Dictionary) -> bool:
 	var pid := int(info.get("pid", -1))
 	if pid <= 0:
@@ -135,9 +152,7 @@ static func is_process_alive(info: Dictionary) -> bool:
 			var pgid := int(info.get("process_group_id", -1))
 			if pgid <= 0:
 				return OS.is_process_running(pid)
-			var output: Array = []
-			var exit_code := OS.execute("/bin/kill", PackedStringArray(["-0", "-" + str(pgid)]), output, true)
-			return exit_code == 0
+			return _linux_process_group_has_live_members(pgid)
 		"macos-direct-pid":
 			var mac_output: Array = []
 			var mac_exit := OS.execute("/bin/kill", PackedStringArray(["-0", str(pid)]), mac_output, true)
