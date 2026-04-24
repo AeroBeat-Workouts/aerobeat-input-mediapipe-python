@@ -105,25 +105,38 @@ Files changed in this task: this plan file only. QA verdict: pass for the target
 **Files Created/Deleted/Modified:**
 - `.plans/mediapipe-python/2026-04-24-mediapipeserver-startup-order-and-mount-comment-cleanup.md`
 
-**Status:** ⏳ Pending
+**Status:** ✅ Complete
 
-**Results:** Pending.
+**Results:** Independent audit pass completed against the live repo state plus the cited history in commits `cad9ae5` (`Fix MediaPipeServer startup ordering`), `17208c6` (`Record MediaPipeServer startup fix validation`), and `9316acc` (`Record QA for MediaPipeServer startup fix`). The implementation scope remains narrow: `cad9ae5` changes only `REF-02`, `REF-03`, and this plan file, so no broader adapter/provider contract claims were introduced beyond removing the eager `MediaPipeServer` lookup and correcting the mount-alias wording.
+
+Audit evidence re-run from scratch:
+- Repo-local `.testbed` mounted-addon path (`REF-04`): reran `cd .testbed && godotenv addons install`, then executed a fresh headless startup probe with `~/.local/bin/godot --headless --path . --script /tmp/tmp.VSckCxuBZ9/mediapipe_provider_startup_probe.gd --quit --log-file /tmp/tmp.VSckCxuBZ9/repo_probe.log`. The log shows `PROBE_SERVER_CHILD_PRESENT=true`, `PROBE_SERVER_CHILD_CLASS=Node`, `[MediaPipeServer] Starting UDP server on port 4242`, `[MediaPipeServer] UDP socket bound to 127.0.0.1:4242`, and `PROBE_PROVIDER_START_RESULT=true`. Exact truth check on that log reported `node_not_found=0`, so `Node not found: "MediaPipeServer"` does not appear in the validated repo-local mounted path.
+- Assembly-facing mounted-addon path (`REF-05`): reran `godotenv addons install` in `../aerobeat-assembly-community`, then executed `~/.local/bin/godot --headless --path . --quit-after 2 --verbose --log-file /tmp/tmp.VSckCxuBZ9/assembly_runtime.log`. The log shows `AeroBeat Assembly started`, `Loading resource: res://addons/aerobeat-input-mediapipe/src/providers/mediapipe_provider.gd`, two successful `[MediaPipeServer] Starting UDP server on port 4242` / `UDP socket bound to 127.0.0.1:4242` pairs in the current startup flow, `Tracking started`, and `Registered MediaPipe addon adapter`. Exact truth check on that log also reported `node_not_found=0`, so `Node not found: "MediaPipeServer"` does not appear in the mounted assembly path either.
+- Mount-path wording verification (`REF-03`, `REF-05`): direct spot-checks of `.testbed/addons/aerobeat-input-mediapipe-python/src/input_provider.gd` and `../aerobeat-assembly-community/addons/aerobeat-input-mediapipe/src/input_provider.gd` both show the updated truthful comment naming the live assembly mount alias `res://addons/aerobeat-input-mediapipe/`.
+- Installed payload verification (`REF-02`, `REF-04`, `REF-05`): direct grep of both mounted provider copies reports `var _server = null` and no `@onready var _server`, matching the lazy `_ensure_server()` startup-order fix actually consumed by both validation surfaces.
+
+Generic exit-warning decision: the repo-local synthetic probe still emits `WARNING: ObjectDB instances leaked at exit` and `ERROR: 1 resources still in use at exit`, but the assembly-facing validation did not reproduce those warnings in this audit rerun. For this bead’s narrow scope, those repo-probe shutdown warnings are caveats rather than blockers because the target startup-order failure is absent in both validated consumer paths, the mounted wording is truthful, and there is no evidence they are the old `MediaPipeServer` lookup bug resurfacing.
+
+Audit verdict: pass. This cleanup slice is complete for its stated scope, so bead `oc-ij4` can be closed.
 
 ---
 
 ## Final Results
 
-**Status:** ⏳ Pending
+**Status:** ✅ Complete
 
-**What We Built:** Pending.
+**What We Built:** Removed the addon-internal `MediaPipeServer` startup-order error from the validated repo-local and assembly-facing mounted paths, and corrected the adapter comment so it truthfully names the live assembly mount alias `res://addons/aerobeat-input-mediapipe/`.
 
-**Reference Check:** Pending.
+**Reference Check:** `REF-01` satisfied as the remaining caveat was correctly traced back to addon-internal startup ordering rather than assembly mismatch. `REF-02` satisfied: provider now uses lazy server acquisition and the validated mounted payloads both contain `var _server = null` instead of eager `@onready` lookup. `REF-03` satisfied: source and mounted payloads both use the truthful mount-alias wording. `REF-04` satisfied: repo-local `.testbed` validation rerun showed `PROBE_SERVER_CHILD_PRESENT=true`, successful UDP bind/start, and `node_not_found=0` for `Node not found: "MediaPipeServer"`. `REF-05` satisfied: assembly-facing mounted-addon validation rerun loaded the mounted provider, started tracking, registered the addon adapter, and also reported `node_not_found=0`.
 
 **Commits:**
-- Pending
+- `cad9ae5` - Fix MediaPipeServer startup ordering
+- `17208c6` - Record MediaPipeServer startup fix validation
+- `9316acc` - Record QA for MediaPipeServer startup fix
+- `461c3b0` - Record audit for MediaPipeServer cleanup slice
 
-**Lessons Learned:** Pending.
+**Lessons Learned:** For addon packages consumed through mounted aliases, truth-check the installed payloads in both the repo-local harness and the downstream assembly rather than relying on source-only inspection. Also separate target-bug evidence from generic shutdown noise: the absence of `Node not found: "MediaPipeServer"` in both consumer paths is the blocker-clearing signal for this slice, while synthetic probe teardown warnings should be tracked separately if they matter later.
 
 ---
 
-*Completed on Pending*
+*Completed on 2026-04-24*
