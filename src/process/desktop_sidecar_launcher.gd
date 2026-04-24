@@ -194,7 +194,7 @@ static func terminate(context: Node, info: Dictionary, termination_timeout_ms: i
 
 			OS.execute("/bin/kill", PackedStringArray(["-KILL", "-" + str(group_id)]), output, true)
 			var kill_elapsed := 0
-			while kill_elapsed < 1500:
+			while kill_elapsed < 2500:
 				await context.get_tree().create_timer(0.1).timeout
 				kill_elapsed += 100
 				if not is_process_alive(info):
