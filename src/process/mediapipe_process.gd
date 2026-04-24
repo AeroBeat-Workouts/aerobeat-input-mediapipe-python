@@ -1,7 +1,14 @@
 class_name MediaPipeProcess
 extends Node
-## Manages the Python MediaPipe sidecar process
-## Uses process groups (setsid) for reliable termination even when OpenCV blocks
+## Manages the Python MediaPipe sidecar process.
+## Linux keeps the proven setsid/process-group launcher path for reliable teardown.
+## macOS and Windows now have explicit direct-PID launch/stop scaffolding instead of
+## silently inheriting Linux-only shell assumptions. Those non-Linux paths are structure,
+## not parity claims; they remain unvalidated on this Linux host.
+
+const DesktopSidecarRuntime = preload("res://addons/aerobeat-input-mediapipe-python/src/runtime/desktop_sidecar_runtime.gd")
+const DesktopSidecarLauncher = preload("res://addons/aerobeat-input-mediapipe-python/src/process/desktop_sidecar_launcher.gd")
+const MediaPipeConfig = preload("res://addons/aerobeat-input-mediapipe-python/src/config/mediapipe_config.gd")
 
 signal process_started()
 signal process_stopped(exit_code: int)
@@ -9,19 +16,17 @@ signal process_error(error: String)
 signal process_output(line: String)
 
 @export var python_script_path: String = "python_mediapipe/main.py"
-@export var termination_timeout_ms: int = 2000  # Time to wait for graceful shutdown
-@export var heartbeat_interval_ms: int = 500  # Send heartbeat every 500ms
+@export var termination_timeout_ms: int = 2000
+@export var heartbeat_interval_ms: int = 500
 
 var _pid: int = -1
-var _pgid: int = -1  # Process group ID for killing entire group
+var _pgid: int = -1
 var _python_path: String = ""
 var _config: MediaPipeConfig
-var _stdout_thread: Thread
-var _stderr_thread: Thread
 var _is_shutting_down := false
-var _termination_timer: Timer = null
+var _launch_info: Dictionary = {}
+var _runtime_validation: Dictionary = {}
 
-# Heartbeat
 var _heartbeat_timer: Timer = null
 var _heartbeat_udp: PacketPeerUDP = null
 
@@ -33,100 +38,77 @@ func start(config: MediaPipeConfig) -> bool:
 	_config = config
 	_is_shutting_down = false
 
-	# Find the prepared sidecar runtime Python executable
-	_python_path = _find_python()
+	_runtime_validation = _validate_sidecar_runtime()
+	if not bool(_runtime_validation.get("valid", false)):
+		process_error.emit(" | ".join(_runtime_validation.get("errors", PackedStringArray())))
+		return false
+
+	_python_path = String(_runtime_validation.get("python_path", ""))
 	if _python_path.is_empty():
 		process_error.emit("Prepared sidecar runtime Python not found. Expected runtime root: %s" % _get_sidecar_runtime_root())
 		return false
 
-	# Verify Python script exists
-	if not FileAccess.file_exists(python_script_path):
-		process_error.emit("Python script not found: " + python_script_path)
+	var resolved_python_script_path := ProjectSettings.globalize_path(_resolve_package_path(python_script_path))
+	if not FileAccess.file_exists(resolved_python_script_path):
+		process_error.emit("Python script not found: " + resolved_python_script_path)
 		return false
 
-	# Use setsid to create a new process group - this is critical for clean termination
-	# when OpenCV VideoCapture is blocking in uninterruptible sleep
 	var args := PackedStringArray([
-		"-c",  # bash command mode
-		_build_shell_command()
+		resolved_python_script_path,
+		"--camera", str(config.camera_id),
+		"--port", str(config.udp_port),
+		"--host", "127.0.0.1",
+		"--detection-confidence", str(config.detection_confidence),
+		"--tracking-confidence", str(config.tracking_confidence),
+		"--model-complexity", str(config.model_complexity),
 	])
 
-	# Start bash which will start Python in a new session
-	_pid = OS.create_process("/bin/bash", args)
-	if _pid == -1:
-		# Fallback: try direct process creation (may not clean up properly)
-		push_warning("Failed to start with process group isolation, trying direct execution...")
-		return _start_direct(config)
+	_launch_info = await DesktopSidecarLauncher.launch_detached(
+		self,
+		"mediapipe-process",
+		_python_path,
+		args,
+		{
+			"working_directory": ProjectSettings.globalize_path(DesktopSidecarRuntime.get_package_root(get_script().resource_path)),
+			"redirect_to_log": false,
+			"startup_probe_delay_sec": 0.2,
+		}
+	)
 
-	# Wait a moment for the PID file to be written, then read the actual Python PGID
-	await get_tree().create_timer(0.2).timeout
-	_pgid = _read_process_group_id()
+	if not bool(_launch_info.get("ok", false)):
+		var launch_notes: PackedStringArray = _launch_info.get("notes", PackedStringArray())
+		var launch_message := "Failed to start MediaPipe sidecar for platform strategy %s" % String(_launch_info.get("platform", OS.get_name()))
+		if not launch_notes.is_empty():
+			launch_message += ": " + " | ".join(launch_notes)
+		process_error.emit(launch_message)
+		return false
 
-	print("[MediaPipeProcess] Started Python sidecar - Shell PID: ", _pid, ", Python PGID: ", _pgid)
+	_pid = int(_launch_info.get("pid", -1))
+	_pgid = int(_launch_info.get("process_group_id", -1))
+	var strategy := String(_launch_info.get("strategy", "unknown"))
+	print("[MediaPipeProcess] Started Python sidecar - Strategy: %s, PID: %d, PGID: %d" % [strategy, _pid, _pgid])
+	var notes: PackedStringArray = _launch_info.get("notes", PackedStringArray())
+	for note in notes:
+		print("[MediaPipeProcess] %s" % note)
 
-	# Setup heartbeat (port + 2 to avoid conflict with stream port at +1)
 	_setup_heartbeat(config.udp_port + 2)
-
 	process_started.emit()
 	return true
 
-func _build_shell_command() -> String:
-	## Build a shell command that:
-	## 1. Starts Python with setsid (new session = new process group)
-	## 2. Writes the PGID to a temp file for later cleanup
-	## 3. Handles proper signal forwarding
-	var pid_file = "/tmp/aerobeat_mediapipe_" + str(OS.get_unique_id()) + ".pid"
-	var cmd = ""
+func _get_required_model_name() -> String:
+	if _config == null:
+		return DesktopSidecarRuntime.get_required_model_name(1)
+	return DesktopSidecarRuntime.get_required_model_name(_config.model_complexity)
 
-	# Export config as environment variables (more reliable than long args)
-	cmd += "export AEROBeat_CAMERA_ID=%d; " % _config.camera_id
-	cmd += "export AEROBeat_PORT=%d; " % _config.udp_port
-	cmd += "export AEROBeat_HOST=\"127.0.0.1\"; "
-	cmd += "export AEROBeat_DETECTION_CONF=%.2f; " % _config.detection_confidence
-	cmd += "export AEROBeat_TRACKING_CONF=%.2f; " % _config.tracking_confidence
-	cmd += "export AEROBeat_MODEL_COMPLEXITY=%d; " % _config.model_complexity
-
-	# Start Python with setsid (creates new process group)
-	# Use nohup to prevent SIGHUP when parent dies
-	# Use exec to replace shell process
-	cmd += "setsid nohup %s %s" % [_python_path, python_script_path]
-
-	# Add arguments (shortened)
-	cmd += " --camera $AEROBeat_CAMERA_ID"
-	cmd += " --port $AEROBeat_PORT"
-	cmd += " --host $AEROBeat_HOST"
-	cmd += " --detection-confidence $AEROBeat_DETECTION_CONF"
-	cmd += " --tracking-confidence $AEROBeat_TRACKING_CONF"
-	cmd += " --model-complexity $AEROBeat_MODEL_COMPLEXITY"
-
-	# Background the process and capture its PGID
-	cmd += " > /dev/null 2>&1 &"
-	cmd += " PGID=$!; "
-	cmd += " echo $PGID > %s; " % pid_file
-	cmd += " wait $PGID; "  # Wait for process to complete
-	cmd += " rm -f %s" % pid_file  # Clean up PID file
-
-	return cmd
-
-func _read_process_group_id() -> int:
-	## Read the process group ID from the temp file
-	var pid_file = "/tmp/aerobeat_mediapipe_" + str(OS.get_unique_id()) + ".pid"
-	var file: FileAccess = FileAccess.open(pid_file, FileAccess.READ)
-	if file:
-		var content: String = file.get_as_text().strip_edges()
-		file.close()
-		if content.is_valid_int():
-			return content.to_int()
-	return -1
+func _validate_sidecar_runtime() -> Dictionary:
+	return DesktopSidecarRuntime.validate_runtime(get_script().resource_path, _get_required_model_name())
 
 func _setup_heartbeat(heartbeat_port: int) -> void:
-	## Setup UDP socket for sending heartbeats to Python
 	if _heartbeat_udp == null:
 		_heartbeat_udp = PacketPeerUDP.new()
 		_heartbeat_udp.set_dest_address("127.0.0.1", heartbeat_port)
 		print("[MediaPipeProcess] Heartbeat target: 127.0.0.1:%d" % heartbeat_port)
 
-	# Create heartbeat timer
 	if _heartbeat_timer == null:
 		_heartbeat_timer = Timer.new()
 		_heartbeat_timer.wait_time = heartbeat_interval_ms / 1000.0
@@ -137,137 +119,49 @@ func _setup_heartbeat(heartbeat_port: int) -> void:
 		_heartbeat_timer.start()
 
 func _send_heartbeat() -> void:
-	## Send heartbeat to Python process to keep it alive
 	if _heartbeat_udp and is_running():
 		var packet := PackedByteArray()
-		packet.append(0x01)  # Heartbeat marker
+		packet.append(0x01)
 		_heartbeat_udp.put_packet(packet)
 
 func _stop_heartbeat() -> void:
-	## Stop the heartbeat timer
 	if _heartbeat_timer:
 		_heartbeat_timer.stop()
-
-func _start_direct(config: MediaPipeConfig) -> bool:
-	## Fallback: start Python directly without process group isolation
-	## Note: This may leave zombie processes if OpenCV blocks
-	var args := PackedStringArray([
-		python_script_path,
-		"--camera", str(config.camera_id),
-		"--port", str(config.udp_port),
-		"--host", "127.0.0.1",
-		"--detection-confidence", str(config.detection_confidence),
-		"--tracking-confidence", str(config.tracking_confidence),
-		"--model-complexity", str(config.model_complexity)
-	])
-
-	_pid = OS.create_process(_python_path, args)
-	_pgid = _pid  # PGID = PID for direct processes
-
-	if _pid == -1:
-		process_error.emit("Failed to start Python process. Check Python installation.")
-		return false
-
-	process_started.emit()
-	return true
 
 func stop() -> void:
 	if _is_shutting_down:
 		return
-
-	# Check if actually running
 	if _pid == -1 and _pgid == -1:
 		return
 
 	_is_shutting_down = true
 	print("[MediaPipeProcess] Stopping Python sidecar (PID: %d, PGID: %d)..." % [_pid, _pgid])
-
-	# Stop heartbeat first (important: stop sending heartbeats so Python knows to exit)
 	_stop_heartbeat()
-
-	# Small delay to let Python detect missing heartbeat
 	OS.delay_msec(100)
 
-	# Use shell command to kill the entire process group
-	# Strategy: SIGTERM first, wait, then SIGKILL if needed
-	await _terminate_process_group()
+	var termination_result := await DesktopSidecarLauncher.terminate(self, _launch_info, termination_timeout_ms)
+	var termination_notes: PackedStringArray = termination_result.get("notes", PackedStringArray())
+	for note in termination_notes:
+		push_warning("[MediaPipeProcess] %s" % note)
 
-	_pid = -1
-	_pgid = -1
+	_cleanup_process_state()
 	_is_shutting_down = false
 	process_stopped.emit(0)
 
-func _terminate_process_group() -> void:
-	## Terminate the entire process group with escalating force
-	var pgid_to_kill: int = _pgid if _pgid > 0 else _pid
-	if pgid_to_kill <= 0:
-		return
+func _cleanup_process_state() -> void:
+	_pid = -1
+	_pgid = -1
+	_launch_info = {}
+	_runtime_validation = {}
 
-	# Step 1: Send SIGTERM to entire process group
-	var output: Array = []
-	var exit_code: int
-
-	# Try SIGTERM on the process group first
-	exit_code = OS.execute("/bin/kill", PackedStringArray(["-TERM", "-" + str(pgid_to_kill)]), output, true)
-	print("[MediaPipeProcess] Sent SIGTERM to process group %d (exit: %d)" % [pgid_to_kill, exit_code])
-
-	# Step 2: Wait for graceful shutdown
-	var elapsed := 0
-	var check_interval := 100  # ms
-	var max_wait := termination_timeout_ms
-
-	while elapsed < max_wait:
-		await get_tree().create_timer(check_interval / 1000.0).timeout
-		elapsed += check_interval
-
-		# Check if process group is still alive
-		if not _is_process_group_alive(pgid_to_kill):
-			print("[MediaPipeProcess] Process group %d terminated gracefully" % pgid_to_kill)
-			return
-
-	# Step 3: Force kill with SIGKILL
-	push_warning("[MediaPipeProcess] Graceful shutdown timeout, forcing SIGKILL...")
-	output.clear()
-	exit_code = OS.execute("/bin/kill", PackedStringArray(["-KILL", "-" + str(pgid_to_kill)]), output, true)
-	print("[MediaPipeProcess] Sent SIGKILL to process group %d (exit: %d)" % [pgid_to_kill, exit_code])
-
-	# Step 4: Brief wait then check again
-	await get_tree().create_timer(0.5).timeout
-
-	if _is_process_group_alive(pgid_to_kill):
-		push_error("[MediaPipeProcess] CRITICAL: Failed to kill process group %d even with SIGKILL!" % pgid_to_kill)
-		push_error("[MediaPipeProcess] Manual cleanup required: sudo kill -9 -%d" % pgid_to_kill)
-	else:
-		print("[MediaPipeProcess] Process group %d killed successfully" % pgid_to_kill)
-
-	# Clean up PID file if it exists
-	var pid_file: String = "/tmp/aerobeat_mediapipe_" + str(OS.get_unique_id()) + ".pid"
-	if FileAccess.file_exists(pid_file):
-		DirAccess.remove_absolute(pid_file)
-
-func _is_process_group_alive(pgid: int) -> bool:
-	## Check if any process in the group is still alive
-	if pgid <= 0:
-		return false
-
-	var output: Array = []
-	# Use negative PGID to check entire process group
-	var exit_code: int = OS.execute("/bin/kill", PackedStringArray(["-0", "-" + str(pgid)]), output, true)
-	# kill -0 returns 0 if process exists, non-zero if it doesn't
-	return exit_code == 0
+	if _heartbeat_udp:
+		_heartbeat_udp.close()
+		_heartbeat_udp = null
 
 func is_running() -> bool:
-	# Check both the shell PID and the Python process group
-	if _pid != -1 and OS.is_process_running(_pid):
-		return true
-	if _pgid > 0 and _is_process_group_alive(_pgid):
-		return true
-	# Also check if heartbeat was recently sent (for process group tracking)
-	if _pgid > 0:
-		var output: Array = []
-		var exit_code := OS.execute("/bin/kill", ["-0", "-" + str(_pgid)], output, true)
-		return exit_code == 0
-	return false
+	if _launch_info.is_empty():
+		return false
+	return DesktopSidecarLauncher.is_process_alive(_launch_info)
 
 func get_pid() -> int:
 	return _pid
@@ -276,61 +170,21 @@ func get_process_group_id() -> int:
 	return _pgid
 
 func _resolve_package_path(relative_path: String) -> String:
-	return "%s/%s" % [get_script().resource_path.get_base_dir(), relative_path]
+	return DesktopSidecarRuntime.resolve_package_path(get_script().resource_path, relative_path)
 
 func _get_platform_arch_key() -> String:
-	if OS.has_feature("x86_64"):
-		return "x64"
-	if OS.has_feature("arm64"):
-		return "arm64"
-	if OS.has_feature("x86_32"):
-		return "x86"
-
-	var processor_name := OS.get_processor_name().to_lower().strip_edges()
-	if processor_name.contains("x86_64") or processor_name.contains("amd64") or processor_name.contains("x64"):
-		return "x64"
-	if processor_name.contains("aarch64") or processor_name.contains("arm64"):
-		return "arm64"
-	if processor_name.contains("i386") or processor_name.contains("i686") or processor_name.contains("x86"):
-		return "x86"
-	return "unknown"
+	return DesktopSidecarRuntime.get_platform_arch_key()
 
 func _get_desktop_platform_key() -> String:
-	var os_key := ""
-	match OS.get_name():
-		"Linux":
-			os_key = "linux"
-		"macOS":
-			os_key = "macos"
-		"Windows":
-			os_key = "windows"
-		_:
-			return ""
-
-	var platform_key := "%s-%s" % [os_key, _get_platform_arch_key()]
-	if platform_key in ["linux-x64", "macos-x64", "windows-x64"]:
-		return platform_key
-	return ""
+	return DesktopSidecarRuntime.get_desktop_platform_key()
 
 func _get_sidecar_runtime_root() -> String:
-	var platform_key := _get_desktop_platform_key()
-	if platform_key.is_empty():
-		return ""
-	return ProjectSettings.globalize_path(_resolve_package_path("../python_mediapipe/assets/runtimes/" + platform_key))
+	return DesktopSidecarRuntime.get_sidecar_runtime_root(get_script().resource_path)
 
 func _find_python() -> String:
-	var runtime_root := _get_sidecar_runtime_root()
-	if runtime_root.is_empty():
-		return ""
-
-	var sidecar_python := ""
-	if _get_desktop_platform_key().begins_with("windows-"):
-		sidecar_python = runtime_root.path_join("venv").path_join("Scripts").path_join("python.exe")
-	else:
-		sidecar_python = runtime_root.path_join("venv").path_join("bin").path_join("python")
-
-	if _test_python(sidecar_python):
-		return sidecar_python
+	var validation := _validate_sidecar_runtime()
+	if bool(validation.get("valid", false)):
+		return String(validation.get("python_path", ""))
 	return ""
 
 func _test_python(cmd: String) -> bool:
@@ -339,110 +193,65 @@ func _test_python(cmd: String) -> bool:
 	return exit_code == 0
 
 func _notification(what: int) -> void:
-	# Critical: Clean up on exit - handle multiple scenarios
 	match what:
 		NOTIFICATION_PREDELETE:
-			# Called when node is about to be deleted (earliest cleanup point)
-			print("[MediaPipeProcess] PREDELETE notification - force killing process group")
+			print("[MediaPipeProcess] PREDELETE notification - force stopping process")
 			_force_kill_immediate()
 		NOTIFICATION_EXIT_TREE:
-			# Called when node leaves the scene tree
 			print("[MediaPipeProcess] EXIT_TREE notification - stopping process")
-			if is_running() or _pgid > 0:
-				# Use call_deferred to handle async stop from sync notification
+			if is_running() or _pid > 0 or _pgid > 0:
 				_stop_sync()
 		NOTIFICATION_WM_CLOSE_REQUEST:
-			# Called when window/application is closing
 			print("[MediaPipeProcess] WM_CLOSE_REQUEST notification - stopping process")
-			if is_running() or _pgid > 0:
+			if is_running() or _pid > 0 or _pgid > 0:
 				_stop_sync()
 
 func _stop_sync() -> void:
-	## Synchronous stop for use in notifications
-	# Stop heartbeat first (so Python self-terminates)
 	_stop_heartbeat()
-
-	# Give Python a moment to detect missing heartbeat
 	OS.delay_msec(200)
-
-	# Try graceful termination first
-	var pgid_to_kill: int = _pgid if _pgid > 0 else _pid
-	if pgid_to_kill > 0:
-		var output: Array = []
-		OS.execute("/bin/kill", PackedStringArray(["-TERM", "-" + str(pgid_to_kill)]), output, true)
-
-		# Wait briefly for graceful shutdown
-		OS.delay_msec(500)
-
-		# Force kill if still alive
-		if _is_process_group_alive(pgid_to_kill):
-			OS.execute("/bin/kill", PackedStringArray(["-KILL", "-" + str(pgid_to_kill)]), output, true)
-			OS.delay_msec(100)
-
-	# Clean up PID file
-	var pid_file: String = "/tmp/aerobeat_mediapipe_" + str(OS.get_unique_id()) + ".pid"
-	if FileAccess.file_exists(pid_file):
-		DirAccess.remove_absolute(pid_file)
-
-	# Close UDP
-	if _heartbeat_udp:
-		_heartbeat_udp.close()
-		_heartbeat_udp = null
+	DesktopSidecarLauncher.terminate_sync(_launch_info)
+	_cleanup_process_state()
 
 func _force_kill_immediate() -> void:
-	## Force kill immediately without async/await (for use in _notification)
-	## This is a synchronous last-resort cleanup
 	_stop_heartbeat()
+	DesktopSidecarLauncher.terminate_sync(_launch_info)
+	_cleanup_process_state()
 
-	var pgid_to_kill: int = _pgid if _pgid > 0 else _pid
-	if pgid_to_kill <= 0:
-		return
-
-	var output: Array = []
-	# Send SIGKILL immediately - no waiting
-	OS.execute("/bin/kill", PackedStringArray(["-KILL", "-" + str(pgid_to_kill)]), output, true)
-
-	# Clean up PID file
-	var pid_file: String = "/tmp/aerobeat_mediapipe_" + str(OS.get_unique_id()) + ".pid"
-	if FileAccess.file_exists(pid_file):
-		DirAccess.remove_absolute(pid_file)
-
-	# Close UDP
-	if _heartbeat_udp:
-		_heartbeat_udp.close()
-		_heartbeat_udp = null
-
-## Check if Python dependencies are installed
 func check_dependencies() -> Dictionary:
 	var result := {
 		"python_found": false,
 		"python_version": "",
 		"mediapipe_installed": false,
 		"opencv_installed": false,
-		"errors": []
+		"errors": PackedStringArray(),
+		"runtime_valid": false,
+		"runtime_platform_key": _get_desktop_platform_key(),
 	}
 
-	var python: String = _find_python()
+	var runtime_validation := _validate_sidecar_runtime()
+	result.runtime_valid = bool(runtime_validation.get("valid", false))
+	if not result.runtime_valid:
+		result.errors = runtime_validation.get("errors", PackedStringArray())
+		return result
+
+	var python: String = String(runtime_validation.get("python_path", ""))
 	if python.is_empty():
 		result.errors.append("Prepared sidecar runtime Python not found at %s" % _get_sidecar_runtime_root())
 		return result
 
 	result.python_found = true
 
-	# Check Python version
 	var output: Array = []
 	OS.execute(python, PackedStringArray(["--version"]), output, true)
 	if output.size() > 0:
 		result.python_version = output[0]
 
-	# Check for mediapipe
 	output.clear()
 	var exit: int = OS.execute(python, PackedStringArray(["-c", "import mediapipe; print('ok')"]), output, true)
 	result.mediapipe_installed = (exit == 0 and output.size() > 0 and output[0].strip_edges() == "ok")
 	if not result.mediapipe_installed:
 		result.errors.append("MediaPipe not installed in the prepared sidecar runtime. Rebuild or refresh python_mediapipe/assets/runtimes/<platform>/ with python_mediapipe/prepare_runtime.py and install python_mediapipe/requirements.txt there.")
 
-	# Check for opencv
 	output.clear()
 	exit = OS.execute(python, PackedStringArray(["-c", "import cv2; print('ok')"]), output, true)
 	result.opencv_installed = (exit == 0 and output.size() > 0 and output[0].strip_edges() == "ok")

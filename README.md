@@ -89,7 +89,9 @@ This repo now treats the Python runtime as a **sidecar-owned asset**, not a rand
 - durable committed assets: Python code + `.task` models
 - non-durable generated asset: the platform runtime contents
 
-The generated runtime contents are intentionally gitignored. The new runtime should be prepared with `python_mediapipe/prepare_runtime.py` rather than by hand-creating the legacy `assets/venv` path. Godot-side auto-start now resolves the platform-keyed desktop runtime family and fails fast when the expected runtime manifest, sentinel, Python executable, or model assets are missing or invalid. Source-checkout/dev runs expect a prepared local runtime such as `assets/runtimes/linux-x64/` on this host.
+The generated runtime contents are intentionally gitignored. The new runtime should be prepared with `python_mediapipe/prepare_runtime.py` rather than by hand-creating the legacy `assets/venv` path. Godot-side auto-start now resolves the platform-keyed desktop runtime family and fails fast when the expected runtime manifest, sentinel, Python executable, or model assets are missing or invalid. The direct `MediaPipeProcess` path now uses that same manifest/sentinel/runtime contract instead of validating only the Python binary path. Source-checkout/dev runs expect a prepared local runtime such as `assets/runtimes/linux-x64/` on this host.
+
+Linux launch/teardown remains the only runtime path validated end-to-end on this host: it still uses detached shell + process-group handling for reliable cleanup. macOS and Windows launcher/teardown branches now exist explicitly in code, but they are scaffolding for future parity work rather than a claim that cross-platform sidecar lifecycle behavior is already proven.
 
 ### Manual setup
 
