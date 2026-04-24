@@ -133,7 +133,7 @@ Audit verdict: pass. This cleanup slice is complete for its stated scope, so bea
 - `cad9ae5` - Fix MediaPipeServer startup ordering
 - `17208c6` - Record MediaPipeServer startup fix validation
 - `9316acc` - Record QA for MediaPipeServer startup fix
-- `461c3b0` - Record audit for MediaPipeServer cleanup slice
+- Audit plan update committed after this verification pass
 
 **Lessons Learned:** For addon packages consumed through mounted aliases, truth-check the installed payloads in both the repo-local harness and the downstream assembly rather than relying on source-only inspection. Also separate target-bug evidence from generic shutdown noise: the absence of `Node not found: "MediaPipeServer"` in both consumer paths is the blocker-clearing signal for this slice, while synthetic probe teardown warnings should be tracked separately if they matter later.
 
