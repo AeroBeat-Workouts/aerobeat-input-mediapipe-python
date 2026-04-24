@@ -77,16 +77,30 @@ Truthful attribution:
 **Prompt:** Implement the smallest truthful fix for the synthetic-probe shutdown warnings, then re-run the repo-local probe and a light assembly-facing non-regression check. Keep scope tight, document exact evidence, and commit/push by default.
 
 **Folders Created/Deleted/Modified:**
-- `src/`
 - `.plans/mediapipe-python/`
 
 **Files Created/Deleted/Modified:**
-- provider/server files as needed
 - `.plans/mediapipe-python/2026-04-24-synthetic-probe-shutdown-warning-truth-pass.md`
 
-**Status:** ⏳ Pending
+**Status:** ✅ Complete
 
-**Results:** Pending.
+**Results:** No durable provider/server repo code change was made, because the fresh evidence for this task shows the shutdown warning belongs to the disposable harness shape rather than `REF-02` / `REF-03` production teardown.
+
+Exact validation run in the repo-local mounted-addon surface (`REF-04`):
+- Reinstalled the workbench addon payload with `cd .testbed && godotenv addons install`.
+- Old disposable harness shape (kept a loaded provider script reference and instantiated provider alive until quit, without explicit teardown): `~/.local/bin/godot --headless --path . --script <temp>/leak_probe.gd --quit --verbose --log-file <temp>/leak_probe.log`. That harness used `ResourceLoader.load("res://addons/aerobeat-input-mediapipe-python/src/providers/mediapipe_provider.gd", "", ResourceLoader.CACHE_MODE_IGNORE)`, `provider_script.new()`, printed `PROBE_PROVIDER_CLASS=Node`, then quit while both references were still live. The resulting log reproduced the generic shutdown warnings exactly: `WARNING: ObjectDB instances leaked at exit`, `Leaked instance: GDScriptNativeClass`, `Leaked instance: Node`, `Leaked instance: GDScript`, `ERROR: 1 resources still in use at exit`, and `Resource still in use: res://addons/aerobeat-input-mediapipe-python/src/providers/mediapipe_provider.gd (GDScript)`.
+- Safer disposable harness teardown: `~/.local/bin/godot --headless --path . --script <temp>/safe_probe.gd --quit --verbose --log-file <temp>/safe_probe.log`. This variant used the same `ResourceLoader.load(..., CACHE_MODE_IGNORE)` / `provider_script.new()` setup, but then called `provider.free()`, set `provider = null`, set `provider_script = null`, awaited one frame, and only then quit. That rerun logged `PROBE_PROVIDER_CLASS=Node` and **did not** emit `ObjectDB instances leaked at exit`, `resources still in use at exit`, `Leaked instance: GDScriptNativeClass`, or `Resource still in use: res://addons/aerobeat-input-mediapipe-python/src/providers/mediapipe_provider.gd (GDScript)`.
+
+Truthful fix decision:
+- The smallest truthful fix for this slice is documentation/plan correction only: record that the warning source is harness-only and that the safe disposable-probe teardown pattern is to free/null the temporary provider + loaded script references before quit.
+- Because the warning disappears without changing `REF-02` / `REF-03`, there is no evidence in this pass that the repo’s provider/server teardown still owns the leak signal.
+
+Assembly-facing non-regression check (`REF-05`):
+- From `../aerobeat-assembly-community`, reran `godotenv addons install`, then executed `~/.local/bin/godot --headless --path . --quit-after 2 --verbose --log-file <temp>/assembly_runtime.log`.
+- Exit status was `0`. The log shows `AeroBeat Assembly started`, `Loading resource: res://addons/aerobeat-input-mediapipe/src/providers/mediapipe_provider.gd`, two successful `[MediaPipeServer] Starting UDP server on port 4242` / `UDP socket bound to 127.0.0.1:4242` pairs, `Tracking started`, and `Registered MediaPipe addon adapter`.
+- Exact scan found no `Node not found: "MediaPipeServer"`, no `ObjectDB instances leaked at exit`, and no `resources still in use at exit` in this light assembly-facing rerun.
+
+Files changed in this task: this plan file only.
 
 ---
 
