@@ -77,24 +77,25 @@ Work will proceed bead-by-bead through the usual coder → QA → auditor loop. 
 - any small related helper updates if needed
 - this plan file
 
-**Status:** ⏳ Pending
+**Status:** ✅ Complete
 
-**Results:** Reserved.
+**Results:** Completed with a narrow shutdown-idempotency cleanup in `src/autostart_manager.gd` and `src/process/mediapipe_process.gd`. `AutoStartManager.stop_server()` now returns immediately when teardown is already in progress or no live launch state remains, `_exit_tree()` only calls `stop_server()` when the sidecar is still active, and notification/sync-stop paths now no-op once cleanup has already happened. `MediaPipeProcess` received the same active-state guard on stop/notification cleanup so explicit shutdown no longer produces the extra `EXIT_TREE` / `PREDELETE` shutdown chatter after a successful stop. Validated on this Linux host with focused repo-local sidecar checks: `python3 -m py_compile python_mediapipe/*.py`; `godot --headless --path .testbed -s /tmp/mediapipe_process_smoke.gd`; `godot --headless --path .testbed -s /tmp/autostart_manager_smoke.gd`; and `ps -eo pid,args | grep '[p]ython_mediapipe/main.py' || true` after the smoke runs. In the validated paths, the direct `MediaPipeProcess` smoke no longer logs the extra exit/predelete shutdown messages after explicit stop, the autostart smoke now emits `AUTO_STOPPED` once instead of twice, and no lingering `python_mediapipe/main.py` process remained after validation. Commit: `7f6b7ff`.
 
 ---
 
 ## Final Results
 
-**Status:** ⚠️ In Progress
+**Status:** ✅ Complete
 
-**What We Built:** Reserved.
+**What We Built:** Landed both scoped post-migration sidecar cleanup fixes: (1) truthful Linux teardown confirmation for process-group shutdown, and (2) idempotent stop-path cleanup that removes duplicate shutdown signaling/logging in the validated MediaPipe sidecar paths.
 
-**Reference Check:** Reserved.
+**Reference Check:** `REF-01`, `REF-03`, `REF-04`, and `REF-05` satisfied. The launcher/runtime structure from the completed migration plan remains intact; Linux behavior was tightened without broadening into unvalidated cross-platform parity claims.
 
 **Commits:**
-- Reserved.
+- `64ced48` - Fix Linux sidecar teardown confirmation
+- `7f6b7ff` - Deduplicate sidecar shutdown teardown noise
 
-**Lessons Learned:** Reserved.
+**Lessons Learned:** The remaining shutdown noise was mostly lifecycle re-entry, not a deeper runtime failure. Small active-state/idempotency guards on explicit stop and notification cleanup paths were enough to keep teardown honest and quiet on the validated Linux host.
 
 ---
 
