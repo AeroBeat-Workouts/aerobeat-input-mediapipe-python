@@ -78,25 +78,30 @@ Exact indexing evidence after the refreshed install plus runtime prep: `addons/a
 **Files Created/Deleted/Modified:**
 - `.plans/mediapipe-python/2026-04-24-hide-python-pycache-in-consumer-addon.md`
 
-**Status:** ⏳ Pending
+**Status:** ✅ Complete
 
-**Results:** Pending.
+**Results:** Independent QA/audit passed against the actual assembly consumer install (`REF-03`). I first re-read the plan and inspected the owner-repo evidence/commits (`0eec2f8`, `2e871a7`), then re-ran the consumer refresh myself from `../aerobeat-assembly-community` by deleting `addons/aerobeat-input-mediapipe`, deleting `.addons/aerobeat-input-mediapipe`, clearing `.godot/editor/filesystem_cache*` plus `.godot/global_script_class_cache.cfg`, and rerunning `godotenv addons install`. The fresh install log again resolved `aerobeat-input-mediapipe` from `git@github.com:AeroBeat-Workouts/aerobeat-input-mediapipe-python.git` on checkout `main`, which satisfied the required remote-state refresh.
+
+Exact installed-addon evidence: after the refresh, `addons/aerobeat-input-mediapipe/python_mediapipe/__pycache__/` existed on disk and contained `.gdignore`; reading that file returned `# Hide Python bytecode cache from Godot consumers.` After rerunning the installed addon’s runtime prep command — `python3 addons/aerobeat-input-mediapipe/python_mediapipe/prepare_runtime.py --platform linux-x64 --mode dev --create-venv --force --validate --json` — the command exited successfully and returned JSON with `"validation_status": "venv_created"`, `"validation_errors": []`, and `"runtime_root": "/home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-assembly-community/addons/aerobeat-input-mediapipe/python_mediapipe/assets/runtimes/linux-x64"`. That same rerun populated `addons/aerobeat-input-mediapipe/python_mediapipe/__pycache__/runtime_paths.cpython-312.pyc`, which proved the hidden directory still exists and is actively usable by the installed runtime flow.
+
+Exact independent indexing evidence: after clearing caches post-refresh, I rebuilt Godot’s editor cache with `~/.local/bin/godot --headless --path . --import --quit-after 1000`. The regenerated `.godot/editor/filesystem_cache10` contains `res://addons/aerobeat-input-mediapipe/python_mediapipe/`, `res://addons/aerobeat-input-mediapipe/python_mediapipe/assets/`, and `res://addons/aerobeat-input-mediapipe/python_mediapipe/assets/models/`, proving `python_mediapipe/` stayed visible. A direct grep across `.godot/editor/filesystem_cache*` and `.godot/global_script_class_cache.cfg` found no match for `res://addons/aerobeat-input-mediapipe/python_mediapipe/__pycache__/`, even though the folder existed on disk and already held both `.gdignore` and `runtime_paths.cpython-312.pyc`. That independently confirms the shipped localized `.gdignore` is working as intended: `python_mediapipe/` remains indexed/visible while `__pycache__/` is suppressed from consumer/editor indexing.
 
 ---
 
 ## Final Results
 
-**Status:** ⚠️ Partial
+**Status:** ✅ Complete
 
-**What We Built:** Landed the tiny owner-repo fix needed to ship a localized hide marker for `python_mediapipe/__pycache__/`, refreshed the assembly consumer install, and revalidated that the installed addon still supports runtime preparation while no longer indexing the bytecode cache folder.
+**What We Built:** Landed the tiny owner-repo fix needed to ship a localized hide marker for `python_mediapipe/__pycache__/`, then independently reinstalled the assembly consumer addon from the remote package source, reran the installed runtime-prep flow, and verified from regenerated Godot cache data that `python_mediapipe/` remains visible while `__pycache__/` is hidden.
 
-**Reference Check:** `REF-01` remains consistent with the previous selective-visibility outcome and narrows it one level deeper for `__pycache__/`. `REF-02` satisfied: only `.gitignore` handling for `python_mediapipe/__pycache__/` changed, and `python_mediapipe/` itself stayed visible. `REF-03` satisfied for coder validation: the refreshed consumer install in `../aerobeat-assembly-community/addons/aerobeat-input-mediapipe/` now carries `python_mediapipe/__pycache__/.gdignore`, does not index `__pycache__/`, and still passes the installed `prepare_runtime.py` validation path.
+**Reference Check:** `REF-01` remains consistent with the previous selective-visibility outcome and narrows it one level deeper for `__pycache__/`. `REF-02` satisfied: only `.gitignore` handling for `python_mediapipe/__pycache__/` changed, the installed addon carries `python_mediapipe/__pycache__/.gdignore`, and the directory still functions for Python runtime cache writes. `REF-03` satisfied by independent audit: after a fresh `godotenv addons install` in `../aerobeat-assembly-community`, the installed addon still passed `prepare_runtime.py --platform linux-x64 --mode dev --create-venv --force --validate --json`, `.godot/editor/filesystem_cache10` still indexed `res://addons/aerobeat-input-mediapipe/python_mediapipe/` plus its visible asset subfolders, and grep found no indexed `res://addons/aerobeat-input-mediapipe/python_mediapipe/__pycache__/` entry.
 
 **Commits:**
 - `0eec2f8` - Hide python_mediapipe pycache from consumers
+- `2e871a7` - Record pycache visibility validation
 
-**Lessons Learned:** A localized `.gdignore` is only effective for consumer installs if the file is actually shippable. With a blanket `__pycache__/` ignore in Git, the fix needed to be not a new visibility rule, but a narrow allowlist that tracks exactly one hide marker file inside the otherwise-ignored cache directory.
+**Lessons Learned:** A localized `.gdignore` is only effective for consumer installs if the file is actually shippable. With a blanket `__pycache__/` ignore in Git, the fix needed to be not a new visibility rule, but a narrow allowlist that tracks exactly one hide marker file inside the otherwise-ignored cache directory. The audit also confirmed that the right truth source is regenerated consumer/editor cache state, not just the presence of `.gdignore` on disk.
 
 ---
 
-*Completed on Pending*
+*Completed on 2026-04-24*
