@@ -25,6 +25,9 @@ Thumbs.db
 
 # Python
 __pycache__/
+!python_mediapipe/__pycache__/
+python_mediapipe/__pycache__/*
+!python_mediapipe/__pycache__/.gdignore
 *.py[cod]
 *$py.class
 *.so
