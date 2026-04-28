@@ -35,6 +35,31 @@ _running = True
 _heartbeat_last_time = time.time()
 _heartbeat_lock = threading.Lock()
 _heartbeat_timeout_sec = 3.0  # Exit if no heartbeat for 3 seconds
+_shutdown_lock = threading.Lock()
+_shutdown_requested_at = None
+_shutdown_reason = "normal exit"
+_force_shutdown_after_sec = max(0.0, float(os.environ.get("AEROBEAT_MEDIAPIPE_FORCE_EXIT_AFTER_SEC", "0")))
+
+
+def request_shutdown(source: str, detail: str | None = None):
+    """Record the first shutdown request and transition the main loop to exit."""
+    global _running, _shutdown_requested_at, _shutdown_reason
+
+    message = f"[{source}] Shutdown requested"
+    if detail:
+        message += f": {detail}"
+
+    with _shutdown_lock:
+        first_request = _shutdown_requested_at is None
+        if first_request:
+            _shutdown_requested_at = time.time()
+            _shutdown_reason = detail or source
+            print(message)
+        else:
+            elapsed = time.time() - _shutdown_requested_at
+            print(f"{message} (already shutting down for {_shutdown_reason}; +{elapsed:.2f}s)")
+
+    _running = False
 
 # Model filenames for different complexity levels (stored under python_mediapipe/assets/models/)
 MODEL_PATHS = {
@@ -72,13 +97,11 @@ def check_heartbeat() -> bool:
 
 def heartbeat_monitor():
     """Monitor heartbeat and trigger shutdown if Godot stops responding"""
-    global _running
     print(f"[Heartbeat] Monitor started - timeout: {_heartbeat_timeout_sec}s")
     while _running:
         time.sleep(0.5)
         if not check_heartbeat():
-            print(f"[Heartbeat] Timeout - no heartbeat for {time.time() - _heartbeat_last_time:.1f}s, shutting down...")
-            _running = False
+            request_shutdown("Heartbeat", f"timeout after {time.time() - _heartbeat_last_time:.1f}s without heartbeat")
             break
     print("[Heartbeat] Monitor stopped")
 
@@ -307,44 +330,14 @@ class LatencyTracker:
 
 
 def signal_handler(sig, frame):
-    global _running
-    print(f"\n[Signal] Received signal {sig} ({signal.Signals(sig).name if hasattr(signal, 'Signals') else 'unknown'}), initiating shutdown...")
-    _running = False
+    signal_name = signal.Signals(sig).name if hasattr(signal, 'Signals') else 'unknown'
+    print(f"\n[Signal] Received signal {sig} ({signal_name}), initiating orderly shutdown...")
+    request_shutdown("Signal", f"received {signal_name}")
 
-    # Force exit immediately using os._exit - bypasses all cleanup
-    # This is necessary because OpenCV VideoCapture can block in uninterruptible sleep
-    def force_exit():
-        time.sleep(0.2)  # Short delay to let signal handler complete
-        print("[Signal] Force exiting with os._exit(0)...")
-        os._exit(0)
-
-    # Start force-exit thread as non-daemon so it won't be waited on
-    import threading
-    exit_thread = threading.Thread(target=force_exit, name="force_exit_thread")
-    exit_thread.daemon = False
-    exit_thread.start()
-
-    # Also schedule a self-SIGKILL as absolute last resort
-    def suicide():
-        time.sleep(0.8)
-        # Only if we're still running (force_exit didn't complete)
-        if _running or True:  # Always try as last resort
-            print("[Signal] Sending SIGKILL to self...")
-            try:
-                os.kill(os.getpid(), signal.SIGKILL)
-            except:
-                pass
-
-    suicide_thread = threading.Thread(target=suicide, name="suicide_thread")
-    suicide_thread.daemon = True
-    suicide_thread.start()
-
-    # Also try to interrupt any blocking I/O by closing file descriptors
     try:
-        import sys
         sys.stderr.flush()
         sys.stdout.flush()
-    except:
+    except Exception:
         pass
 
 
@@ -485,7 +478,12 @@ def serialize_landmarks_json(landmarks, timestamp, capture_ms=0.0, inference_ms=
 
 
 def main():
-    global _running
+    global _running, _heartbeat_last_time, _shutdown_requested_at, _shutdown_reason
+
+    _running = True
+    _heartbeat_last_time = time.time()
+    _shutdown_requested_at = None
+    _shutdown_reason = "normal exit"
 
     # Platform-specific setup for optimal performance
     setup_platform_optimizations()
@@ -613,19 +611,25 @@ def main():
     heartbeat_thread = threading.Thread(target=heartbeat_monitor, daemon=True)
     heartbeat_thread.start()
 
-    # Start watchdog thread to ensure clean exit
-    # This is needed because OpenCV VideoCapture can block in uninterruptible sleep
+    # Start watchdog thread to surface stuck shutdowns.
+    # By default it only logs; an opt-in SIGKILL fuse can be armed via
+    # AEROBEAT_MEDIAPIPE_FORCE_EXIT_AFTER_SEC for environments that truly need it.
     def watchdog():
         shutdown_start = None
+        announced_force_policy = False
         while True:
             if not _running:
                 if shutdown_start is None:
                     shutdown_start = time.time()
-                    print("[Watchdog] Shutdown requested, monitoring...")
-                elif time.time() - shutdown_start > 2.0:
-                    # Process should have exited by now, force kill
-                    print("[Watchdog] Shutdown timeout reached, forcing exit...")
-                    os._exit(1)
+                    print(f"[Watchdog] Shutdown requested, monitoring orderly exit (reason: {_shutdown_reason})...")
+                else:
+                    elapsed = time.time() - shutdown_start
+                    if _force_shutdown_after_sec > 0 and elapsed > _force_shutdown_after_sec:
+                        print(f"[Watchdog] Shutdown still stuck after {elapsed:.1f}s; sending SIGKILL as configured by AEROBEAT_MEDIAPIPE_FORCE_EXIT_AFTER_SEC={_force_shutdown_after_sec}")
+                        os.kill(os.getpid(), signal.SIGKILL)
+                    elif _force_shutdown_after_sec <= 0 and not announced_force_policy:
+                        print("[Watchdog] Force-exit fuse disabled; waiting for cleanup to finish naturally")
+                        announced_force_policy = True
             time.sleep(0.5)
 
     watchdog_thread = threading.Thread(target=watchdog, daemon=True)
@@ -684,7 +688,7 @@ def main():
                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
                 cv2.imshow("MediaPipe Pose", display_frame)
                 if cv2.waitKey(1) & 0xFF == ord('q'):
-                    _running = False
+                    request_shutdown("UI", "debug window quit requested")
                     break
             continue
 
@@ -795,7 +799,7 @@ def main():
 
             cv2.imshow("MediaPipe Pose", display_frame)
             if cv2.waitKey(1) & 0xFF == ord('q'):
-                _running = False
+                request_shutdown("UI", "debug window quit requested")
                 break
 
         # Cap FPS
@@ -805,7 +809,11 @@ def main():
             time.sleep(sleep_time)
 
     # Cleanup
-    print("[Main] Cleaning up...")
+    shutdown_elapsed = None
+    if _shutdown_requested_at is not None:
+        shutdown_elapsed = time.time() - _shutdown_requested_at
+    elapsed_text = f" after {shutdown_elapsed:.2f}s" if shutdown_elapsed is not None else ""
+    print(f"[Main] Cleaning up{elapsed_text} (reason: {_shutdown_reason})...")
     if args.show_window:
         cv2.destroyAllWindows()
     if frame_capture:
@@ -817,6 +825,10 @@ def main():
     if heartbeat_sock:
         heartbeat_sock.close()
     udp_sender.close()
+    if detector and hasattr(detector, 'close'):
+        detector.close()
+    heartbeat_thread.join(timeout=1.0)
+    print("[Main] Cleanup complete")
     print("MediaPipe stopped")
 
 
