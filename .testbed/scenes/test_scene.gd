@@ -7,6 +7,13 @@ extends Node2D
 @onready var camera_display: TextureRect = $CameraDisplay
 @onready var landmark_drawer: Control = $CameraDisplay/LandmarkDrawer
 
+enum StartupMode {
+	TRACKING,
+	PREVIEW_ONLY_DEBUG,
+}
+
+@export var startup_mode: StartupMode = StartupMode.TRACKING
+
 var provider: Node = null
 var auto_start_manager: Node = null
 var camera_view: Node = null
@@ -16,18 +23,18 @@ var _server_ready: bool = false
 func _ready() -> void:
 	update_status("Initializing...", Color.WHITE)
 	info_label.text = "Starting AutoStartManager..."
-	
+
 	# Setup AutoStartManager
 	_setup_auto_start()
 
 func _setup_auto_start() -> void:
 	# Get AutoStartManager from scene (should already exist as child node)
 	auto_start_manager = get_node_or_null("AutoStartManager")
-	
+
 	if auto_start_manager == null:
 		push_error("[TestScene] AutoStartManager node not found in scene!")
 		return
-	
+
 	# Connect signals
 	auto_start_manager.server_started.connect(_on_server_started)
 	auto_start_manager.server_failed.connect(_on_server_failed)
@@ -37,7 +44,7 @@ func _setup_auto_start() -> void:
 	auto_start_manager.check_progress.connect(_on_check_progress)
 	auto_start_manager.installation_progress.connect(_on_install_progress)
 	auto_start_manager.installation_complete.connect(_on_install_complete)
-	
+
 	# Only start server manually if auto_start is disabled
 	# Otherwise AutoStartManager._ready() will handle it
 	if not auto_start_manager.auto_start:
@@ -59,11 +66,24 @@ func _on_install_complete(success: bool) -> void:
 
 func _on_server_started(pid: int) -> void:
 	update_status("Python server started (PID: " + str(pid) + ")", Color.GREEN)
-	
+
 	# Wait a moment for server to initialize
 	await get_tree().create_timer(2.0).timeout
-	_start_provider()
 	await _start_camera_feed()
+
+	if startup_mode == StartupMode.PREVIEW_ONLY_DEBUG:
+		_server_ready = true
+		update_status("Preview-only debug mode active", Color.GREEN)
+		info_label.text = """MediaPipe Provider Ready
+
+Mode: Preview-only debug (explicit opt-in).
+Camera preview is active.
+Pose tracking is intentionally disabled in this mode."""
+		if landmark_drawer:
+			landmark_drawer.clear_landmarks()
+		return
+
+	_start_provider()
 
 func _on_server_failed(error: String) -> void:
 	update_status("Auto-start failed: " + error, Color.RED)
@@ -104,21 +124,20 @@ func _start_provider() -> void:
 		provider = provider_script.new()
 		provider.name = "MediaPipeProvider"
 		add_child(provider)
-		
+
 		provider.pose_updated.connect(_on_pose_updated)
 		provider.tracking_lost.connect(_on_tracking_lost)
 		provider.tracking_restored.connect(_on_tracking_restored)
-		
+
 		var success: bool = provider.start()
 		if success:
 			_server_ready = true
-			update_status("Provider listening on port " + str(provider._server.get_bound_port()) + " - Waiting for tracking data...", Color.GREEN)
+			update_status("Tracking mode active - waiting for pose data...", Color.GREEN)
 			info_label.text = """MediaPipe Provider Ready
 
-Camera feed and tracking active.
-
-Landmarks appear as green dots.
-Make sure you're in a well-lit area."""
+Mode: Tracking (default).
+Camera feed and pose tracking are active.
+Landmarks appear as green dots when a pose is detected."""
 		else:
 			update_status("Failed to start provider", Color.RED)
 
@@ -128,49 +147,49 @@ func _start_camera_feed() -> void:
 	if CameraViewClass == null:
 		push_error("[TestScene] Failed to load camera_view.gd")
 		return
-	
+
 	camera_view = CameraViewClass.new()
 	camera_view.name = "CameraView"
 	camera_view.stream_url = "http://127.0.0.1:4243/camera"
 	camera_view.position = Vector2(20, 80)
 	camera_view.size = Vector2(640, 480)
-	
+
 	# Replace the placeholder display with the live camera view
 	var previous_camera_display := camera_display
 	previous_camera_display.replace_by(camera_view)
 	camera_display = camera_view
-	
+
 	# Reconnect landmark drawer to new camera display
 	if landmark_drawer:
 		landmark_drawer.reparent(camera_display)
-	
+
 	# replace_by() detaches the old placeholder but does not free it
 	if previous_camera_display and previous_camera_display != camera_view:
 		previous_camera_display.queue_free()
-	
+
 	# Wait a frame for the node to be fully added to the tree
 	await get_tree().process_frame
-	
+
 	# Start the stream (async)
 	await camera_view.start_stream()
 
 func _process(_delta: float) -> void:
 	_frame_count += 1
-	
+
 	# Check server liveness every 60 frames (~1 second)
 	if _frame_count % 60 == 0:
 		if auto_start_manager and auto_start_manager.server_pid > 0:
 			var is_alive: bool = auto_start_manager.is_server_running()
 			if not is_alive:
 				update_status("Python server died!", Color.RED)
-	
+
 	if _frame_count % 30 == 0 and _server_ready:
 		_update_debug_info()
 
 func _on_pose_updated(landmarks: Array) -> void:
 	if _frame_count % 60 == 0:
 		update_status("Tracking active - " + str(landmarks.size()) + " landmarks detected", Color.GREEN)
-	
+
 	if landmark_drawer:
 		landmark_drawer.update_landmarks(landmarks)
 
@@ -188,27 +207,34 @@ func update_status(text: String, color: Color = Color.WHITE) -> void:
 		status_label.modulate = color
 
 func _update_debug_info() -> void:
-	if not info_label or not provider or not _server_ready:
+	if not info_label or not _server_ready:
 		return
-	
+
 	var info: String = "MediaPipe Provider Status\n"
 	info += "==========================\n\n"
-	
+	info += "Mode: %s\n" % _get_startup_mode_label()
+
 	if auto_start_manager:
 		info += "Server PID: " + str(auto_start_manager.get_server_pid()) + "\n"
 		info += "Server Running: " + str(auto_start_manager.is_server_running()) + "\n"
-	
+
+	info += "Camera Feed: %s\n" % ("Active" if camera_view and camera_view.is_streaming() else "Inactive")
+
 	if provider:
 		info += "Provider Port: %d\n" % provider._server.get_bound_port()
 		info += "Is Tracking: %s\n" % str(provider.is_tracking())
-		info += "Camera Feed: %s\n" % ("Active" if camera_view and camera_view.is_streaming() else "Inactive")
-		
+
 		info += "\nDetected Positions:\n"
 		info += "  Left Hand: %s\n" % (_format_pos(provider.get_left_hand_position()))
 		info += "  Right Hand: %s\n" % (_format_pos(provider.get_right_hand_position()))
 		info += "  Head: %s\n" % (_format_pos(provider.get_head_position()))
-	
+	else:
+		info += "Tracking: Disabled (preview-only debug mode)\n"
+
 	info_label.text = info
+
+func _get_startup_mode_label() -> String:
+	return "Preview-only debug" if startup_mode == StartupMode.PREVIEW_ONLY_DEBUG else "Tracking (default)"
 
 func _format_pos(pos: Variant) -> String:
 	if pos == null:
@@ -233,7 +259,7 @@ func _notification(what: int) -> void:
 
 func _stop_everything() -> void:
 	print("[TestScene] Stopping everything...")
-	
+
 	# Stop camera view FIRST to disconnect from HTTP stream
 	# This prevents XServer errors from MJPEG stream
 	if camera_view and camera_view.is_streaming():
@@ -242,10 +268,10 @@ func _stop_everything() -> void:
 	if camera_view and is_instance_valid(camera_view):
 		camera_view.queue_free()
 	camera_view = null
-	
+
 	# Small delay to let TCP connections close
 	OS.delay_msec(50)
-	
+
 	# Stop provider (UDP server)
 	if provider:
 		print("[TestScene] Stopping provider...")
@@ -253,15 +279,15 @@ func _stop_everything() -> void:
 		if is_instance_valid(provider):
 			provider.queue_free()
 		provider = null
-	
+
 	# AutoStartManager handles shutdown from its own exit/close notifications.
 	# Avoid calling its async stop_server() here during teardown, which leaks a
 	# GDScriptFunctionState if the scene is already exiting.
 	if auto_start_manager:
 		print("[TestScene] AutoStartManager will stop itself during scene teardown...")
 		auto_start_manager = null
-	
+
 	# Give processes time to clean up
 	OS.delay_msec(200)
-	
+
 	print("[TestScene] Cleanup complete")
