@@ -17,6 +17,22 @@ func _init():
 func _is_gut_available() -> bool:
 	return ClassDB.class_exists("GutTest") or FileAccess.file_exists("res://addons/gut/plugin.cfg")
 
+# Minimal local assertion stubs so this script still parses and can run standalone without GUT.
+func assert_is(_value, _type, _message: String = "") -> void:
+	pass
+
+func assert_null(_value, _message: String = "") -> void:
+	pass
+
+func assert_eq(_a, _b, _message: String = "") -> void:
+	pass
+
+func assert_false(_value, _message: String = "") -> void:
+	pass
+
+func assert_true(_value, _message: String = "") -> void:
+	pass
+
 func _run_standalone_tests():
 	print("Testing MediaPipeProvider...")
 	

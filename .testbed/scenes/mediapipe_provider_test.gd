@@ -1,6 +1,6 @@
 extends Node
 ## Standalone test version of MediaPipeProvider
-## Extends Node instead of AeroInputProvider for independent testing
+## Extends Node for independent runtime validation of the repo-local camera-input path
 
 const MediaPipeConfig = preload("res://addons/aerobeat-input-mediapipe-python/src/config/mediapipe_config.gd")
 const MediaPipeServer = preload("res://addons/aerobeat-input-mediapipe-python/src/server/mediapipe_server.gd")

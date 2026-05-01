@@ -1,7 +1,7 @@
 extends Node
 ## Standalone test version of MediaPipeProvider
-## Extends Node instead of AeroInputProvider for independent testing
-## This allows the addon to be tested without the aerobeat-input-core dependency
+## Extends Node for independent runtime validation in this repo's testbed
+## This keeps the camera-input path testable without requiring the full aerobeat-input-core contract surface
 
 class_name MediaPipeProviderTest
 

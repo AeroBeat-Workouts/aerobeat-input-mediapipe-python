@@ -1,6 +1,8 @@
 # AeroBeat MediaPipe Python
 
-MediaPipe pose tracking for AeroBeat using a Python sidecar plus Godot glue.
+The official current AeroBeat v1 gameplay-input path for **PC-first camera play**.
+
+MediaPipe pose tracking for AeroBeat using a Python sidecar plus Godot glue. This repo should be read through the locked downscoped v1 truth: **camera-only official gameplay input**, **Boxing + Flow official gameplay features**, and **PC community first**. The architecture remains modular and future-friendly, but that should not be mistaken for present-tense parity across non-camera inputs or every platform target.
 
 This repo is **partially migrated** into the broader AeroBeat input-provider contract:
 
@@ -303,3 +305,13 @@ Those belong in consuming repos such as `aerobeat-assembly-community`.
 ## License
 
 Mozilla Public License 2.0 (MPL 2.0)
+
+## Contributing
+
+Contributions should keep this repo truthful to the current AeroBeat v1 slice.
+
+Please ensure:
+- code follows existing style
+- changes do not imply non-camera gameplay parity or multi-platform v1 parity that the locked docs do not claim
+- Python/runtime validation remains honest about what is host-validated vs scaffolded
+- new behavior is documented here without reviving stale `aerobeat-core` / transition-era assumptions

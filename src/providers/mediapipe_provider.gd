@@ -1,7 +1,7 @@
 class_name MediaPipeProvider
 extends Node
-## MediaPipe implementation of input provider with multi-pose support
-## Works standalone OR as part of the aerobeat-input-core assembly contract
+## MediaPipe implementation of the current AeroBeat camera input provider with multi-pose support
+## Works within the aerobeat-input-core assembly contract while staying truthful to this repo's PC-first camera path
 
 signal pose_updated(landmarks: Array)
 signal multi_pose_updated(poses: Array)  # Array of {pose_id, landmarks}
