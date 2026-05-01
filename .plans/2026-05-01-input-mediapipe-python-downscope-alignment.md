@@ -77,7 +77,7 @@ The target truth stayed narrow: **camera-only official gameplay input**, **Boxin
 - Corrected install/help messages to point at `python_mediapipe/requirements.txt`.
 - Fixed stale test references (`src/driver.gd`) and packet-shape expectations in the standalone server test.
 - Added minimal assertion stubs so the legacy GUT-shaped scripts parse without GUT present, while preserving them as future harness-facing tests rather than claiming they are the primary current validation path.
-- Commit: `a43ff04` (`Align MediaPipe Python repo to PC camera v1 truth`)
+- Implementation commit: `b89f3e3` (`Align MediaPipe Python repo to PC camera v1 truth`)
 
 ---
 
@@ -102,7 +102,8 @@ A truthful, repo-localized current-path pass for `aerobeat-input-mediapipe-pytho
 - ⚠️ Legacy standalone scripts under `tests/` and `tests/unit/` remain GUT-shaped / non-MainLoop scripts and are not the authoritative direct-run validation path yet; this pass made them parse more cleanly but did not redesign the harness architecture.
 
 **Commits:**
-- `a43ff04` - `Align MediaPipe Python repo to PC camera v1 truth`
+- `b89f3e3` - `Align MediaPipe Python repo to PC camera v1 truth`
+- plan/results recorded in the immediately following repo history commit
 
 **Lessons Learned:**
 - The most dangerous drift in this repo was operational, not just textual: dead absolute symlinks and hardcoded venv paths made the “current path” look healthier than it really was.
