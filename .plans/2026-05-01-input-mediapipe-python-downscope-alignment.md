@@ -81,7 +81,8 @@ The target truth stayed narrow: **camera-only official gameplay input**, **Boxin
 - QA follow-up runtime pass made `prepare_runtime.py --validate` fail honestly on a host-missing venv, added `--install-requirements` as the canonical fresh-rerun helper, and updated README/runtime repair hints to match the actual repeatable prep flow.
 - `.uid` hygiene fallout from the rerun was cleaned back out of the repo before handoff.
 - Initial implementation commit: `b89f3e3` (`Align MediaPipe Python repo to PC camera v1 truth`)
-- QA-fix follow-up commit: `PENDING_COMMIT` (`PENDING_MESSAGE`)
+- QA-fix follow-up implementation commit: `6ccda5d` (`Fix QA rerun gaps for MediaPipe runtime and GUT suite`)
+- plan/result history update committed immediately after the implementation handoff
 
 ---
 
@@ -116,7 +117,8 @@ A truthful, repo-localized current-path pass for `aerobeat-input-mediapipe-pytho
 
 **Commits:**
 - `b89f3e3` - `Align MediaPipe Python repo to PC camera v1 truth`
-- `PENDING_COMMIT` - `PENDING_MESSAGE`
+- `6ccda5d` - `Fix QA rerun gaps for MediaPipe runtime and GUT suite`
+- plan/result history update committed immediately after the implementation handoff
 
 **Lessons Learned:**
 - The most dangerous drift in this repo was operational, not just textual: dead absolute symlinks and hardcoded venv paths made the “current path” look healthier than it really was.
@@ -201,7 +203,8 @@ The repo-local testbed path and Python sidecar path are materially improved and 
 - ✅ `~/.local/bin/godot --headless --path .testbed --quit-after 2`
 - ✅ `~/.local/bin/godot --headless --path .testbed --script addons/gut/gut_cmdln.gd -gdir=res://tests -ginclude_subdirs -gexit`
   - 29 tests, 29 passing, 0 failing
-- Commit: `PENDING_COMMIT` (`PENDING_MESSAGE`)
+- Implementation commit: `6ccda5d` (`Fix QA rerun gaps for MediaPipe runtime and GUT suite`)
+- Plan/history update commit follows immediately after this rerun record
 
 ---
 
