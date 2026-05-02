@@ -32,8 +32,7 @@ const LANDMARK_LEFT_ANKLE = 27
 const LANDMARK_RIGHT_ANKLE = 28
 
 func _ready():
-	if config == null:
-		config = _new_local_script_instance("../config/mediapipe_config.gd")
+	config = _ensure_config()
 	
 	_ensure_server()
 	if _server == null:
@@ -79,7 +78,7 @@ func get_landmark_position_for_pose(pose_idx: int, landmark_id: int,
 	# Find landmark by id
 	for lm: Variant in landmarks:
 		if lm is Dictionary and lm.get("id") == landmark_id:
-			if lm.has("v") and lm.v > config.min_visibility:
+			if _passes_visibility_threshold(lm):
 				return _convert_landmark_to_position(lm, mode)
 			break
 	
@@ -122,7 +121,8 @@ func _convert_landmark_to_position(lm: Dictionary, mode: TrackingMode) -> Varian
 	var y: float = 1.0 - lm.get("y", 0.0)  # Flip Y axis
 	var z: float = lm.get("z", 0.0)
 	
-	if config and config.flip_horizontal:
+	var resolved_config := _ensure_config()
+	if resolved_config != null and resolved_config.flip_horizontal:
 		x = 1.0 - x
 	
 	if mode == TrackingMode.MODE_2D:
@@ -155,13 +155,19 @@ func is_tracking_player(player_idx: int) -> bool:
 	return landmarks is Array and landmarks.size() > 0
 
 func _on_landmarks_received(landmarks: Array):
+	var resolved_config := _ensure_config()
 	_landmarks.clear()
-	for landmark: Dictionary in landmarks:
-		# Use >= for visibility check so exact threshold matches
-		var visibility: float = landmark.get("v", 1.0)
-		if visibility >= config.min_visibility:
-			_landmarks[landmark.get("id", 0)] = landmark
+	for landmark: Variant in landmarks:
+		if not landmark is Dictionary:
+			continue
+		var landmark_dict: Dictionary = landmark
+		if _passes_visibility_threshold(landmark_dict, resolved_config):
+			_landmarks[landmark_dict.get("id", 0)] = landmark_dict
 	
+	_all_poses = [{
+		"pose_id": 0,
+		"landmarks": landmarks.duplicate(true),
+	}]
 	_last_update_time_ms = Time.get_ticks_msec()
 	pose_updated.emit(landmarks)
 
@@ -199,6 +205,18 @@ func _ensure_server() -> void:
 	
 	_server.name = "MediaPipeServer"
 	add_child(_server)
+
+func _ensure_config() -> Variant:
+	if config != null:
+		return config
+	config = _new_local_script_instance("../config/mediapipe_config.gd")
+	return config
+
+func _passes_visibility_threshold(landmark: Dictionary, resolved_config: Variant = null) -> bool:
+	var active_config := resolved_config if resolved_config != null else _ensure_config()
+	if active_config == null:
+		return true
+	return float(landmark.get("v", 1.0)) >= float(active_config.min_visibility)
 
 func _new_local_script_instance(relative_path: String) -> Variant:
 	var script_path := "%s/%s" % [get_script().resource_path.get_base_dir(), relative_path]

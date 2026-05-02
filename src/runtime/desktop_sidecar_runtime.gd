@@ -116,7 +116,7 @@ static func get_runtime_prepare_command_hint(owner_script_path: String, runtime_
 	if platform_key.is_empty():
 		platform_key = "<platform>"
 	var mode := runtime_mode if not runtime_mode.is_empty() else get_runtime_mode()
-	return "python3 python_mediapipe/prepare_runtime.py --platform %s --mode %s --create-venv --validate" % [platform_key, mode]
+	return "python3 python_mediapipe/prepare_runtime.py --platform %s --mode %s --install-requirements --validate" % [platform_key, mode]
 
 static func read_json_file(path: String) -> Variant:
 	if path.is_empty() or not FileAccess.file_exists(path):

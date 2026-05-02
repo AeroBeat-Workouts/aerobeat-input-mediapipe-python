@@ -146,14 +146,20 @@ Canonical current contract:
 From the repo root:
 
 ```bash
+python3 python_mediapipe/prepare_runtime.py --platform linux-x64 --mode dev --install-requirements --validate
+```
+
+Equivalent explicit two-step flow if you want to see the stages separately:
+
+```bash
 python3 python_mediapipe/prepare_runtime.py --platform linux-x64 --mode dev --create-venv --validate
-python_mediapipe/assets/runtimes/linux-x64/venv/bin/pip install -r python_mediapipe/requirements.txt
-python3 python_mediapipe/prepare_runtime.py --platform linux-x64 --mode dev --validate
+python3 python_mediapipe/prepare_runtime.py --platform linux-x64 --mode dev --install-requirements --validate
 ```
 
 Notes:
 
-- `--create-venv` only creates a real venv for the **current host platform**
+- `--install-requirements` implies `--create-venv` for the **current host platform** and is now the canonical fresh-rerun command on Linux
+- a bare `--validate` on the current host now fails if the runtime Python executable is still missing, so it no longer silently overstates a scaffolded runtime as ready
 - the helper may scaffold foreign-platform manifest/sentinel files, but that is **not** the same as producing a working foreign-platform runtime on this Linux host
 - source-checkout/dev runs expect a prepared local runtime for the current platform
 - release/export flows should also resolve the same `assets/runtimes/<platform>/` family, but this repo does not yet automate final packaging/bundling policy

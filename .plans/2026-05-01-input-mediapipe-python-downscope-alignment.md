@@ -1,7 +1,7 @@
 # aerobeat-input-mediapipe-python
 
 **Date:** 2026-05-01  
-**Status:** In Progress  
+**Status:** Ready for QA Recheck  
 **Agent:** Chip 🐱‍💻
 
 ---
@@ -77,42 +77,131 @@ The target truth stayed narrow: **camera-only official gameplay input**, **Boxin
 - Corrected install/help messages to point at `python_mediapipe/requirements.txt`.
 - Fixed stale test references (`src/driver.gd`) and packet-shape expectations in the standalone server test.
 - Added minimal assertion stubs so the legacy GUT-shaped scripts parse without GUT present, while preserving them as future harness-facing tests rather than claiming they are the primary current validation path.
-- Implementation commit: `b89f3e3` (`Align MediaPipe Python repo to PC camera v1 truth`)
+- QA follow-up coder pass fixed the authoritative `.testbed` GUT suite, hardened `MediaPipeProvider` against missing config / malformed pose shapes, synced primary-pose helpers back to `_all_poses`, and replaced the no-op/risky unit tests with real GUT assertions.
+- QA follow-up runtime pass made `prepare_runtime.py --validate` fail honestly on a host-missing venv, added `--install-requirements` as the canonical fresh-rerun helper, and updated README/runtime repair hints to match the actual repeatable prep flow.
+- `.uid` hygiene fallout from the rerun was cleaned back out of the repo before handoff.
+- Initial implementation commit: `b89f3e3` (`Align MediaPipe Python repo to PC camera v1 truth`)
+- QA-fix follow-up commit: `PENDING_COMMIT` (`PENDING_MESSAGE`)
 
 ---
 
 ## Final Results
 
-**Status:** ✅ Complete
+**Status:** ⚠️ Ready for QA Recheck
 
 **What We Built:**
-A truthful, repo-localized current-path pass for `aerobeat-input-mediapipe-python`: docs and metadata now describe the repo as the official current AeroBeat v1 PC camera input path; the testbed resolves local repo assets instead of stale machine-specific paths; and the runtime no longer assumes a hard `aerobeat-core` dependency or a hardcoded Python 3.12 venv layout.
+A truthful, repo-localized current-path pass for `aerobeat-input-mediapipe-python` that now also survives the previously failing QA rerun: docs and metadata still describe the repo as the official current AeroBeat v1 PC camera input path; the repo-local `.testbed` resolves local assets instead of stale machine-specific paths; the authoritative GUT suite is green again; and the runtime-prep helper/documentation now describes and performs a repeatable fresh Linux rerun instead of silently treating a scaffold-only runtime as ready.
 
 **Reference Check:**
 - `REF-01`: satisfied; repo treated as a keep-active/current-path repo, not a light pass.
-- `REF-02`: satisfied; wording now matches the downscoped truth of **camera-only official gameplay**, **Boxing + Flow**, **PC community first**.
+- `REF-02`: satisfied; wording still matches the downscoped truth of **camera-only official gameplay**, **Boxing + Flow**, **PC community first**.
 - `REF-03`: satisfied; changes stayed scoped to the owning repo and its local testbed/runtime surfaces.
 
 **Validation:**
-- ✅ `python3 -m venv venv && . venv/bin/activate && pip install -r python_mediapipe/requirements.txt`
-- ✅ `. venv/bin/activate && python -m py_compile python_mediapipe/*.py`
-- ✅ `. venv/bin/activate && python python_mediapipe/test_filter.py`
+- ✅ `python3 python_mediapipe/prepare_runtime.py --platform linux-x64 --mode dev --validate`
+  - now fails honestly from a fresh runtime scaffold with `Runtime python executable is missing .../venv/bin/python`
+- ✅ `python3 python_mediapipe/prepare_runtime.py --platform linux-x64 --mode dev --install-requirements --validate`
+  - fresh-rerun success path; recreated the runtime venv, installed `python_mediapipe/requirements.txt`, and validated the contract in one command
+- ✅ `python3 -m py_compile python_mediapipe/*.py`
+- ✅ `python_mediapipe/assets/runtimes/linux-x64/venv/bin/python python_mediapipe/test_filter.py`
+- ✅ `python_mediapipe/assets/runtimes/linux-x64/venv/bin/python python_mediapipe/test_runner.py --video .testbed/assets/videos/boxing.mp4 --output .testbed/test_report.qa-fix.json`
+  - produced `frames_processed=941/941`
+  - `achieved_fps≈58.3`
+  - `avg_latency_ms≈16.19`
+  - `detection_rate≈0.744`
 - ✅ `~/.local/bin/godot --headless --path .testbed --quit-after 2`
-- ✅ `~/.local/bin/godot --headless --path .testbed --quit-after 5`
-- ⚠️ Legacy standalone scripts under `tests/` and `tests/unit/` remain GUT-shaped / non-MainLoop scripts and are not the authoritative direct-run validation path yet; this pass made them parse more cleanly but did not redesign the harness architecture.
+  - runtime resolved and sidecar dependencies/model asset reported ready; still emits the pre-existing `ObjectDB instances leaked at exit` warning on teardown
+- ✅ `~/.local/bin/godot --headless --path .testbed --script addons/gut/gut_cmdln.gd -gdir=res://tests -ginclude_subdirs -gexit`
+  - 29 tests, 29 passing, 0 failing
 
 **Commits:**
 - `b89f3e3` - `Align MediaPipe Python repo to PC camera v1 truth`
-- plan/results recorded in the immediately following repo history commit
+- `PENDING_COMMIT` - `PENDING_MESSAGE`
 
 **Lessons Learned:**
 - The most dangerous drift in this repo was operational, not just textual: dead absolute symlinks and hardcoded venv paths made the “current path” look healthier than it really was.
-- Repo-local testbeds need repo-local path resolution first; otherwise documentation truth and runtime truth diverge quickly.
+- If `--validate` can succeed on a scaffold-only host runtime, the docs will eventually overclaim readiness; the helper now has to fail loudly there.
+- The repo-local GUT suite is a real authoritative surface now, so test files need real assertions and provider state/setup that matches runtime behavior.
 
 **QA Handoff Notes:**
-- Verify the repo-local `.testbed/` still behaves correctly in the editor, especially AutoStartManager startup/cleanup around real camera access.
-- Treat `tests/` and `tests/unit/` as legacy harness work in need of a proper Godot/GUT entrypoint rather than proof of current end-to-end coverage.
-- Smoke-check that README + plugin wording still matches the locked docs truth in `aerobeat-docs` for future downscope passes.
+- Re-run the same QA surface set, especially the authoritative `.testbed` GUT command and the new one-shot `--install-requirements --validate` runtime prep command.
+- Expect the fresh bare `--validate` run to fail until the runtime venv exists; that failure is intentional and now part of the truthful story.
+- The headless `.testbed` smoke still prints `ObjectDB instances leaked at exit`; that warning predates this fix and remains the only notable cleanup noise seen in the rerun.
+
+## QA Follow-up (2026-05-01, independent rerun)
+
+**QA Status:** ❌ Fail
+
+**What QA independently verified:**
+- README wording, `plugin.cfg`, and `.testbed/addons.jsonc` against the downscoped docs truth in `aerobeat-docs`.
+- Repo-local testbed dependency restore via `godotenv addons install`.
+- Testbed local-path resolution for `aerobeat-input-mediapipe-python` and sibling `aerobeat-input-core`.
+- Python runtime prep / validation flow via `python_mediapipe/prepare_runtime.py`.
+- Python suite surfaces: `py_compile`, `python_mediapipe/test_filter.py`, `python_mediapipe/test_runner.py` against `.testbed/assets/videos/boxing.mp4`.
+- Godot headless smoke boot of the repo-local `.testbed/`.
+- Authoritative Godot test harness path currently wired by CI: GUT in `.testbed/tests/`.
+
+**QA validation results:**
+- ✅ `godotenv addons install` restored repo-local addons correctly.
+- ✅ Restored addon paths resolve to local repos, not dead absolute machine-local symlinks:
+  - `.testbed/addons/aerobeat-input-mediapipe-python -> /home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-input-mediapipe-python`
+  - `.testbed/addons/aerobeat-input-core -> /home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-input-core`
+- ✅ Truth alignment check passed for current repo surfaces reviewed:
+  - `README.md` describes this as the official **PC-first camera** input path.
+  - `plugin.cfg` description matches the same downscoped claim.
+  - `.testbed/addons.jsonc` no longer points at stale `aerobeat-core` / dead external paths.
+- ✅ `python3 -m py_compile python_mediapipe/*.py`
+- ✅ `python_mediapipe/assets/runtimes/linux-x64/venv/bin/python python_mediapipe/test_filter.py`
+- ✅ `python_mediapipe/assets/runtimes/linux-x64/venv/bin/python python_mediapipe/test_runner.py --video .testbed/assets/videos/boxing.mp4 --output .testbed/test_report.qa.json`
+  - produced `frames_processed=941/941`
+  - `achieved_fps≈53.93`
+  - `avg_latency_ms≈17.43`
+  - `detection_rate≈0.7439`
+- ✅ `godot --headless --path .testbed --quit-after 2`
+  - AutoStartManager resolved the repo-local runtime and reported Python dependencies/model asset ready.
+- ❌ The coder-claimed runtime validation path was incomplete as documented in the plan.
+  - Running `python3 python_mediapipe/prepare_runtime.py --platform linux-x64 --mode dev --validate` only scaffolded the runtime and left `python_mediapipe/assets/runtimes/linux-x64/venv/bin/python` missing.
+  - The next authoritative Python command failed exactly there until QA created the runtime venv and installed requirements.
+- ❌ The authoritative repo-local Godot/GUT suite currently fails.
+  - `godot --headless --path .testbed --script addons/gut/gut_cmdln.gd -gdir=res://tests -ginclude_subdirs -gexit`
+  - Result: 18 tests, 5 passing, 4 failing, 9 risky/pending.
+  - `res://tests/unit/test_mediapipe_process.gd` also hits a parse error because its local `assert_string_contains(...)` stub signature does not match the inherited GUT method signature.
+  - `res://tests/unit/test_mediapipe_provider.gd` fails multiple assertions / runtime errors because `_on_landmarks_received(...)` expects config data that the tests do not provide (`min_visibility` access on null config/landmark shape issues).
+
+**Defects found:**
+1. **Plan overstates validation success.** The plan marks completion and cites green validation, but the current repo-local authoritative GUT path fails in QA rerun.
+2. **Runtime prep truth gap.** `prepare_runtime.py --validate` without `--create-venv` does not produce the executable path the rest of the README/current-path commands assume. A fresh local rerun fails unless the venv/install steps are also performed.
+3. **Broken repo-local GUT coverage.**
+   - `test_mediapipe_process.gd` parse/signature mismatch against GUT.
+   - `test_mediapipe_provider.gd` runtime failures around null config / packet expectations.
+   - Overall GUT suite remains red, so the repo is not QA-clean end-to-end yet.
+4. **Headless smoke still reports leak noise.** `godot --headless --path .testbed --quit-after 2` exits, but reports `ObjectDB instances leaked at exit`.
+
+**QA conclusion:**
+The repo-local testbed path and Python sidecar path are materially improved and the local path-resolution fix is real, but the bead should remain open because the repo's authoritative automated Godot suite is still failing and the recorded validation story is not yet truthful enough.
+
+## Coder QA-Fix Follow-up (2026-05-01)
+
+**Coder status:** ✅ Ready for QA recheck
+
+**Fixes applied after QA fail:**
+- Replaced the no-op local assertion stub pattern in `.testbed/tests/unit/test_mediapipe_process.gd`, `.testbed/tests/unit/test_mediapipe_provider.gd`, and `.testbed/tests/unit/test_mediapipe_server.gd` with real GUT assertions / signal watches so the authoritative suite runs green instead of parsing risky no-op tests.
+- Hardened `src/providers/mediapipe_provider.gd` so it lazily creates config when needed, tolerates malformed pose/landmark shapes, defaults missing landmark visibility to visible, and keeps `_all_poses` in sync for the primary-pose convenience getters.
+- Updated `python_mediapipe/prepare_runtime.py` so a bare host-platform `--validate` now fails honestly when the runtime Python executable is missing, while `--install-requirements` creates/reuses the runtime venv, installs `python_mediapipe/requirements.txt`, and validates the contract in one command.
+- Updated `README.md` and `src/runtime/desktop_sidecar_runtime.gd` so repair instructions and canonical setup docs point at the truthful fresh-rerun command.
+- Removed untracked generated `.uid` fallout before handoff.
+
+**Coder rerun results:**
+- ✅ Fresh runtime repro: `rm -rf python_mediapipe/assets/runtimes/linux-x64 && python3 python_mediapipe/prepare_runtime.py --platform linux-x64 --mode dev --validate`
+  - now fails with the expected missing-venv validation error instead of falsely reading as ready
+- ✅ Fresh runtime repair: `python3 python_mediapipe/prepare_runtime.py --platform linux-x64 --mode dev --install-requirements --validate`
+- ✅ `python3 -m py_compile python_mediapipe/*.py`
+- ✅ `python_mediapipe/assets/runtimes/linux-x64/venv/bin/python python_mediapipe/test_filter.py`
+- ✅ `python_mediapipe/assets/runtimes/linux-x64/venv/bin/python python_mediapipe/test_runner.py --video .testbed/assets/videos/boxing.mp4 --output .testbed/test_report.qa-fix.json`
+- ✅ `~/.local/bin/godot --headless --path .testbed --quit-after 2`
+- ✅ `~/.local/bin/godot --headless --path .testbed --script addons/gut/gut_cmdln.gd -gdir=res://tests -ginclude_subdirs -gexit`
+  - 29 tests, 29 passing, 0 failing
+- Commit: `PENDING_COMMIT` (`PENDING_MESSAGE`)
 
 ---
 

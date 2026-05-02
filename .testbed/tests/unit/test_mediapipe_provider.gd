@@ -1,135 +1,85 @@
 extends "res://addons/gut/test.gd"
-## Unit tests for MediaPipeProvider
-## Compatible with GUT if available, otherwise runs basic checks
 
 const MediaPipeProvider = preload("res://addons/aerobeat-input-mediapipe-python/src/providers/mediapipe_provider.gd")
 const MediaPipeConfig = preload("res://addons/aerobeat-input-mediapipe-python/src/config/mediapipe_config.gd")
-const MediaPipeServer = preload("res://addons/aerobeat-input-mediapipe-python/src/server/mediapipe_server.gd")
 
-var provider = null
+var provider: MediaPipeProvider = null
 
-func _init():
-	# Run tests if GUT is not available
-	if not _is_gut_available():
-		print("[MediaPipeProviderTest] Running standalone tests...")
-		_run_standalone_tests()
-
-func _is_gut_available() -> bool:
-	return ClassDB.class_exists("GutTest") or FileAccess.file_exists("res://addons/gut/plugin.cfg")
-
-# Minimal local assertion stubs so this script still parses and can run standalone without GUT.
-func assert_is(_value, _type, _message: String = "") -> void:
-	pass
-
-func assert_null(_value, _message: String = "") -> void:
-	pass
-
-func assert_eq(_a, _b, _message: String = "") -> void:
-	pass
-
-func assert_false(_value, _message: String = "") -> void:
-	pass
-
-func assert_true(_value, _message: String = "") -> void:
-	pass
-
-func _run_standalone_tests():
-	print("Testing MediaPipeProvider...")
-	
-	# Test 1: Create provider
-	provider = MediaPipeProvider.new()
-	if provider:
-		print("✓ Provider created successfully")
-	else:
-		print("✗ Failed to create provider")
-		return
-	
-	# Test 2: Check default config
-	if provider.config == null:
-		print("✗ Config is null by default")
-	else:
-		print("✓ Config initialized")
-	
-	# Test 3: Test landmark processing
+func before_each() -> void:
+	provider = add_child_autoqfree(MediaPipeProvider.new())
 	provider.config = MediaPipeConfig.new()
-	provider._on_landmarks_received([{"id": 15, "x": 0.5, "y": 0.5, "v": 0.99}])
-	var pos = provider.get_left_hand_position()
-	if pos is Vector2:
-		print("✓ Returns Vector2 in 2D mode")
-	else:
-		print("✗ Expected Vector2, got: ", typeof(pos))
-	
-	# Test 4: Y-axis flip
-	provider._landmarks.clear()
-	provider._on_landmarks_received([{"id": 0, "x": 0.5, "y": 0.2, "v": 0.99}])
-	var head_pos = provider.get_head_position()
-	if head_pos and abs(head_pos.y - 0.8) < 0.01:
-		print("✓ Y-axis is correctly flipped")
-	else:
-		print("✗ Y-axis flip incorrect")
-	
-	print("[MediaPipeProviderTest] Standalone tests complete.")
 
-# GUT-compatible test methods (only run when GUT is available)
-func before_each():
-	if not _is_gut_available():
-		return
-	provider = MediaPipeProvider.new()
-	# Note: Can't use add_child without Node, tests would need refactor for full GUT compatibility
-
-func after_each():
-	if provider and is_instance_valid(provider):
-		provider.queue_free()
-
-func test_extends_node():
-	if not _is_gut_available():
-		return
-	# In standalone mode, extends Node instead of AeroInputProvider
+func test_extends_node() -> void:
 	assert_is(provider, Node)
 
-func test_creates_server_if_missing():
-	if not _is_gut_available():
-		return
-	# Server creation test would require Node functionality
-	pass
+func test_creates_default_config_when_missing() -> void:
+	provider.config = null
+	var resolved_config = provider._ensure_config()
+	assert_is(resolved_config, MediaPipeConfig)
+	assert_is(provider.config, MediaPipeConfig)
 
-func test_returns_null_when_no_data():
-	if not _is_gut_available():
-		return
+func test_returns_null_when_no_data() -> void:
 	assert_null(provider.get_left_hand_position())
 
-func test_returns_vector2_in_2d_mode():
-	if not _is_gut_available():
-		return
-	provider._on_landmarks_received([{"id": 15, "x": 0.5, "y": 0.5, "v": 0.99}])
+func test_returns_vector2_in_2d_mode() -> void:
+	provider._on_landmarks_received([
+		{"id": provider.LANDMARK_LEFT_WRIST, "x": 0.5, "y": 0.5, "v": 0.99}
+	])
 	var pos = provider.get_left_hand_position()
 	assert_typeof(pos, TYPE_VECTOR2)
+	assert_eq(pos, Vector2(0.5, 0.5))
 
-func test_y_axis_is_flipped():
-	if not _is_gut_available():
-		return
-	provider.config = MediaPipeConfig.new()
+func test_y_axis_is_flipped() -> void:
 	provider.config.flip_horizontal = false
-	provider._on_landmarks_received([{"id": 0, "x": 0.5, "y": 0.2, "v": 0.99}])
+	provider._on_landmarks_received([
+		{"id": provider.LANDMARK_NOSE, "x": 0.5, "y": 0.2, "v": 0.99}
+	])
 	var pos = provider.get_head_position()
-	assert_eq(pos.y, 0.8, "Y should be 1.0 - 0.2 = 0.8")
+	assert_true(is_equal_approx(pos.y, 0.8), "Y should be 1.0 - 0.2 = 0.8")
 
-func test_horizontal_flip():
-	if not _is_gut_available():
-		return
-	provider.config = MediaPipeConfig.new()
+func test_horizontal_flip() -> void:
 	provider.config.flip_horizontal = true
-	provider._on_landmarks_received([{"id": 0, "x": 0.2, "v": 0.99}])
+	provider._on_landmarks_received([
+		{"id": provider.LANDMARK_NOSE, "x": 0.2, "y": 0.2, "v": 0.99}
+	])
 	var pos = provider.get_head_position()
-	assert_eq(pos.x, 0.8, "X should be flipped")
+	assert_true(is_equal_approx(pos.x, 0.8), "X should be flipped")
 
-func test_is_tracking_false_when_no_data():
-	if not _is_gut_available():
-		return
+func test_missing_visibility_defaults_to_visible() -> void:
+	provider.config.flip_horizontal = false
+	provider._on_landmarks_received([
+		{"id": provider.LANDMARK_NOSE, "x": 0.25, "y": 0.75}
+	])
+	var pos = provider.get_head_position()
+	assert_eq(pos, Vector2(0.25, 0.25))
+
+func test_is_tracking_false_when_no_data() -> void:
 	assert_false(provider.is_tracking())
 
-func test_is_tracking_true_after_data():
-	if not _is_gut_available():
-		return
-	provider._on_landmarks_received([{"id": 0, "v": 0.99}])
+func test_is_tracking_true_after_data() -> void:
+	provider._on_landmarks_received([
+		{"id": provider.LANDMARK_NOSE, "x": 0.5, "y": 0.5, "v": 0.99}
+	])
 	assert_true(provider.is_tracking())
+
+func test_get_landmark_position_for_pose_handles_invalid_shapes() -> void:
+	provider._all_poses = [
+		{"landmarks": "bad-shape"},
+		"also-bad"
+	]
+	assert_null(provider.get_landmark_position_for_pose(0, provider.LANDMARK_NOSE))
+	assert_null(provider.get_landmark_position_for_pose(1, provider.LANDMARK_NOSE))
+
+func test_get_landmark_position_for_pose_filters_by_visibility() -> void:
+	provider.config.min_visibility = 0.5
+	provider.config.flip_horizontal = false
+	provider._all_poses = [
+		{
+			"landmarks": [
+				{"id": provider.LANDMARK_LEFT_WRIST, "x": 0.1, "y": 0.9, "v": 0.2},
+				{"id": provider.LANDMARK_RIGHT_WRIST, "x": 0.9, "y": 0.1, "v": 0.8}
+			]
+		}
+	]
+	assert_null(provider.get_landmark_position_for_pose(0, provider.LANDMARK_LEFT_WRIST))
+	assert_eq(provider.get_landmark_position_for_pose(0, provider.LANDMARK_RIGHT_WRIST), Vector2(0.9, 0.9))

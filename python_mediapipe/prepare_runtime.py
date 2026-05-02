@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import shutil
+import subprocess
 import sys
 import venv
 from pathlib import Path
@@ -14,6 +15,7 @@ from runtime_paths import (
     get_current_platform_key,
     get_platform_key,
     get_runtime_env_dir,
+    get_runtime_python_path,
     validate_runtime_contract,
     write_runtime_contract_files,
 )
@@ -37,6 +39,14 @@ def parse_args() -> argparse.Namespace:
         "--force",
         action="store_true",
         help="Remove and recreate the runtime-local venv if it already exists.",
+    )
+    parser.add_argument(
+        "--install-requirements",
+        action="store_true",
+        help=(
+            "Install python_mediapipe/requirements.txt into the runtime-local venv. "
+            "Implies --create-venv for the current host platform."
+        ),
     )
     parser.add_argument(
         "--validate",
@@ -63,10 +73,12 @@ def main() -> int:
     notes: list[str] = []
     validation_status = "scaffolded"
 
+    wants_runtime_python = args.create_venv or args.install_requirements
+
     if requested_platform_key != current_platform_key:
-        if args.create_venv:
+        if wants_runtime_python:
             raise SystemExit(
-                "Refusing to create a foreign-platform runtime venv on this host. "
+                "Refusing to prepare a foreign-platform runtime venv on this host. "
                 f"Current host platform is {current_platform_key}, requested {requested_platform_key}."
             )
         warnings.append(
@@ -78,15 +90,25 @@ def main() -> int:
     runtime_root = ensure_runtime_root(requested_platform_key)
     runtime_env_dir = get_runtime_env_dir(runtime_root=runtime_root)
 
-    if args.create_venv:
+    if wants_runtime_python:
         if runtime_env_dir.exists() and args.force:
             shutil.rmtree(runtime_env_dir)
         if not runtime_env_dir.exists():
             venv.EnvBuilder(with_pip=True).create(runtime_env_dir)
+            notes.append(f"Created local runtime venv at {runtime_env_dir}.")
+        elif args.create_venv:
+            notes.append(f"Reusing existing local runtime venv at {runtime_env_dir}.")
         validation_status = "venv_created"
-        notes.append(f"Created local runtime venv at {runtime_env_dir}.")
+
+        if args.install_requirements:
+            _install_requirements(runtime_root=runtime_root, platform_key=requested_platform_key)
+            validation_status = "ready"
+            notes.append("Installed python_mediapipe/requirements.txt into the runtime-local venv.")
     else:
-        warnings.append("Python dependency installation is not part of this foundation pass unless --create-venv is requested.")
+        warnings.append(
+            "Python dependency installation is not part of this scaffolding pass unless "
+            "--create-venv or --install-requirements is requested."
+        )
 
     manifest = build_runtime_manifest(
         mode=args.mode,
@@ -100,7 +122,7 @@ def main() -> int:
     errors = validate_runtime_contract(
         requested_platform_key,
         runtime_root=runtime_root,
-        require_python=args.create_venv,
+        require_python=(requested_platform_key == current_platform_key),
     ) if args.validate else []
 
     result = {
@@ -130,6 +152,16 @@ def main() -> int:
                 print(f"- {error}")
 
     return 1 if errors else 0
+
+
+def _install_requirements(*, runtime_root: Path, platform_key: str) -> None:
+    python_executable = get_runtime_python_path(platform_key=platform_key, runtime_root=runtime_root)
+    requirements_path = Path(__file__).resolve().parent / "requirements.txt"
+    subprocess.run(
+        [str(python_executable), "-m", "pip", "install", "-r", str(requirements_path)],
+        check=True,
+    )
+
 
 
 def _split_platform_key_for_validation(platform_key: str) -> tuple[str, str]:
