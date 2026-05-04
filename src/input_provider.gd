@@ -12,6 +12,8 @@ extends "res://addons/aerobeat-input-core/src/interfaces/input_provider.gd"
 ## - tracking state + basic confidence queries
 ## - no gesture callbacks, haptics, velocity, or 6DOF transform output yet
 
+const PROVIDER_ID := "mediapipe_python"
+
 var _provider = null
 var _config = null
 var _tracking_mode: TrackingMode = TrackingMode.MODE_2D
@@ -38,6 +40,9 @@ func stop() -> void:
 
 func is_tracking() -> bool:
 	return _provider != null and _provider.is_tracking()
+
+func get_provider_id() -> String:
+	return PROVIDER_ID
 
 func has_capability(capability: Capability) -> bool:
 	match capability:
