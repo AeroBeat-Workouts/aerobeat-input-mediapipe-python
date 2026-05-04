@@ -10,6 +10,16 @@ const TRACKING_DEGRADED := &"degraded"
 const TRACKING_LOST := &"lost"
 const TRACKING_REACQUIRING := &"reacquiring"
 
+const PUNCH_READY_EXTENSION := 0.72
+const PUNCH_FIRE_EXTENSION := 0.92
+const PUNCH_ELBOW_STRAIGHT_MIN_DEG := 170.0
+const PUNCH_LATERAL_VELOCITY_RATIO := 1.35
+
+const HOOK_ELBOW_MIN_DEG := 55.0
+const HOOK_ELBOW_MAX_DEG := 145.0
+const UPPERCUT_ELBOW_MIN_DEG := 35.0
+const UPPERCUT_ELBOW_MAX_DEG := 125.0
+
 var _config = null
 var _smoother: LandmarkSmoother = LandmarkSmoother.new()
 var _latest_state: Dictionary = {}
@@ -20,6 +30,11 @@ var _baseline_accumulator := {
 	"athlete_height": 0.0,
 	"shoulder_center_x": 0.0,
 	"hip_center_y": 0.0,
+	"nose_y": 0.0,
+	"left_knee_y": 0.0,
+	"right_knee_y": 0.0,
+	"left_ankle_y": 0.0,
+	"right_ankle_y": 0.0,
 }
 var _baseline: Dictionary = {
 	"is_calibrated": false,
@@ -29,8 +44,14 @@ var _baseline: Dictionary = {
 	"athlete_height": 0.0,
 	"shoulder_center_x": 0.0,
 	"hip_center_y": 0.0,
+	"nose_y": 0.0,
+	"left_knee_y": 0.0,
+	"right_knee_y": 0.0,
+	"left_ankle_y": 0.0,
+	"right_ankle_y": 0.0,
 }
 var _previous_positions: Dictionary = {}
+var _gesture_state := {}
 var _consecutive_valid_frames := 0
 var _consecutive_invalid_frames := 0
 var _reacquire_frames_remaining := 0
@@ -40,6 +61,7 @@ var _frame_index := 0
 func _init() -> void:
 	_smoother = LandmarkSmoother.new(_get_smoothing_window_size())
 	_latest_state = _build_empty_state()
+	_reset_gesture_state()
 
 func configure(config) -> PoseDetectorSubstrate:
 	_config = config
@@ -61,6 +83,11 @@ func reset() -> void:
 		"athlete_height": 0.0,
 		"shoulder_center_x": 0.0,
 		"hip_center_y": 0.0,
+		"nose_y": 0.0,
+		"left_knee_y": 0.0,
+		"right_knee_y": 0.0,
+		"left_ankle_y": 0.0,
+		"right_ankle_y": 0.0,
 	}
 	_baseline = {
 		"is_calibrated": false,
@@ -70,7 +97,13 @@ func reset() -> void:
 		"athlete_height": 0.0,
 		"shoulder_center_x": 0.0,
 		"hip_center_y": 0.0,
+		"nose_y": 0.0,
+		"left_knee_y": 0.0,
+		"right_knee_y": 0.0,
+		"left_ankle_y": 0.0,
+		"right_ankle_y": 0.0,
 	}
+	_reset_gesture_state()
 	_latest_state = _build_empty_state()
 
 func process_landmarks(landmarks: Array, timestamp_ms: int = 0) -> Dictionary:
@@ -80,9 +113,14 @@ func process_landmarks(landmarks: Array, timestamp_ms: int = 0) -> Dictionary:
 	var smoothed_landmarks: Dictionary = _smoother.push_landmarks(landmarks)
 	var metrics: Dictionary = _build_metrics(smoothed_landmarks, timestamp_ms)
 	var tracking_state: StringName = _update_tracking_state(smoothed_landmarks)
-	_update_baseline(metrics, tracking_state)
+	_update_baseline(metrics, tracking_state, smoothed_landmarks)
 	metrics["tracking_state"] = tracking_state
 	metrics["baseline"] = _baseline.duplicate(true)
+	var events: Array = []
+	if tracking_state == TRACKING_TRACKING or tracking_state == TRACKING_REACQUIRING:
+		events = _detect_boxing_events(smoothed_landmarks, metrics)
+	else:
+		_clear_transient_gesture_state()
 	_latest_state = {
 		"frame_index": _frame_index,
 		"timestamp_ms": timestamp_ms,
@@ -90,6 +128,8 @@ func process_landmarks(landmarks: Array, timestamp_ms: int = 0) -> Dictionary:
 		"landmarks_by_id": smoothed_landmarks.duplicate(true),
 		"baseline": _baseline.duplicate(true),
 		"metrics": metrics,
+		"events": events.duplicate(true),
+		"gesture_states": _gesture_state.get("states", {}).duplicate(true),
 	}
 	_last_processed_timestamp_ms = timestamp_ms
 	return _latest_state
@@ -103,9 +143,12 @@ func mark_tracking_timeout(timestamp_ms: int) -> void:
 	_consecutive_valid_frames = 0
 	_consecutive_invalid_frames = maxi(_consecutive_invalid_frames, 3)
 	_reacquire_frames_remaining = _get_reacquire_window_frames()
+	_clear_transient_gesture_state()
 	if _latest_state.is_empty():
 		_latest_state = _build_empty_state()
 	_latest_state["tracking_state"] = TRACKING_LOST
+	_latest_state["events"] = []
+	_latest_state["gesture_states"] = _gesture_state.get("states", {}).duplicate(true)
 	var metrics: Dictionary = _latest_state.get("metrics", {})
 	metrics["tracking_state"] = TRACKING_LOST
 	_latest_state["metrics"] = metrics
@@ -153,6 +196,8 @@ func _build_empty_state() -> Dictionary:
 			"measurements": {},
 			"baseline": _baseline.duplicate(true),
 		},
+		"events": [],
+		"gesture_states": _gesture_state.get("states", {}).duplicate(true),
 	}
 
 func _build_metrics(landmarks_by_id: Dictionary, timestamp_ms: int) -> Dictionary:
@@ -165,6 +210,8 @@ func _build_metrics(landmarks_by_id: Dictionary, timestamp_ms: int) -> Dictionar
 	var right_wrist := PoseMetrics.get_landmark(landmarks_by_id, PoseLandmarkIds.RIGHT_WRIST)
 	var left_hip := PoseMetrics.get_landmark(landmarks_by_id, PoseLandmarkIds.LEFT_HIP)
 	var right_hip := PoseMetrics.get_landmark(landmarks_by_id, PoseLandmarkIds.RIGHT_HIP)
+	var left_knee := PoseMetrics.get_landmark(landmarks_by_id, PoseLandmarkIds.LEFT_KNEE)
+	var right_knee := PoseMetrics.get_landmark(landmarks_by_id, PoseLandmarkIds.RIGHT_KNEE)
 	var left_ankle := PoseMetrics.get_landmark(landmarks_by_id, PoseLandmarkIds.LEFT_ANKLE)
 	var right_ankle := PoseMetrics.get_landmark(landmarks_by_id, PoseLandmarkIds.RIGHT_ANKLE)
 	var shoulder_center := PoseMetrics.midpoint(left_shoulder, right_shoulder)
@@ -203,6 +250,42 @@ func _build_metrics(landmarks_by_id: Dictionary, timestamp_ms: int) -> Dictionar
 		"right_foot": _direction_from_velocity(velocities.get("right_foot", Vector3.ZERO)),
 	}
 
+	var shoulder_center_vec := PoseMetrics.to_vector3(shoulder_center)
+	var hip_center_vec := PoseMetrics.to_vector3(hip_center)
+	var nose_vec := PoseMetrics.to_vector3(nose)
+	var body_centerline_x := _average_x([nose, shoulder_center, hip_center])
+	var head_lateral_offset := 0.0
+	var hip_lateral_offset := 0.0
+	var shoulder_lateral_offset := 0.0
+	var lateral_offset := 0.0
+	var height_ratio := 1.0
+	var height_state: StringName = StringName("unknown")
+	var squat_depth := 0.0
+	var head_drop_ratio := 0.0
+	var left_knee_rise := 0.0
+	var right_knee_rise := 0.0
+	var left_foot_rise := 0.0
+	var right_foot_rise := 0.0
+
+	if bool(_baseline.get("is_calibrated", false)):
+		var baseline_shoulder_width := maxf(float(_baseline.get("shoulder_width", 0.0)), 0.000001)
+		var baseline_torso_height := maxf(float(_baseline.get("torso_height", 0.0)), 0.000001)
+		var baseline_shoulder_x := float(_baseline.get("shoulder_center_x", body_centerline_x))
+		var baseline_hip_y := float(_baseline.get("hip_center_y", hip_center_vec.y))
+		var baseline_nose_y := float(_baseline.get("nose_y", nose_vec.y))
+		lateral_offset = PoseMetrics.normalized_ratio(body_centerline_x - baseline_shoulder_x, baseline_shoulder_width)
+		head_lateral_offset = PoseMetrics.normalized_ratio(nose_vec.x - baseline_shoulder_x, baseline_shoulder_width)
+		hip_lateral_offset = PoseMetrics.normalized_ratio(hip_center_vec.x - baseline_shoulder_x, baseline_shoulder_width)
+		shoulder_lateral_offset = PoseMetrics.normalized_ratio(shoulder_center_vec.x - baseline_shoulder_x, baseline_shoulder_width)
+		height_ratio = PoseMetrics.normalized_ratio(torso_height, baseline_torso_height)
+		height_state = _estimate_height_state(height_ratio, hip_center_vec.y - baseline_hip_y)
+		squat_depth = maxf(0.0, 1.0 - height_ratio)
+		head_drop_ratio = maxf(0.0, (baseline_nose_y - nose_vec.y) / baseline_torso_height)
+		left_knee_rise = maxf(0.0, (float(left_knee.get("y", 0.0)) - float(_baseline.get("left_knee_y", left_knee.get("y", 0.0)))) / baseline_torso_height)
+		right_knee_rise = maxf(0.0, (float(right_knee.get("y", 0.0)) - float(_baseline.get("right_knee_y", right_knee.get("y", 0.0)))) / baseline_torso_height)
+		left_foot_rise = maxf(0.0, (float(left_ankle.get("y", 0.0)) - float(_baseline.get("left_ankle_y", left_ankle.get("y", 0.0)))) / baseline_torso_height)
+		right_foot_rise = maxf(0.0, (float(right_ankle.get("y", 0.0)) - float(_baseline.get("right_ankle_y", right_ankle.get("y", 0.0)))) / baseline_torso_height)
+
 	var measurements := {
 		"shoulder_width": shoulder_width,
 		"torso_height": torso_height,
@@ -213,21 +296,25 @@ func _build_metrics(landmarks_by_id: Dictionary, timestamp_ms: int) -> Dictionar
 		"right_elbow_bend_deg": right_elbow_bend,
 		"left_arm_extension": left_arm_extension,
 		"right_arm_extension": right_arm_extension,
-		"head_center": PoseMetrics.to_vector3(nose),
-		"shoulder_center": PoseMetrics.to_vector3(shoulder_center),
-		"hip_center": PoseMetrics.to_vector3(hip_center),
-		"body_centerline_x": _average_x([nose, shoulder_center, hip_center]),
-		"lateral_offset": 0.0,
-		"height_ratio": 1.0,
-		"height_state": StringName("unknown"),
+		"head_center": nose_vec,
+		"shoulder_center": shoulder_center_vec,
+		"hip_center": hip_center_vec,
+		"body_centerline_x": body_centerline_x,
+		"lateral_offset": lateral_offset,
+		"head_lateral_offset": head_lateral_offset,
+		"shoulder_lateral_offset": shoulder_lateral_offset,
+		"hip_lateral_offset": hip_lateral_offset,
+		"height_ratio": height_ratio,
+		"height_state": height_state,
+		"squat_depth": squat_depth,
+		"head_drop_ratio": head_drop_ratio,
+		"left_knee_rise": left_knee_rise,
+		"right_knee_rise": right_knee_rise,
+		"left_foot_rise": left_foot_rise,
+		"right_foot_rise": right_foot_rise,
+		"left_leg_angle_from_core_deg": _leg_angle_from_core_deg(left_hip, left_ankle),
+		"right_leg_angle_from_core_deg": _leg_angle_from_core_deg(right_hip, right_ankle),
 	}
-
-	if bool(_baseline.get("is_calibrated", false)):
-		var baseline_shoulder_x := float(_baseline.get("shoulder_center_x", measurements["body_centerline_x"]))
-		var baseline_hip_y := float(_baseline.get("hip_center_y", PoseMetrics.to_vector3(hip_center).y))
-		measurements["lateral_offset"] = PoseMetrics.normalized_ratio(measurements["body_centerline_x"] - baseline_shoulder_x, maxf(float(_baseline.get("shoulder_width", 0.0)), 0.000001))
-		measurements["height_ratio"] = PoseMetrics.normalized_ratio(torso_height, maxf(float(_baseline.get("torso_height", 0.0)), 0.000001))
-		measurements["height_state"] = _estimate_height_state(float(measurements["height_ratio"]), PoseMetrics.to_vector3(hip_center).y - baseline_hip_y)
 
 	return {
 		"confidences": confidences,
@@ -290,7 +377,7 @@ func _update_tracking_state(landmarks_by_id: Dictionary) -> StringName:
 		return TRACKING_LOST
 	return TRACKING_DEGRADED
 
-func _update_baseline(metrics: Dictionary, tracking_state: StringName) -> void:
+func _update_baseline(metrics: Dictionary, tracking_state: StringName, landmarks_by_id: Dictionary) -> void:
 	if tracking_state != TRACKING_TRACKING and tracking_state != TRACKING_REACQUIRING:
 		return
 	var measurements: Dictionary = metrics.get("measurements", {})
@@ -309,6 +396,13 @@ func _update_baseline(metrics: Dictionary, tracking_state: StringName) -> void:
 	var hip_center: Variant = measurements.get("hip_center", Vector3.ZERO)
 	if hip_center is Vector3:
 		_baseline_accumulator["hip_center_y"] += hip_center.y
+	var head_center: Variant = measurements.get("head_center", Vector3.ZERO)
+	if head_center is Vector3:
+		_baseline_accumulator["nose_y"] += head_center.y
+	_baseline_accumulator["left_knee_y"] += float(PoseMetrics.get_landmark(landmarks_by_id, PoseLandmarkIds.LEFT_KNEE).get("y", 0.0))
+	_baseline_accumulator["right_knee_y"] += float(PoseMetrics.get_landmark(landmarks_by_id, PoseLandmarkIds.RIGHT_KNEE).get("y", 0.0))
+	_baseline_accumulator["left_ankle_y"] += float(PoseMetrics.get_landmark(landmarks_by_id, PoseLandmarkIds.LEFT_ANKLE).get("y", 0.0))
+	_baseline_accumulator["right_ankle_y"] += float(PoseMetrics.get_landmark(landmarks_by_id, PoseLandmarkIds.RIGHT_ANKLE).get("y", 0.0))
 	var frames: int = int(_baseline_accumulator["frames"])
 	if frames < 5:
 		return
@@ -320,6 +414,11 @@ func _update_baseline(metrics: Dictionary, tracking_state: StringName) -> void:
 		"athlete_height": float(_baseline_accumulator["athlete_height"]) / float(frames),
 		"shoulder_center_x": float(_baseline_accumulator["shoulder_center_x"]) / float(frames),
 		"hip_center_y": float(_baseline_accumulator["hip_center_y"]) / float(frames),
+		"nose_y": float(_baseline_accumulator["nose_y"]) / float(frames),
+		"left_knee_y": float(_baseline_accumulator["left_knee_y"]) / float(frames),
+		"right_knee_y": float(_baseline_accumulator["right_knee_y"]) / float(frames),
+		"left_ankle_y": float(_baseline_accumulator["left_ankle_y"]) / float(frames),
+		"right_ankle_y": float(_baseline_accumulator["right_ankle_y"]) / float(frames),
 	}
 
 func _estimate_height_state(height_ratio: float, hip_center_delta_y: float) -> StringName:
@@ -327,7 +426,6 @@ func _estimate_height_state(height_ratio: float, hip_center_delta_y: float) -> S
 		return &"lowered"
 	if height_ratio >= 0.95:
 		return &"standing"
-		
 	return &"transition"
 
 func _average_x(points: Array) -> float:
@@ -354,7 +452,7 @@ func _get_smoothing_window_size() -> int:
 	if _config == null:
 		return 4
 	var smoothing_factor := clampf(float(_config.smoothing_factor), 0.0, 1.0)
-	return maxi(int(round(2.0 + smoothing_factor * 4.0)), 2)
+	return maxi(int(round(1.0 + smoothing_factor * 4.0)), 1)
 
 func _get_min_visibility() -> float:
 	if _config == null:
@@ -371,3 +469,246 @@ func _get_tracking_timeout_ms() -> int:
 
 func _get_reacquire_window_frames() -> int:
 	return 2
+
+func _reset_gesture_state() -> void:
+	_gesture_state = {
+		"states": {
+			"guard": false,
+			"squat": false,
+			"lean_left": false,
+			"lean_right": false,
+			"sidestep_left": false,
+			"sidestep_right": false,
+			"leg_lift_left": false,
+			"leg_lift_right": false,
+		},
+		"ready": {
+			"punch_left": true,
+			"punch_right": true,
+			"hook_left": true,
+			"hook_right": true,
+			"uppercut_left": true,
+			"uppercut_right": true,
+			"knee_left": true,
+			"knee_right": true,
+		},
+	}
+
+func _clear_transient_gesture_state() -> void:
+	_reset_gesture_state()
+
+func _detect_boxing_events(landmarks_by_id: Dictionary, metrics: Dictionary) -> Array:
+	var events: Array = []
+	var measurements: Dictionary = metrics.get("measurements", {})
+	if not bool(_baseline.get("is_calibrated", false)):
+		return events
+	var shoulder_width := maxf(float(measurements.get("shoulder_width", float(_baseline.get("shoulder_width", 0.0)))), 0.000001)
+	var torso_height := maxf(float(measurements.get("torso_height", float(_baseline.get("torso_height", 0.0)))), 0.000001)
+	var left_shoulder := PoseMetrics.get_landmark(landmarks_by_id, PoseLandmarkIds.LEFT_SHOULDER)
+	var right_shoulder := PoseMetrics.get_landmark(landmarks_by_id, PoseLandmarkIds.RIGHT_SHOULDER)
+	var left_elbow := PoseMetrics.get_landmark(landmarks_by_id, PoseLandmarkIds.LEFT_ELBOW)
+	var right_elbow := PoseMetrics.get_landmark(landmarks_by_id, PoseLandmarkIds.RIGHT_ELBOW)
+	var left_wrist := PoseMetrics.get_landmark(landmarks_by_id, PoseLandmarkIds.LEFT_WRIST)
+	var right_wrist := PoseMetrics.get_landmark(landmarks_by_id, PoseLandmarkIds.RIGHT_WRIST)
+	var left_hip := PoseMetrics.get_landmark(landmarks_by_id, PoseLandmarkIds.LEFT_HIP)
+	var right_hip := PoseMetrics.get_landmark(landmarks_by_id, PoseLandmarkIds.RIGHT_HIP)
+	var left_ankle := PoseMetrics.get_landmark(landmarks_by_id, PoseLandmarkIds.LEFT_ANKLE)
+	var right_ankle := PoseMetrics.get_landmark(landmarks_by_id, PoseLandmarkIds.RIGHT_ANKLE)
+	var velocities: Dictionary = metrics.get("velocities", {})
+	var left_hand_velocity: Vector3 = velocities.get("left_hand", Vector3.ZERO)
+	var right_hand_velocity: Vector3 = velocities.get("right_hand", Vector3.ZERO)
+
+	_process_guard(events, left_shoulder, right_shoulder, left_elbow, right_elbow, left_wrist, right_wrist, shoulder_width)
+	_process_squat(events, float(measurements.get("height_ratio", 1.0)))
+	_process_lean(events, float(measurements.get("head_lateral_offset", 0.0)), float(measurements.get("hip_lateral_offset", 0.0)), float(measurements.get("head_drop_ratio", 0.0)))
+	_process_sidestep(events, float(measurements.get("lateral_offset", 0.0)), float(measurements.get("head_lateral_offset", 0.0)), float(measurements.get("hip_lateral_offset", 0.0)))
+	_process_knee(events, "left", float(measurements.get("left_knee_rise", 0.0)), float(measurements.get("left_foot_rise", 0.0)), float(measurements.get("right_knee_rise", 0.0)), left_hip, left_ankle, torso_height)
+	_process_knee(events, "right", float(measurements.get("right_knee_rise", 0.0)), float(measurements.get("right_foot_rise", 0.0)), float(measurements.get("left_knee_rise", 0.0)), right_hip, right_ankle, torso_height)
+	_process_leg_lift(events, "left", float(measurements.get("left_leg_angle_from_core_deg", 0.0)), left_hip, left_ankle, torso_height)
+	_process_leg_lift(events, "right", float(measurements.get("right_leg_angle_from_core_deg", 0.0)), right_hip, right_ankle, torso_height)
+	if not _get_state("guard"):
+		_process_straight_punch(events, "left", left_shoulder, left_elbow, left_wrist, float(measurements.get("left_elbow_bend_deg", 0.0)), float(measurements.get("left_arm_extension", 0.0)), left_hand_velocity, shoulder_width)
+		_process_straight_punch(events, "right", right_shoulder, right_elbow, right_wrist, float(measurements.get("right_elbow_bend_deg", 0.0)), float(measurements.get("right_arm_extension", 0.0)), right_hand_velocity, shoulder_width)
+		_process_hook(events, "left", left_shoulder, left_elbow, left_wrist, float(measurements.get("left_elbow_bend_deg", 0.0)), left_hand_velocity, shoulder_width)
+		_process_hook(events, "right", right_shoulder, right_elbow, right_wrist, float(measurements.get("right_elbow_bend_deg", 0.0)), right_hand_velocity, shoulder_width)
+		_process_uppercut(events, "left", left_elbow, left_wrist, float(measurements.get("left_elbow_bend_deg", 0.0)), left_hand_velocity, shoulder_width)
+		_process_uppercut(events, "right", right_elbow, right_wrist, float(measurements.get("right_elbow_bend_deg", 0.0)), right_hand_velocity, shoulder_width)
+	return events
+
+func _process_straight_punch(events: Array, side: String, shoulder: Dictionary, elbow: Dictionary, wrist: Dictionary, elbow_bend_deg: float, arm_extension: float, hand_velocity: Vector3, shoulder_width: float) -> void:
+	var event_name := "punch_%s" % side
+	if arm_extension <= PUNCH_READY_EXTENSION:
+		_set_ready(event_name, true)
+	if not _is_ready(event_name):
+		return
+	if shoulder.is_empty() or elbow.is_empty() or wrist.is_empty():
+		return
+	var outward_velocity := hand_velocity.x if side == "right" else -hand_velocity.x
+	var lateral_speed := absf(hand_velocity.x)
+	var vertical_speed := absf(hand_velocity.y)
+	var outward_distance: float = float(shoulder.get("x", 0.0) - wrist.get("x", 0.0) if side == "left" else wrist.get("x", 0.0) - shoulder.get("x", 0.0))
+	if arm_extension < PUNCH_FIRE_EXTENSION:
+		return
+	if elbow_bend_deg < PUNCH_ELBOW_STRAIGHT_MIN_DEG:
+		return
+	if outward_velocity <= shoulder_width * 1.35:
+		return
+	if lateral_speed <= vertical_speed * PUNCH_LATERAL_VELOCITY_RATIO:
+		return
+	if float(outward_distance) <= shoulder_width * 0.75:
+		return
+	_emit_power_event(events, event_name, clampf(0.55 + (arm_extension - PUNCH_FIRE_EXTENSION) * 2.5 + outward_velocity / maxf(shoulder_width * 6.0, 0.000001), 0.0, 1.0))
+	_set_ready(event_name, false)
+
+func _process_hook(events: Array, side: String, shoulder: Dictionary, elbow: Dictionary, wrist: Dictionary, elbow_bend_deg: float, hand_velocity: Vector3, shoulder_width: float) -> void:
+	var event_name := "hook_%s" % side
+	if absf(hand_velocity.x) <= shoulder_width * 1.10:
+		_set_ready(event_name, true)
+	if not _is_ready(event_name):
+		return
+	if shoulder.is_empty() or elbow.is_empty() or wrist.is_empty():
+		return
+	var outward_velocity := hand_velocity.x if side == "right" else -hand_velocity.x
+	var lateral_speed := absf(hand_velocity.x)
+	var vertical_speed := absf(hand_velocity.y)
+	if elbow_bend_deg < HOOK_ELBOW_MIN_DEG or elbow_bend_deg > HOOK_ELBOW_MAX_DEG:
+		return
+	if absf(float(wrist.get("y", 0.0)) - float(elbow.get("y", 0.0))) > shoulder_width * 0.40:
+		return
+	if outward_velocity <= shoulder_width * 1.50:
+		return
+	if lateral_speed <= vertical_speed * 1.6:
+		return
+	var outward_distance: float = float(shoulder.get("x", 0.0) - wrist.get("x", 0.0) if side == "left" else wrist.get("x", 0.0) - shoulder.get("x", 0.0))
+	if float(outward_distance) <= shoulder_width * 0.45:
+		return
+	_emit_power_event(events, event_name, clampf(0.45 + outward_velocity / maxf(shoulder_width * 5.5, 0.000001), 0.0, 1.0))
+	_set_ready(event_name, false)
+
+func _process_uppercut(events: Array, side: String, elbow: Dictionary, wrist: Dictionary, elbow_bend_deg: float, hand_velocity: Vector3, shoulder_width: float) -> void:
+	var event_name := "uppercut_%s" % side
+	if absf(hand_velocity.y) <= shoulder_width * 1.10:
+		_set_ready(event_name, true)
+	if not _is_ready(event_name):
+		return
+	if elbow.is_empty() or wrist.is_empty():
+		return
+	if elbow_bend_deg < UPPERCUT_ELBOW_MIN_DEG or elbow_bend_deg > UPPERCUT_ELBOW_MAX_DEG:
+		return
+	if absf(float(wrist.get("x", 0.0)) - float(elbow.get("x", 0.0))) > shoulder_width * 0.28:
+		return
+	if hand_velocity.y <= shoulder_width * 1.40:
+		return
+	if absf(hand_velocity.y) <= absf(hand_velocity.x) * 1.2:
+		return
+	_emit_power_event(events, event_name, clampf(0.45 + hand_velocity.y / maxf(shoulder_width * 5.0, 0.000001), 0.0, 1.0))
+	_set_ready(event_name, false)
+
+func _process_guard(events: Array, left_shoulder: Dictionary, right_shoulder: Dictionary, left_elbow: Dictionary, right_elbow: Dictionary, left_wrist: Dictionary, right_wrist: Dictionary, shoulder_width: float) -> void:
+	if left_shoulder.is_empty() or right_shoulder.is_empty() or left_elbow.is_empty() or right_elbow.is_empty() or left_wrist.is_empty() or right_wrist.is_empty():
+		_set_state_toggle(events, "guard", false)
+		return
+	var aligned := absf(float(left_wrist.get("x", 0.0)) - float(left_elbow.get("x", 0.0))) <= shoulder_width * 0.32
+	aligned = aligned and absf(float(right_wrist.get("x", 0.0)) - float(right_elbow.get("x", 0.0))) <= shoulder_width * 0.32
+	var raised := float(left_wrist.get("y", 0.0)) >= float(left_shoulder.get("y", 0.0)) - shoulder_width * 0.10
+	raised = raised and float(right_wrist.get("y", 0.0)) >= float(right_shoulder.get("y", 0.0)) - shoulder_width * 0.10
+	var wrist_near_head := absf(float(left_wrist.get("x", 0.0)) - float(left_shoulder.get("x", 0.0))) <= shoulder_width * 0.55
+	wrist_near_head = wrist_near_head and absf(float(right_wrist.get("x", 0.0)) - float(right_shoulder.get("x", 0.0))) <= shoulder_width * 0.55
+	_set_state_toggle(events, "guard", aligned and raised and wrist_near_head)
+
+func _process_squat(events: Array, height_ratio: float) -> void:
+	var active: bool = _get_state("squat")
+	if not active and height_ratio <= 0.82:
+		_set_state_toggle(events, "squat", true)
+	elif active and height_ratio >= 0.92:
+		_set_state_toggle(events, "squat", false)
+
+func _process_lean(events: Array, head_offset: float, hip_offset: float, head_drop_ratio: float) -> void:
+	var relative_offset := head_offset - hip_offset
+	var leaning_left := head_offset <= -0.30 and relative_offset <= -0.12 and head_drop_ratio >= 0.05
+	var leaning_right := head_offset >= 0.30 and relative_offset >= 0.12 and head_drop_ratio >= 0.05
+	var neutral := absf(head_offset) <= 0.12 and absf(relative_offset) <= 0.08
+	if leaning_left:
+		_set_state_toggle(events, "lean_right", false)
+		_set_state_toggle(events, "lean_left", true)
+	elif leaning_right:
+		_set_state_toggle(events, "lean_left", false)
+		_set_state_toggle(events, "lean_right", true)
+	elif neutral:
+		_set_state_toggle(events, "lean_left", false)
+		_set_state_toggle(events, "lean_right", false)
+
+func _process_sidestep(events: Array, lateral_offset: float, head_offset: float, hip_offset: float) -> void:
+	var body_aligned := absf(head_offset - hip_offset) <= 0.18
+	if lateral_offset <= -0.45 and body_aligned:
+		_set_state_toggle(events, "sidestep_right", false)
+		_set_state_toggle(events, "sidestep_left", true)
+	elif lateral_offset >= 0.45 and body_aligned:
+		_set_state_toggle(events, "sidestep_left", false)
+		_set_state_toggle(events, "sidestep_right", true)
+	elif absf(lateral_offset) <= 0.14:
+		_set_state_toggle(events, "sidestep_left", false)
+		_set_state_toggle(events, "sidestep_right", false)
+
+func _process_knee(events: Array, side: String, knee_rise: float, foot_rise: float, opposite_knee_rise: float, hip: Dictionary, ankle: Dictionary, torso_height: float) -> void:
+	var event_name := "knee_%s" % side
+	var lateral_offset := 0.0
+	if not hip.is_empty() and not ankle.is_empty() and torso_height > 0.0:
+		lateral_offset = absf(float(ankle.get("x", 0.0)) - float(hip.get("x", 0.0))) / torso_height
+	var foot_fallback := foot_rise * 0.85 if lateral_offset <= 0.30 else 0.0
+	var rise := maxf(knee_rise, foot_fallback)
+	if rise <= 0.10:
+		_set_ready(event_name, true)
+	if not _is_ready(event_name):
+		return
+	if opposite_knee_rise >= 0.18 and absf(knee_rise - opposite_knee_rise) <= 0.08:
+		return
+	if rise < 0.22:
+		return
+	_emit_power_event(events, event_name, clampf((rise - 0.22) / 0.25 + 0.45, 0.0, 1.0))
+	_set_ready(event_name, false)
+
+func _process_leg_lift(events: Array, side: String, leg_angle_from_core_deg: float, hip: Dictionary, ankle: Dictionary, torso_height: float) -> void:
+	var state_name := "leg_lift_%s" % side
+	if hip.is_empty() or ankle.is_empty() or torso_height <= 0.0:
+		_set_state_toggle(events, state_name, false)
+		return
+	var ankle_raise := maxf(0.0, (float(ankle.get("y", 0.0)) - float(hip.get("y", 0.0))) / torso_height + 1.0)
+	var should_start := leg_angle_from_core_deg >= 32.0 and ankle_raise >= 0.32
+	var should_end := leg_angle_from_core_deg <= 18.0 or ankle_raise <= 0.18
+	if not _get_state(state_name) and should_start:
+		_set_state_toggle(events, state_name, true)
+	elif _get_state(state_name) and should_end:
+		_set_state_toggle(events, state_name, false)
+
+func _set_state_toggle(events: Array, state_name: String, active: bool) -> void:
+	if _get_state(state_name) == active:
+		return
+	_gesture_state["states"][state_name] = active
+	var suffix := "start" if active else "end"
+	events.append({"name": StringName("%s_%s" % [state_name, suffix])})
+
+func _emit_power_event(events: Array, event_name: String, power: float) -> void:
+	events.append({
+		"name": StringName(event_name),
+		"power": clampf(power, 0.0, 1.0),
+	})
+
+func _get_state(state_name: String) -> bool:
+	return bool(_gesture_state.get("states", {}).get(state_name, false))
+
+func _set_ready(event_name: String, ready: bool) -> void:
+	var ready_map: Dictionary = _gesture_state.get("ready", {})
+	ready_map[event_name] = ready
+	_gesture_state["ready"] = ready_map
+
+func _is_ready(event_name: String) -> bool:
+	return bool(_gesture_state.get("ready", {}).get(event_name, true))
+
+func _leg_angle_from_core_deg(hip: Dictionary, ankle: Dictionary) -> float:
+	if hip.is_empty() or ankle.is_empty():
+		return 0.0
+	var vector := PoseMetrics.to_vector2(ankle) - PoseMetrics.to_vector2(hip)
+	if vector.length() <= 0.000001:
+		return 0.0
+	return absf(rad_to_deg(vector.angle_to(Vector2.UP)))

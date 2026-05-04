@@ -1,4 +1,4 @@
-extends "res://addons/aerobeat-input-core/src/interfaces/input_provider.gd"
+extends "res://addons/aerobeat-input-core/src/interfaces/boxing_input.gd"
 ## Assembly-facing AeroInputProvider adapter for this addon.
 ##
 ## This addon entrypoint is for consuming projects that mount this repo under
@@ -8,11 +8,12 @@ extends "res://addons/aerobeat-input-core/src/interfaces/input_provider.gd"
 ## directly so this repo can still be worked on without hiding assembly wiring here.
 ##
 ## Current truthful scope:
+## - boxing gameplay intent events from conservative 2D-camera detectors
 ## - lifecycle + polling access for head/hands/feet positions
 ## - tracking state + confidence queries
 ## - shared detector substrate metrics for normalization and body-state estimation
 ## - estimated per-limb velocities from 2D landmark deltas
-## - no gameplay gesture callbacks, haptics, or 6DOF transform output yet
+## - no haptics or 6DOF transform output yet
 
 const PROVIDER_ID := "mediapipe_python"
 
@@ -48,7 +49,7 @@ func get_provider_id() -> String:
 
 func has_capability(capability: Capability) -> bool:
 	match capability:
-		Capability.LOWER_BODY, Capability.VELOCITY:
+		Capability.GESTURE_RECOGNITION, Capability.LOWER_BODY, Capability.VELOCITY:
 			return true
 		_:
 			return false
@@ -125,9 +126,62 @@ func _ensure_provider() -> void:
 	_provider.tracking_lost.connect(func() -> void:
 		failed.emit("Tracking lost")
 	)
+	_connect_provider_signals()
 	if _provider.config == null:
 		_provider.config = _new_local_config()
 	_config = _provider.config
+
+func _connect_provider_signals() -> void:
+	if _provider == null:
+		return
+	if not _provider.punch_left.is_connected(_on_provider_punch_left):
+		_provider.punch_left.connect(_on_provider_punch_left)
+	if not _provider.punch_right.is_connected(_on_provider_punch_right):
+		_provider.punch_right.connect(_on_provider_punch_right)
+	if not _provider.uppercut_left.is_connected(_on_provider_uppercut_left):
+		_provider.uppercut_left.connect(_on_provider_uppercut_left)
+	if not _provider.uppercut_right.is_connected(_on_provider_uppercut_right):
+		_provider.uppercut_right.connect(_on_provider_uppercut_right)
+	if not _provider.hook_left.is_connected(_on_provider_hook_left):
+		_provider.hook_left.connect(_on_provider_hook_left)
+	if not _provider.hook_right.is_connected(_on_provider_hook_right):
+		_provider.hook_right.connect(_on_provider_hook_right)
+	if not _provider.guard_start.is_connected(_on_provider_guard_start):
+		_provider.guard_start.connect(_on_provider_guard_start)
+	if not _provider.guard_end.is_connected(_on_provider_guard_end):
+		_provider.guard_end.connect(_on_provider_guard_end)
+	if not _provider.squat_start.is_connected(_on_provider_squat_start):
+		_provider.squat_start.connect(_on_provider_squat_start)
+	if not _provider.squat_end.is_connected(_on_provider_squat_end):
+		_provider.squat_end.connect(_on_provider_squat_end)
+	if not _provider.lean_left_start.is_connected(_on_provider_lean_left_start):
+		_provider.lean_left_start.connect(_on_provider_lean_left_start)
+	if not _provider.lean_left_end.is_connected(_on_provider_lean_left_end):
+		_provider.lean_left_end.connect(_on_provider_lean_left_end)
+	if not _provider.lean_right_start.is_connected(_on_provider_lean_right_start):
+		_provider.lean_right_start.connect(_on_provider_lean_right_start)
+	if not _provider.lean_right_end.is_connected(_on_provider_lean_right_end):
+		_provider.lean_right_end.connect(_on_provider_lean_right_end)
+	if not _provider.sidestep_left_start.is_connected(_on_provider_sidestep_left_start):
+		_provider.sidestep_left_start.connect(_on_provider_sidestep_left_start)
+	if not _provider.sidestep_left_end.is_connected(_on_provider_sidestep_left_end):
+		_provider.sidestep_left_end.connect(_on_provider_sidestep_left_end)
+	if not _provider.sidestep_right_start.is_connected(_on_provider_sidestep_right_start):
+		_provider.sidestep_right_start.connect(_on_provider_sidestep_right_start)
+	if not _provider.sidestep_right_end.is_connected(_on_provider_sidestep_right_end):
+		_provider.sidestep_right_end.connect(_on_provider_sidestep_right_end)
+	if not _provider.knee_left.is_connected(_on_provider_knee_left):
+		_provider.knee_left.connect(_on_provider_knee_left)
+	if not _provider.knee_right.is_connected(_on_provider_knee_right):
+		_provider.knee_right.connect(_on_provider_knee_right)
+	if not _provider.leg_lift_left_start.is_connected(_on_provider_leg_lift_left_start):
+		_provider.leg_lift_left_start.connect(_on_provider_leg_lift_left_start)
+	if not _provider.leg_lift_left_end.is_connected(_on_provider_leg_lift_left_end):
+		_provider.leg_lift_left_end.connect(_on_provider_leg_lift_left_end)
+	if not _provider.leg_lift_right_start.is_connected(_on_provider_leg_lift_right_start):
+		_provider.leg_lift_right_start.connect(_on_provider_leg_lift_right_start)
+	if not _provider.leg_lift_right_end.is_connected(_on_provider_leg_lift_right_end):
+		_provider.leg_lift_right_end.connect(_on_provider_leg_lift_right_end)
 
 func _apply_settings(settings_json: String) -> void:
 	if settings_json.is_empty():
@@ -162,6 +216,78 @@ func _new_local_config() -> Variant:
 
 func _resolve_local_path(relative_path: String) -> String:
 	return "%s/%s" % [get_script().resource_path.get_base_dir(), relative_path]
+
+func _on_provider_punch_left(power: float) -> void:
+	punch_left.emit(power)
+
+func _on_provider_punch_right(power: float) -> void:
+	punch_right.emit(power)
+
+func _on_provider_uppercut_left(power: float) -> void:
+	uppercut_left.emit(power)
+
+func _on_provider_uppercut_right(power: float) -> void:
+	uppercut_right.emit(power)
+
+func _on_provider_hook_left(power: float) -> void:
+	hook_left.emit(power)
+
+func _on_provider_hook_right(power: float) -> void:
+	hook_right.emit(power)
+
+func _on_provider_guard_start() -> void:
+	guard_start.emit()
+
+func _on_provider_guard_end() -> void:
+	guard_end.emit()
+
+func _on_provider_squat_start() -> void:
+	squat_start.emit()
+
+func _on_provider_squat_end() -> void:
+	squat_end.emit()
+
+func _on_provider_lean_left_start() -> void:
+	lean_left_start.emit()
+
+func _on_provider_lean_left_end() -> void:
+	lean_left_end.emit()
+
+func _on_provider_lean_right_start() -> void:
+	lean_right_start.emit()
+
+func _on_provider_lean_right_end() -> void:
+	lean_right_end.emit()
+
+func _on_provider_sidestep_left_start() -> void:
+	sidestep_left_start.emit()
+
+func _on_provider_sidestep_left_end() -> void:
+	sidestep_left_end.emit()
+
+func _on_provider_sidestep_right_start() -> void:
+	sidestep_right_start.emit()
+
+func _on_provider_sidestep_right_end() -> void:
+	sidestep_right_end.emit()
+
+func _on_provider_knee_left(power: float) -> void:
+	knee_left.emit(power)
+
+func _on_provider_knee_right(power: float) -> void:
+	knee_right.emit(power)
+
+func _on_provider_leg_lift_left_start() -> void:
+	leg_lift_left_start.emit()
+
+func _on_provider_leg_lift_left_end() -> void:
+	leg_lift_left_end.emit()
+
+func _on_provider_leg_lift_right_start() -> void:
+	leg_lift_right_start.emit()
+
+func _on_provider_leg_lift_right_end() -> void:
+	leg_lift_right_end.emit()
 
 func _to_provider_mode(mode: TrackingMode) -> int:
 	return 1 if mode == TrackingMode.MODE_3D else 0

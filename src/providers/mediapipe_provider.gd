@@ -11,6 +11,31 @@ signal multi_pose_updated(poses: Array)  # Array of {pose_id, landmarks}
 signal tracking_lost()
 signal tracking_restored()
 
+signal punch_left(power: float)
+signal punch_right(power: float)
+signal uppercut_left(power: float)
+signal uppercut_right(power: float)
+signal hook_left(power: float)
+signal hook_right(power: float)
+signal guard_start()
+signal guard_end()
+signal squat_start()
+signal squat_end()
+signal lean_left_start()
+signal lean_left_end()
+signal lean_right_start()
+signal lean_right_end()
+signal sidestep_left_start()
+signal sidestep_left_end()
+signal sidestep_right_start()
+signal sidestep_right_end()
+signal knee_left(power: float)
+signal knee_right(power: float)
+signal leg_lift_left_start()
+signal leg_lift_left_end()
+signal leg_lift_right_start()
+signal leg_lift_right_end()
+
 @export var config = null
 
 var _server = null
@@ -205,13 +230,14 @@ func _on_multi_pose_received(poses: Array):
 
 	multi_pose_updated.emit(_all_poses.duplicate(true))
 
-func _process_primary_landmarks(landmarks: Array, emit_signal: bool, overwrite_all_poses: bool) -> void:
+func _process_primary_landmarks(landmarks: Array, emit_signal: bool, overwrite_all_poses: bool, timestamp_ms: int = 0) -> void:
 	_ensure_detector_substrate()
 	var normalized_landmarks := _normalize_landmarks(landmarks)
 	var state: Dictionary = {}
 	if _detector_substrate != null:
-		state = _detector_substrate.process_landmarks(normalized_landmarks)
+		state = _detector_substrate.process_landmarks(normalized_landmarks, timestamp_ms)
 		_landmarks = state.get("landmarks_by_id", {}).duplicate(true)
+		_emit_detector_events(state.get("events", []))
 	else:
 		_landmarks.clear()
 		for landmark: Variant in normalized_landmarks:
@@ -227,6 +253,64 @@ func _process_primary_landmarks(landmarks: Array, emit_signal: bool, overwrite_a
 	_last_update_time_ms = Time.get_ticks_msec()
 	if emit_signal:
 		pose_updated.emit(normalized_landmarks)
+
+func _emit_detector_events(events: Array) -> void:
+	for event_variant: Variant in events:
+		if not event_variant is Dictionary:
+			continue
+		var event_data: Dictionary = event_variant
+		var event_name := StringName(event_data.get("name", StringName()))
+		if event_name == StringName():
+			continue
+		match String(event_name):
+			"punch_left":
+				punch_left.emit(float(event_data.get("power", 0.0)))
+			"punch_right":
+				punch_right.emit(float(event_data.get("power", 0.0)))
+			"uppercut_left":
+				uppercut_left.emit(float(event_data.get("power", 0.0)))
+			"uppercut_right":
+				uppercut_right.emit(float(event_data.get("power", 0.0)))
+			"hook_left":
+				hook_left.emit(float(event_data.get("power", 0.0)))
+			"hook_right":
+				hook_right.emit(float(event_data.get("power", 0.0)))
+			"guard_start":
+				guard_start.emit()
+			"guard_end":
+				guard_end.emit()
+			"squat_start":
+				squat_start.emit()
+			"squat_end":
+				squat_end.emit()
+			"lean_left_start":
+				lean_left_start.emit()
+			"lean_left_end":
+				lean_left_end.emit()
+			"lean_right_start":
+				lean_right_start.emit()
+			"lean_right_end":
+				lean_right_end.emit()
+			"sidestep_left_start":
+				sidestep_left_start.emit()
+			"sidestep_left_end":
+				sidestep_left_end.emit()
+			"sidestep_right_start":
+				sidestep_right_start.emit()
+			"sidestep_right_end":
+				sidestep_right_end.emit()
+			"knee_left":
+				knee_left.emit(float(event_data.get("power", 0.0)))
+			"knee_right":
+				knee_right.emit(float(event_data.get("power", 0.0)))
+			"leg_lift_left_start":
+				leg_lift_left_start.emit()
+			"leg_lift_left_end":
+				leg_lift_left_end.emit()
+			"leg_lift_right_start":
+				leg_lift_right_start.emit()
+			"leg_lift_right_end":
+				leg_lift_right_end.emit()
 
 func _normalize_landmarks(landmarks: Array) -> Array:
 	var normalized: Array = []
