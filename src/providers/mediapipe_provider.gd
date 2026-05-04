@@ -17,6 +17,10 @@ signal uppercut_left(power: float)
 signal uppercut_right(power: float)
 signal hook_left(power: float)
 signal hook_right(power: float)
+signal swing_left(placement: StringName, direction: StringName)
+signal swing_right(placement: StringName, direction: StringName)
+signal trail_left(placement: StringName, direction: StringName)
+signal trail_right(placement: StringName, direction: StringName)
 signal guard_start()
 signal guard_end()
 signal squat_start()
@@ -275,6 +279,14 @@ func _emit_detector_events(events: Array) -> void:
 				hook_left.emit(float(event_data.get("power", 0.0)))
 			"hook_right":
 				hook_right.emit(float(event_data.get("power", 0.0)))
+			"swing_left":
+				swing_left.emit(StringName(event_data.get("placement", &"center")), StringName(event_data.get("direction", StringName())))
+			"swing_right":
+				swing_right.emit(StringName(event_data.get("placement", &"center")), StringName(event_data.get("direction", StringName())))
+			"trail_left":
+				trail_left.emit(StringName(event_data.get("placement", &"center")), StringName(event_data.get("direction", StringName())))
+			"trail_right":
+				trail_right.emit(StringName(event_data.get("placement", &"center")), StringName(event_data.get("direction", StringName())))
 			"guard_start":
 				guard_start.emit()
 			"guard_end":

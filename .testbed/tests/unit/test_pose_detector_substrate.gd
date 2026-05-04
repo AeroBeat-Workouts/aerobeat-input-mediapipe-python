@@ -89,6 +89,47 @@ func test_detects_straight_hook_and_uppercut_events_truthfully() -> void:
 	}), 1600)
 	assert_eq(_event_names(uppercut_state.get("events", [])), ["uppercut_left"])
 
+func test_detects_flow_swing_events_with_distinct_placement_and_direction() -> void:
+	_calibrate_stance()
+	substrate.process_landmarks(_make_pose_frame(), 1100)
+	substrate.process_landmarks(_make_pose_frame({
+		PoseLandmarkIds.LEFT_ELBOW: {"x": 0.28, "y": 0.66},
+		PoseLandmarkIds.LEFT_WRIST: {"x": 0.18, "y": 0.62},
+	}), 1180)
+	var swing_state := substrate.process_landmarks(_make_pose_frame({
+		PoseLandmarkIds.LEFT_ELBOW: {"x": 0.21, "y": 0.70},
+		PoseLandmarkIds.LEFT_WRIST: {"x": 0.08, "y": 0.70},
+	}), 1260)
+	var flow_events := _flow_events(swing_state.get("events", []))
+	assert_eq(flow_events.size(), 1)
+	assert_eq(flow_events[0]["name"], "swing_left")
+	assert_eq(flow_events[0]["placement"], "left")
+	assert_eq(flow_events[0]["direction"], "left")
+
+func test_detects_flow_trail_as_continuation_motion() -> void:
+	_calibrate_stance()
+	substrate.process_landmarks(_make_pose_frame(), 2000)
+	var timestamps := [2100, 2200, 2300, 2400]
+	var wrist_positions := [
+		{"x": 0.72, "y": 0.60},
+		{"x": 0.72, "y": 0.70},
+		{"x": 0.72, "y": 0.80},
+		{"x": 0.72, "y": 0.90},
+	]
+	var emitted_events: Array = []
+	for idx in range(timestamps.size()):
+		var state := substrate.process_landmarks(_make_pose_frame({
+			PoseLandmarkIds.RIGHT_ELBOW: {"x": 0.66, "y": wrist_positions[idx]["y"] - 0.04},
+			PoseLandmarkIds.RIGHT_WRIST: wrist_positions[idx],
+		}), timestamps[idx])
+		emitted_events.append_array(_flow_events(state.get("events", [])))
+	assert_true(bool(substrate.get_latest_state().get("gesture_states", {}).get("trail_right", false)))
+	assert_true(emitted_events.size() >= 2)
+	assert_eq(emitted_events[0]["name"], "trail_right")
+	assert_eq(emitted_events[0]["placement"], "right")
+	assert_eq(emitted_events[0]["direction"], "up")
+	assert_eq(emitted_events[emitted_events.size() - 1]["name"], "trail_right")
+
 func test_detects_guard_squat_lean_and_sidestep_state_events() -> void:
 	_calibrate_stance()
 	var guard_start_state := substrate.process_landmarks(_make_pose_frame({
@@ -149,6 +190,22 @@ func _calibrate_stance() -> void:
 	for idx in range(5):
 		var state := substrate.process_landmarks(_make_pose_frame(), 1000 + idx * 16)
 		assert_eq(String(state["tracking_state"]), "tracking")
+
+func _flow_events(events: Array) -> Array:
+	var flow_events: Array = []
+	for event_variant: Variant in events:
+		if not event_variant is Dictionary:
+			continue
+		var event_data: Dictionary = event_variant
+		var event_name := String(event_data.get("name", ""))
+		if not event_name.begins_with("swing_") and not event_name.begins_with("trail_"):
+			continue
+		flow_events.append({
+			"name": event_name,
+			"placement": String(event_data.get("placement", "")),
+			"direction": String(event_data.get("direction", "")),
+		})
+	return flow_events
 
 func _event_names(events: Array) -> Array:
 	var names: Array = []

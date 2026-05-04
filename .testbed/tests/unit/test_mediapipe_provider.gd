@@ -100,6 +100,51 @@ func test_get_landmark_position_for_pose_filters_by_visibility() -> void:
 	assert_null(provider.get_landmark_position_for_pose(0, provider.LANDMARK_LEFT_WRIST))
 	assert_eq(provider.get_landmark_position_for_pose(0, provider.LANDMARK_RIGHT_WRIST), Vector2(0.9, 0.1))
 
+func test_flow_detector_events_emit_provider_signals_with_payload() -> void:
+	for idx in range(5):
+		provider._process_primary_landmarks(_make_pose_frame(), false, true, 1000 + idx * 16)
+	var swing_calls: Array = []
+	var trail_calls: Array = []
+	provider.swing_left.connect(func(placement: StringName, direction: StringName) -> void:
+		swing_calls.append([String(placement), String(direction)])
+	)
+	provider.trail_right.connect(func(placement: StringName, direction: StringName) -> void:
+		trail_calls.append([String(placement), String(direction)])
+	)
+	provider._process_primary_landmarks(_make_pose_frame(), false, true, 1100)
+	provider._process_primary_landmarks(_make_pose_frame({
+		PoseLandmarkIds.LEFT_ELBOW: {"x": 0.28, "y": 0.34},
+		PoseLandmarkIds.LEFT_WRIST: {"x": 0.18, "y": 0.38},
+	}), false, true, 1180)
+	provider._process_primary_landmarks(_make_pose_frame({
+		PoseLandmarkIds.LEFT_ELBOW: {"x": 0.21, "y": 0.30},
+		PoseLandmarkIds.LEFT_WRIST: {"x": 0.08, "y": 0.30},
+	}), false, true, 1260)
+	assert_eq(swing_calls, [["left", "left"]])
+	provider._process_primary_landmarks(_make_pose_frame(), false, true, 2000)
+	provider._process_primary_landmarks(_make_pose_frame({
+		PoseLandmarkIds.RIGHT_ELBOW: {"x": 0.66, "y": 0.36},
+		PoseLandmarkIds.RIGHT_WRIST: {"x": 0.72, "y": 0.40},
+	}), false, true, 2100)
+	provider._process_primary_landmarks(_make_pose_frame({
+		PoseLandmarkIds.RIGHT_ELBOW: {"x": 0.66, "y": 0.26},
+		PoseLandmarkIds.RIGHT_WRIST: {"x": 0.72, "y": 0.30},
+	}), false, true, 2200)
+	provider._process_primary_landmarks(_make_pose_frame({
+		PoseLandmarkIds.RIGHT_ELBOW: {"x": 0.66, "y": 0.16},
+		PoseLandmarkIds.RIGHT_WRIST: {"x": 0.72, "y": 0.20},
+	}), false, true, 2300)
+	provider._process_primary_landmarks(_make_pose_frame({
+		PoseLandmarkIds.RIGHT_ELBOW: {"x": 0.66, "y": 0.06},
+		PoseLandmarkIds.RIGHT_WRIST: {"x": 0.72, "y": 0.10},
+	}), false, true, 2400)
+	provider._process_primary_landmarks(_make_pose_frame({
+		PoseLandmarkIds.RIGHT_ELBOW: {"x": 0.66, "y": -0.04},
+		PoseLandmarkIds.RIGHT_WRIST: {"x": 0.72, "y": 0.00},
+	}), false, true, 2500)
+	assert_true(trail_calls.size() >= 2)
+	assert_eq(trail_calls[0], ["right", "up"])
+
 func test_detector_substrate_populates_velocity_measurements_and_events() -> void:
 	for idx in range(5):
 		provider._process_primary_landmarks(_make_pose_frame(), false, true, 1000 + idx * 16)

@@ -20,6 +20,19 @@ const HOOK_ELBOW_MAX_DEG := 145.0
 const UPPERCUT_ELBOW_MIN_DEG := 35.0
 const UPPERCUT_ELBOW_MAX_DEG := 125.0
 
+const FLOW_HISTORY_MAX_MS := 560
+const FLOW_SWING_WINDOW_MIN_MS := 120
+const FLOW_SWING_WINDOW_MAX_MS := 320
+const FLOW_SWING_MIN_ARC_RATIO := 0.72
+const FLOW_SWING_MIN_TRAVEL_RATIO := 0.42
+const FLOW_SWING_MIN_SPEED_RATIO := 1.45
+const FLOW_TRAIL_WINDOW_MIN_MS := 260
+const FLOW_TRAIL_MIN_ARC_RATIO := 0.95
+const FLOW_TRAIL_MIN_TRAVEL_RATIO := 0.34
+const FLOW_TRAIL_MIN_SPEED_RATIO := 1.05
+const FLOW_TRAIL_EMIT_INTERVAL_MS := 90
+const FLOW_PLACEMENT_SIDE_THRESHOLD := 0.45
+
 var _config = null
 var _smoother: LandmarkSmoother = LandmarkSmoother.new()
 var _latest_state: Dictionary = {}
@@ -118,7 +131,7 @@ func process_landmarks(landmarks: Array, timestamp_ms: int = 0) -> Dictionary:
 	metrics["baseline"] = _baseline.duplicate(true)
 	var events: Array = []
 	if tracking_state == TRACKING_TRACKING or tracking_state == TRACKING_REACQUIRING:
-		events = _detect_boxing_events(smoothed_landmarks, metrics)
+		events = _detect_intent_events(smoothed_landmarks, metrics, timestamp_ms)
 	else:
 		_clear_transient_gesture_state()
 	_latest_state = {
@@ -481,6 +494,8 @@ func _reset_gesture_state() -> void:
 			"sidestep_right": false,
 			"leg_lift_left": false,
 			"leg_lift_right": false,
+			"trail_left": false,
+			"trail_right": false,
 		},
 		"ready": {
 			"punch_left": true,
@@ -491,13 +506,21 @@ func _reset_gesture_state() -> void:
 			"uppercut_right": true,
 			"knee_left": true,
 			"knee_right": true,
+			"swing_left": true,
+			"swing_right": true,
+		},
+		"flow": {
+			"left_hand": [],
+			"right_hand": [],
+			"trail_left": {"last_emit_ms": 0},
+			"trail_right": {"last_emit_ms": 0},
 		},
 	}
 
 func _clear_transient_gesture_state() -> void:
 	_reset_gesture_state()
 
-func _detect_boxing_events(landmarks_by_id: Dictionary, metrics: Dictionary) -> Array:
+func _detect_intent_events(landmarks_by_id: Dictionary, metrics: Dictionary, timestamp_ms: int) -> Array:
 	var events: Array = []
 	var measurements: Dictionary = metrics.get("measurements", {})
 	if not bool(_baseline.get("is_calibrated", false)):
@@ -517,6 +540,8 @@ func _detect_boxing_events(landmarks_by_id: Dictionary, metrics: Dictionary) -> 
 	var velocities: Dictionary = metrics.get("velocities", {})
 	var left_hand_velocity: Vector3 = velocities.get("left_hand", Vector3.ZERO)
 	var right_hand_velocity: Vector3 = velocities.get("right_hand", Vector3.ZERO)
+	_update_flow_hand_history("left", left_wrist, float(metrics.get("confidences", {}).get("left_hand", 0.0)), timestamp_ms)
+	_update_flow_hand_history("right", right_wrist, float(metrics.get("confidences", {}).get("right_hand", 0.0)), timestamp_ms)
 
 	_process_guard(events, left_shoulder, right_shoulder, left_elbow, right_elbow, left_wrist, right_wrist, shoulder_width)
 	_process_squat(events, float(measurements.get("height_ratio", 1.0)))
@@ -533,6 +558,12 @@ func _detect_boxing_events(landmarks_by_id: Dictionary, metrics: Dictionary) -> 
 		_process_hook(events, "right", right_shoulder, right_elbow, right_wrist, float(measurements.get("right_elbow_bend_deg", 0.0)), right_hand_velocity, shoulder_width)
 		_process_uppercut(events, "left", left_elbow, left_wrist, float(measurements.get("left_elbow_bend_deg", 0.0)), left_hand_velocity, shoulder_width)
 		_process_uppercut(events, "right", right_elbow, right_wrist, float(measurements.get("right_elbow_bend_deg", 0.0)), right_hand_velocity, shoulder_width)
+	if not _has_any_event(events, ["punch_left", "hook_left", "uppercut_left"]):
+		_process_flow_trail(events, "left", left_hand_velocity, shoulder_width, timestamp_ms)
+		_process_flow_swing(events, "left", left_hand_velocity, shoulder_width, timestamp_ms)
+	if not _has_any_event(events, ["punch_right", "hook_right", "uppercut_right"]):
+		_process_flow_trail(events, "right", right_hand_velocity, shoulder_width, timestamp_ms)
+		_process_flow_swing(events, "right", right_hand_velocity, shoulder_width, timestamp_ms)
 	return events
 
 func _process_straight_punch(events: Array, side: String, shoulder: Dictionary, elbow: Dictionary, wrist: Dictionary, elbow_bend_deg: float, arm_extension: float, hand_velocity: Vector3, shoulder_width: float) -> void:
@@ -603,6 +634,190 @@ func _process_uppercut(events: Array, side: String, elbow: Dictionary, wrist: Di
 		return
 	_emit_power_event(events, event_name, clampf(0.45 + hand_velocity.y / maxf(shoulder_width * 5.0, 0.000001), 0.0, 1.0))
 	_set_ready(event_name, false)
+
+func _process_flow_swing(events: Array, side: String, hand_velocity: Vector3, shoulder_width: float, timestamp_ms: int) -> void:
+	var event_name := "swing_%s" % side
+	if hand_velocity.length() <= shoulder_width * 0.90:
+		_set_ready(event_name, true)
+	if not _is_ready(event_name):
+		return
+	if _get_state("trail_%s" % side):
+		return
+	var analysis := _analyze_flow_motion(side, shoulder_width, FLOW_SWING_WINDOW_MAX_MS)
+	if analysis.is_empty():
+		return
+	var duration_ms := int(analysis.get("duration_ms", 0))
+	if duration_ms < FLOW_SWING_WINDOW_MIN_MS or duration_ms > FLOW_SWING_WINDOW_MAX_MS:
+		return
+	if float(analysis.get("avg_confidence", 0.0)) < 0.62:
+		return
+	if float(analysis.get("arc_length", 0.0)) < shoulder_width * FLOW_SWING_MIN_ARC_RATIO:
+		return
+	if float(analysis.get("net_distance", 0.0)) < shoulder_width * FLOW_SWING_MIN_TRAVEL_RATIO:
+		return
+	if float(analysis.get("directional_consistency", 0.0)) < 0.52:
+		return
+	if hand_velocity.length() < shoulder_width * FLOW_SWING_MIN_SPEED_RATIO:
+		return
+	var direction := StringName(analysis.get("direction", StringName()))
+	if direction == StringName():
+		return
+	_emit_flow_event(events, event_name, StringName(analysis.get("placement", &"center")), direction)
+	_set_ready(event_name, false)
+
+func _process_flow_trail(events: Array, side: String, hand_velocity: Vector3, shoulder_width: float, timestamp_ms: int) -> void:
+	var state_name := "trail_%s" % side
+	var trail_meta: Dictionary = _get_flow_meta(state_name)
+	var analysis := _analyze_flow_motion(side, shoulder_width, FLOW_HISTORY_MAX_MS)
+	var active := _get_state(state_name)
+	if analysis.is_empty():
+		if active:
+			_gesture_state["states"][state_name] = false
+		return
+	var sustained := int(analysis.get("duration_ms", 0)) >= FLOW_TRAIL_WINDOW_MIN_MS
+	sustained = sustained and float(analysis.get("avg_confidence", 0.0)) >= 0.60
+	sustained = sustained and float(analysis.get("arc_length", 0.0)) >= shoulder_width * FLOW_TRAIL_MIN_ARC_RATIO
+	sustained = sustained and float(analysis.get("net_distance", 0.0)) >= shoulder_width * FLOW_TRAIL_MIN_TRAVEL_RATIO
+	sustained = sustained and float(analysis.get("directional_consistency", 0.0)) >= 0.76
+	sustained = sustained and float(analysis.get("lane_spread", 0.0)) <= shoulder_width * 0.82
+	sustained = sustained and hand_velocity.length() >= shoulder_width * FLOW_TRAIL_MIN_SPEED_RATIO
+	if not sustained:
+		if active and (hand_velocity.length() <= shoulder_width * 0.75 or float(analysis.get("directional_consistency", 0.0)) < 0.55):
+			_gesture_state["states"][state_name] = false
+		return
+	var direction := StringName(analysis.get("direction", StringName()))
+	if direction == StringName():
+		return
+	if not active:
+		_gesture_state["states"][state_name] = true
+	var last_emit_ms := int(trail_meta.get("last_emit_ms", 0))
+	if active and timestamp_ms - last_emit_ms < FLOW_TRAIL_EMIT_INTERVAL_MS and StringName(trail_meta.get("direction", StringName())) == direction and StringName(trail_meta.get("placement", StringName())) == StringName(analysis.get("placement", &"center")):
+		return
+	trail_meta["last_emit_ms"] = timestamp_ms
+	trail_meta["placement"] = StringName(analysis.get("placement", &"center"))
+	trail_meta["direction"] = direction
+	_set_flow_meta(state_name, trail_meta)
+	_emit_flow_event(events, state_name, StringName(analysis.get("placement", &"center")), direction)
+
+func _update_flow_hand_history(side: String, wrist: Dictionary, confidence: float, timestamp_ms: int) -> void:
+	var history_name := "%s_hand" % side
+	var history: Array = _get_flow_history(history_name)
+	if wrist.is_empty() or confidence < 0.35:
+		history.clear()
+		_set_flow_history(history_name, history)
+		return
+	history.append({
+		"timestamp_ms": timestamp_ms,
+		"position": PoseMetrics.to_vector2(wrist),
+		"confidence": confidence,
+	})
+	while history.size() > 0 and timestamp_ms - int(history[0].get("timestamp_ms", timestamp_ms)) > FLOW_HISTORY_MAX_MS:
+		history.remove_at(0)
+	_set_flow_history(history_name, history)
+
+func _analyze_flow_motion(side: String, shoulder_width: float, max_window_ms: int) -> Dictionary:
+	var history: Array = _get_flow_history("%s_hand" % side)
+	if history.size() < 3:
+		return {}
+	var latest_timestamp := int(history[history.size() - 1].get("timestamp_ms", 0))
+	var samples: Array = []
+	for sample_variant: Variant in history:
+		if not sample_variant is Dictionary:
+			continue
+		var sample: Dictionary = sample_variant
+		if latest_timestamp - int(sample.get("timestamp_ms", latest_timestamp)) <= max_window_ms:
+			samples.append(sample)
+	if samples.size() < 3:
+		return {}
+	var first: Dictionary = samples[0]
+	var last: Dictionary = samples[samples.size() - 1]
+	var first_pos: Vector2 = first.get("position", Vector2.ZERO)
+	var last_pos: Vector2 = last.get("position", Vector2.ZERO)
+	var arc_length := 0.0
+	var confidence_total := 0.0
+	var direction_sum := Vector2.ZERO
+	var min_x := first_pos.x
+	var max_x := first_pos.x
+	var avg_x_total := 0.0
+	for idx in range(samples.size()):
+		var sample: Dictionary = samples[idx]
+		var position: Vector2 = sample.get("position", Vector2.ZERO)
+		confidence_total += float(sample.get("confidence", 0.0))
+		avg_x_total += position.x
+		min_x = minf(min_x, position.x)
+		max_x = maxf(max_x, position.x)
+		if idx == 0:
+			continue
+		var previous: Dictionary = samples[idx - 1]
+		var previous_position: Vector2 = previous.get("position", Vector2.ZERO)
+		var delta := position - previous_position
+		var segment_length := delta.length()
+		arc_length += segment_length
+		if segment_length > 0.000001:
+			direction_sum += delta.normalized() * segment_length
+	var net_delta := last_pos - first_pos
+	var direction_name := _flow_direction_name(net_delta)
+	if direction_name == StringName():
+		return {}
+	return {
+		"duration_ms": maxi(int(last.get("timestamp_ms", 0)) - int(first.get("timestamp_ms", 0)), 0),
+		"arc_length": arc_length,
+		"net_distance": net_delta.length(),
+		"net_delta": net_delta,
+		"avg_confidence": confidence_total / float(samples.size()),
+		"directional_consistency": direction_sum.length() / maxf(arc_length, 0.000001),
+		"placement": _flow_placement_name(avg_x_total / float(samples.size()), shoulder_width),
+		"direction": direction_name,
+		"lane_spread": max_x - min_x,
+	}
+
+func _flow_direction_name(net_delta: Vector2) -> StringName:
+	if net_delta.length() <= 0.000001:
+		return StringName()
+	if absf(net_delta.x) >= absf(net_delta.y):
+		return &"right" if net_delta.x > 0.0 else &"left"
+	return &"up" if net_delta.y > 0.0 else &"down"
+
+func _flow_placement_name(avg_x: float, shoulder_width: float) -> StringName:
+	var center_x := float(_baseline.get("shoulder_center_x", avg_x))
+	var offset := PoseMetrics.normalized_ratio(avg_x - center_x, maxf(shoulder_width, 0.000001))
+	if offset <= -FLOW_PLACEMENT_SIDE_THRESHOLD:
+		return &"left"
+	if offset >= FLOW_PLACEMENT_SIDE_THRESHOLD:
+		return &"right"
+	return &"center"
+
+func _emit_flow_event(events: Array, event_name: String, placement: StringName, direction: StringName) -> void:
+	events.append({
+		"name": StringName(event_name),
+		"placement": placement,
+		"direction": direction,
+	})
+
+func _has_any_event(events: Array, event_names: Array) -> bool:
+	for event_variant: Variant in events:
+		if not event_variant is Dictionary:
+			continue
+		var event_name := String(event_variant.get("name", ""))
+		if event_names.has(event_name):
+			return true
+	return false
+
+func _get_flow_history(history_name: String) -> Array:
+	return (_gesture_state.get("flow", {}).get(history_name, []) as Array).duplicate(true)
+
+func _set_flow_history(history_name: String, history: Array) -> void:
+	var flow: Dictionary = _gesture_state.get("flow", {})
+	flow[history_name] = history
+	_gesture_state["flow"] = flow
+
+func _get_flow_meta(state_name: String) -> Dictionary:
+	return (_gesture_state.get("flow", {}).get(state_name, {}) as Dictionary).duplicate(true)
+
+func _set_flow_meta(state_name: String, data: Dictionary) -> void:
+	var flow: Dictionary = _gesture_state.get("flow", {})
+	flow[state_name] = data
+	_gesture_state["flow"] = flow
 
 func _process_guard(events: Array, left_shoulder: Dictionary, right_shoulder: Dictionary, left_elbow: Dictionary, right_elbow: Dictionary, left_wrist: Dictionary, right_wrist: Dictionary, shoulder_width: float) -> void:
 	if left_shoulder.is_empty() or right_shoulder.is_empty() or left_elbow.is_empty() or right_elbow.is_empty() or left_wrist.is_empty() or right_wrist.is_empty():

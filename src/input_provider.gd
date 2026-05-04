@@ -8,7 +8,7 @@ extends "res://addons/aerobeat-input-core/src/interfaces/boxing_input.gd"
 ## directly so this repo can still be worked on without hiding assembly wiring here.
 ##
 ## Current truthful scope:
-## - boxing gameplay intent events from conservative 2D-camera detectors
+## - boxing gameplay intent events plus first-pass Flow motion-family signals from conservative 2D-camera detectors
 ## - lifecycle + polling access for head/hands/feet positions
 ## - tracking state + confidence queries
 ## - shared detector substrate metrics for normalization and body-state estimation
@@ -16,6 +16,11 @@ extends "res://addons/aerobeat-input-core/src/interfaces/boxing_input.gd"
 ## - no haptics or 6DOF transform output yet
 
 const PROVIDER_ID := "mediapipe_python"
+
+signal swing_left(placement: StringName, direction: StringName)
+signal swing_right(placement: StringName, direction: StringName)
+signal trail_left(placement: StringName, direction: StringName)
+signal trail_right(placement: StringName, direction: StringName)
 
 var _provider = null
 var _config = null
@@ -146,6 +151,14 @@ func _connect_provider_signals() -> void:
 		_provider.hook_left.connect(_on_provider_hook_left)
 	if not _provider.hook_right.is_connected(_on_provider_hook_right):
 		_provider.hook_right.connect(_on_provider_hook_right)
+	if _provider.has_signal("swing_left") and not _provider.swing_left.is_connected(_on_provider_swing_left):
+		_provider.swing_left.connect(_on_provider_swing_left)
+	if _provider.has_signal("swing_right") and not _provider.swing_right.is_connected(_on_provider_swing_right):
+		_provider.swing_right.connect(_on_provider_swing_right)
+	if _provider.has_signal("trail_left") and not _provider.trail_left.is_connected(_on_provider_trail_left):
+		_provider.trail_left.connect(_on_provider_trail_left)
+	if _provider.has_signal("trail_right") and not _provider.trail_right.is_connected(_on_provider_trail_right):
+		_provider.trail_right.connect(_on_provider_trail_right)
 	if not _provider.guard_start.is_connected(_on_provider_guard_start):
 		_provider.guard_start.connect(_on_provider_guard_start)
 	if not _provider.guard_end.is_connected(_on_provider_guard_end):
@@ -234,6 +247,18 @@ func _on_provider_hook_left(power: float) -> void:
 
 func _on_provider_hook_right(power: float) -> void:
 	hook_right.emit(power)
+
+func _on_provider_swing_left(placement: StringName, direction: StringName) -> void:
+	swing_left.emit(placement, direction)
+
+func _on_provider_swing_right(placement: StringName, direction: StringName) -> void:
+	swing_right.emit(placement, direction)
+
+func _on_provider_trail_left(placement: StringName, direction: StringName) -> void:
+	trail_left.emit(placement, direction)
+
+func _on_provider_trail_right(placement: StringName, direction: StringName) -> void:
+	trail_right.emit(placement, direction)
 
 func _on_provider_guard_start() -> void:
 	guard_start.emit()
