@@ -8,7 +8,8 @@ This repo is **partially migrated** into the broader AeroBeat input-provider con
 
 - it now has an addon entrypoint at `src/input_provider.gd`
 - it includes a thin assembly-facing `AeroInputProvider` adapter for lifecycle + polling access
-- it **does not** yet implement the full contract surface such as gesture callbacks, haptics, velocity, or 6DOF transforms
+- it now includes a reusable detector substrate in `src/detectors/` for smoothing, confidence gating, baseline calibration, normalization, velocity estimation, and body-state primitives
+- it **does not** yet implement the full contract surface such as gameplay gesture callbacks, haptics, or 6DOF transforms
 - provider registration / consumer wiring in `aerobeat-assembly-community` remains follow-on work in that repo, not hidden here
 
 ## Repo layout
@@ -284,9 +285,11 @@ This repo now exposes an assembly-facing `src/input_provider.gd` via `plugin.cfg
 - `start()` / `stop()` / `is_tracking()` are adapted
 - head/hand/foot position polling is adapted
 - lower-body support is reported because foot polling exists
+- estimated per-limb velocity polling is implemented from normalized 2D landmark deltas
+- detector-substrate observation primitives now include smoothing, confidence gating, standing baseline calibration, shoulder/torso normalization, elbow bend / arm extension, centerline tracking, lateral offset, height-state estimation, and degraded/reacquire tracking state
 - gesture callbacks are **not** implemented here yet
 - haptics are **not** implemented here yet
-- velocity / rotation / full `tracking_updated` spatial output are **not** implemented here yet
+- rotation / full `tracking_updated` spatial output are **not** implemented here yet
 
 If you need full contract parity, plan that work explicitly instead of assuming it already landed.
 
