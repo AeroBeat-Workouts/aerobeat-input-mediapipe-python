@@ -1,0 +1,150 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/proving_harness.gd" id="1_harness"]
+[ext_resource type="Script" path="res://scenes/landmark_drawer.gd" id="2_landmarks"]
+[ext_resource type="Script" path="res://scenes/hand_trail_drawer.gd" id="3_trails"]
+[ext_resource type="Script" path="res://addons/aerobeat-input-mediapipe-python/src/autostart_manager.gd" id="4_autostart"]
+
+[node name="BoxingProving" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_harness")
+harness_mode = 0
+scene_title = "Boxing Detector Proving"
+scene_notes = "Live proving ground for punches, guard, squat, lean, sidestep, knees, and leg lifts.\nUse the event feed plus threshold readouts on the right to tune gesture behavior without rewriting detector logic."
+
+[node name="AutoStartManager" type="Node" parent="."]
+script = ExtResource("4_autostart")
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 16
+
+[node name="VSplit" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Header" type="VBoxContainer" parent="Margin/VSplit"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="TitleLabel" type="Label" parent="Margin/VSplit/Header"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 26
+text = "Boxing Detector Proving"
+
+[node name="StatusLabel" type="Label" parent="Margin/VSplit/Header"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Initializing..."
+
+[node name="NotesLabel" type="Label" parent="Margin/VSplit/Header"]
+layout_mode = 2
+autowrap_mode = 3
+text = "Live proving ground for punches, guard, squat, lean, sidestep, knees, and leg lifts."
+
+[node name="Content" type="HSplitContainer" parent="Margin/VSplit"]
+layout_mode = 2
+size_flags_vertical = 3
+split_offset = 740
+
+[node name="LeftColumn" type="VBoxContainer" parent="Margin/VSplit/Content"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 10
+
+[node name="CameraPanel" type="PanelContainer" parent="Margin/VSplit/Content/LeftColumn"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="CameraDisplay" type="TextureRect" parent="Margin/VSplit/Content/LeftColumn/CameraPanel"]
+custom_minimum_size = Vector2(960, 640)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+expand_mode = 1
+stretch_mode = 5
+
+[node name="LandmarkDrawer" type="Control" parent="Margin/VSplit/Content/LeftColumn/CameraPanel/CameraDisplay"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("2_landmarks")
+
+[node name="TrailDrawer" type="Control" parent="Margin/VSplit/Content/LeftColumn/CameraPanel/CameraDisplay"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("3_trails")
+
+[node name="QuickStatsPanel" type="PanelContainer" parent="Margin/VSplit/Content/LeftColumn"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 200)
+
+[node name="QuickStats" type="RichTextLabel" parent="Margin/VSplit/Content/LeftColumn/QuickStatsPanel"]
+layout_mode = 2
+fit_content = true
+scroll_active = false
+bbcode_enabled = false
+text = "Waiting for provider..."
+
+[node name="RightColumn" type="VBoxContainer" parent="Margin/VSplit/Content"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 10
+
+[node name="SummaryPanel" type="PanelContainer" parent="Margin/VSplit/Content/RightColumn"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 220)
+size_flags_vertical = 3
+
+[node name="Summary" type="RichTextLabel" parent="Margin/VSplit/Content/RightColumn/SummaryPanel"]
+layout_mode = 2
+bbcode_enabled = false
+scroll_active = true
+text = "Waiting for provider..."
+
+[node name="MetricsPanel" type="PanelContainer" parent="Margin/VSplit/Content/RightColumn"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 280)
+size_flags_vertical = 3
+
+[node name="Metrics" type="RichTextLabel" parent="Margin/VSplit/Content/RightColumn/MetricsPanel"]
+layout_mode = 2
+bbcode_enabled = false
+scroll_active = true
+text = "Waiting for detector metrics..."
+
+[node name="EventsPanel" type="PanelContainer" parent="Margin/VSplit/Content/RightColumn"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 260)
+size_flags_vertical = 3
+
+[node name="Events" type="RichTextLabel" parent="Margin/VSplit/Content/RightColumn/EventsPanel"]
+layout_mode = 2
+bbcode_enabled = false
+scroll_active = true
+text = "Waiting for events..."
