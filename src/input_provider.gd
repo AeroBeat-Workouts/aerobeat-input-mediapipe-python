@@ -9,8 +9,10 @@ extends "res://addons/aerobeat-input-core/src/interfaces/input_provider.gd"
 ##
 ## Current truthful scope:
 ## - lifecycle + polling access for head/hands/feet positions
-## - tracking state + basic confidence queries
-## - no gesture callbacks, haptics, velocity, or 6DOF transform output yet
+## - tracking state + confidence queries
+## - shared detector substrate metrics for normalization and body-state estimation
+## - estimated per-limb velocities from 2D landmark deltas
+## - no gameplay gesture callbacks, haptics, or 6DOF transform output yet
 
 const PROVIDER_ID := "mediapipe_python"
 
@@ -46,7 +48,7 @@ func get_provider_id() -> String:
 
 func has_capability(capability: Capability) -> bool:
 	match capability:
-		Capability.LOWER_BODY:
+		Capability.LOWER_BODY, Capability.VELOCITY:
 			return true
 		_:
 			return false
@@ -71,19 +73,19 @@ func get_right_foot_position(mode: TrackingMode = TrackingMode.MODE_2D) -> Vecto
 	return _to_vector3(_provider.get_right_foot_position(_to_provider_mode(mode)))
 
 func get_head_velocity() -> Vector3:
-	return Vector3.ZERO
+	return _provider.get_landmark_velocity_for_body_part(&"head") if _provider != null else Vector3.ZERO
 
 func get_left_hand_velocity() -> Vector3:
-	return Vector3.ZERO
+	return _provider.get_landmark_velocity_for_body_part(&"left_hand") if _provider != null else Vector3.ZERO
 
 func get_right_hand_velocity() -> Vector3:
-	return Vector3.ZERO
+	return _provider.get_landmark_velocity_for_body_part(&"right_hand") if _provider != null else Vector3.ZERO
 
 func get_left_foot_velocity() -> Vector3:
-	return Vector3.ZERO
+	return _provider.get_landmark_velocity_for_body_part(&"left_foot") if _provider != null else Vector3.ZERO
 
 func get_right_foot_velocity() -> Vector3:
-	return Vector3.ZERO
+	return _provider.get_landmark_velocity_for_body_part(&"right_foot") if _provider != null else Vector3.ZERO
 
 func get_head_rotation() -> Quaternion:
 	return Quaternion.IDENTITY
@@ -101,15 +103,9 @@ func get_right_foot_rotation() -> Quaternion:
 	return Quaternion.IDENTITY
 
 func get_tracking_confidence(body_part: StringName) -> float:
-	if _provider == null or _provider.config == null:
+	if _provider == null:
 		return 0.0
-	var landmark_id := _body_part_to_landmark_id(body_part)
-	if landmark_id < 0:
-		return 0.0
-	var landmark: Variant = _provider._landmarks.get(landmark_id, null)
-	if landmark is Dictionary:
-		return float(landmark.get("v", 0.0))
-	return 0.0
+	return _provider.get_detector_state().get("metrics", {}).get("confidences", {}).get(String(body_part), 0.0)
 
 func set_tracking_mode(mode: TrackingMode) -> void:
 	_tracking_mode = mode
@@ -147,6 +143,8 @@ func _apply_settings(settings_json: String) -> void:
 		_config.udp_port = int(settings["udp_port"])
 	if settings.has("min_visibility"):
 		_config.min_visibility = float(settings["min_visibility"])
+	if settings.has("tracking_confidence"):
+		_config.tracking_confidence = float(settings["tracking_confidence"])
 	if settings.has("flip_horizontal"):
 		_config.flip_horizontal = bool(settings["flip_horizontal"])
 
@@ -174,18 +172,3 @@ func _to_vector3(value: Variant) -> Vector3:
 	if value is Vector2:
 		return Vector3(value.x, value.y, 0.0)
 	return Vector3.ZERO
-
-func _body_part_to_landmark_id(body_part: StringName) -> int:
-	match String(body_part):
-		"head":
-			return _provider.LANDMARK_NOSE
-		"left_hand":
-			return _provider.LANDMARK_LEFT_WRIST
-		"right_hand":
-			return _provider.LANDMARK_RIGHT_WRIST
-		"left_foot":
-			return _provider.LANDMARK_LEFT_ANKLE
-		"right_foot":
-			return _provider.LANDMARK_RIGHT_ANKLE
-		_:
-			return -1
