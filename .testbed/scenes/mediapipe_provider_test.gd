@@ -2,8 +2,8 @@ extends Node
 ## Standalone test version of MediaPipeProvider
 ## Extends Node for independent runtime validation of the repo-local camera-input path
 
-const MediaPipeConfig = preload("res://addons/aerobeat-input-mediapipe-python/src/config/mediapipe_config.gd")
-const MediaPipeServer = preload("res://addons/aerobeat-input-mediapipe-python/src/server/mediapipe_server.gd")
+const MediaPipeConfigScript = preload("res://addons/aerobeat-input-mediapipe-python/src/config/mediapipe_config.gd")
+const MediaPipeServerScript = preload("res://addons/aerobeat-input-mediapipe-python/src/server/mediapipe_server.gd")
 
 signal pose_updated(landmarks: Array)
 signal tracking_lost()
@@ -14,9 +14,9 @@ enum TrackingMode {
 	MODE_3D
 }
 
-@export var config: MediaPipeConfig
+@export var config: MediaPipeConfigScript
 
-var _server: MediaPipeServer = null
+var _server: MediaPipeServerScript = null
 
 var _last_update_time_ms: int = 0
 var _tracking_timeout_ms: int = 1000  # Increased to 1 second for more lenient tracking
@@ -31,11 +31,11 @@ const LANDMARK_RIGHT_ANKLE: int = 28
 
 func _ready() -> void:
 	if config == null:
-		config = MediaPipeConfig.new()
+		config = MediaPipeConfigScript.new()
 		config.min_visibility = 0.3  # More lenient default for testing
 		config.flip_horizontal = true
 	
-	_server = MediaPipeServer.new()
+	_server = MediaPipeServerScript.new()
 	_server.name = "MediaPipeServer"
 	add_child(_server)
 	
