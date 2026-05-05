@@ -45,6 +45,29 @@ const FLOW_EVENT_ORDER := [
 	"trail_right",
 ]
 
+const BOXING_ATTACK_EVENTS := [
+	"punch_left",
+	"punch_right",
+	"hook_left",
+	"hook_right",
+	"uppercut_left",
+	"uppercut_right",
+]
+
+const BOXING_KNEE_EVENTS := [
+	"knee_left",
+	"knee_right",
+]
+
+const BOXING_STATE_ROWS := [
+	{"label": "guard", "state": "guard", "start": "guard_start", "end": "guard_end"},
+	{"label": "squat", "state": "squat", "start": "squat_start", "end": "squat_end"},
+	{"label": "lean_left", "state": "lean_left", "start": "lean_left_start", "end": "lean_left_end"},
+	{"label": "lean_right", "state": "lean_right", "start": "lean_right_start", "end": "lean_right_end"},
+	{"label": "sidestep_left", "state": "sidestep_left", "start": "sidestep_left_start", "end": "sidestep_left_end"},
+	{"label": "sidestep_right", "state": "sidestep_right", "start": "sidestep_right_start", "end": "sidestep_right_end"},
+]
+
 enum HarnessMode {
 	BOXING,
 	FLOW,
@@ -65,6 +88,7 @@ enum HarnessMode {
 @onready var trail_drawer: Control = $Margin/VSplit/Content/LeftColumn/CameraPanel/CameraDisplay/TrailDrawer
 @onready var quick_stats_label: RichTextLabel = $Margin/VSplit/Content/LeftColumn/QuickStatsPanel/QuickStats
 @onready var summary_label: RichTextLabel = $Margin/VSplit/Content/RightColumn/SummaryPanel/Summary
+@onready var signal_status_label: RichTextLabel = $Margin/VSplit/Content/RightColumn/SignalPanel/SignalStatus
 @onready var metrics_label: RichTextLabel = $Margin/VSplit/Content/RightColumn/MetricsPanel/Metrics
 @onready var events_label: RichTextLabel = $Margin/VSplit/Content/RightColumn/EventsPanel/Events
 
@@ -79,19 +103,18 @@ var _event_lines: Array[String] = []
 var _left_trail: Array = []
 var _right_trail: Array = []
 var _last_flow_events := {}
+var _event_counts: Dictionary = {}
+var _last_event_payloads: Dictionary = {}
+var _last_event_timestamps_ms: Dictionary = {}
 
 func _ready() -> void:
 	title_label.text = scene_title
 	notes_label.text = scene_notes
-	if quick_stats_label:
-		quick_stats_label.bbcode_enabled = false
-	if summary_label:
-		summary_label.bbcode_enabled = false
-	if metrics_label:
-		metrics_label.bbcode_enabled = false
-	if events_label:
-		events_label.bbcode_enabled = false
+	for label_variant: Variant in [quick_stats_label, summary_label, signal_status_label, metrics_label, events_label]:
+		if label_variant is RichTextLabel:
+			label_variant.bbcode_enabled = false
 	_reset_last_flow_events()
+	_reset_event_tracking()
 	_update_status("Initializing...", Color.WHITE)
 	_setup_auto_start()
 	_refresh_debug_panels()
@@ -317,6 +340,7 @@ func _start_camera_feed() -> void:
 func _refresh_debug_panels() -> void:
 	quick_stats_label.text = _build_quick_stats_text()
 	summary_label.text = _build_summary_text()
+	signal_status_label.text = _build_signal_text()
 	metrics_label.text = _build_metrics_text()
 	events_label.text = _build_events_text()
 
@@ -325,6 +349,9 @@ func _build_quick_stats_text() -> String:
 	var metrics: Dictionary = state.get("metrics", {})
 	var measurements: Dictionary = metrics.get("measurements", {})
 	var confidences: Dictionary = metrics.get("confidences", {})
+	var gesture_states: Dictionary = state.get("gesture_states", {})
+	var gesture_debug: Dictionary = state.get("gesture_debug", {})
+	var ready_map: Dictionary = gesture_debug.get("ready", {})
 	var pose_count := int(provider.get_num_poses()) if provider != null else 0
 	var visible_landmarks := int((state.get("landmarks_by_id", {}) as Dictionary).size())
 	var lines := [
@@ -341,8 +368,13 @@ func _build_quick_stats_text() -> String:
 		"R hand confidence: %s" % _fmt_float(confidences.get("right_hand", 0.0)),
 	]
 	if harness_mode == HarnessMode.BOXING:
+		var armed_count := 0
+		for event_name: String in BOXING_ATTACK_EVENTS + BOXING_KNEE_EVENTS:
+			if bool(ready_map.get(event_name, true)):
+				armed_count += 1
 		lines.append("Height state: %s" % String(measurements.get("height_state", &"unknown")))
-		lines.append("Lateral offset: %s" % _fmt_float(measurements.get("lateral_offset", 0.0)))
+		lines.append("Guard active: %s" % str(bool(gesture_states.get("guard", false))))
+		lines.append("Attack gates armed: %d / %d" % [armed_count, BOXING_ATTACK_EVENTS.size() + BOXING_KNEE_EVENTS.size()])
 	else:
 		lines.append("Trail L points/duration: %d / %dms" % [_left_trail.size(), _trail_duration_ms(_left_trail)])
 		lines.append("Trail R points/duration: %d / %dms" % [_right_trail.size(), _trail_duration_ms(_right_trail)])
@@ -382,6 +414,69 @@ func _build_summary_text() -> String:
 			lines.append("%s: %s" % [key, _describe_last_flow_event(key)])
 		lines.append("trail_left_active=%s trail_right_active=%s" % [str(bool(gesture_states.get("trail_left", false))), str(bool(gesture_states.get("trail_right", false)))])
 		lines.append("Local continuity: L=%d pts (%dms), R=%d pts (%dms)" % [_left_trail.size(), _trail_duration_ms(_left_trail), _right_trail.size(), _trail_duration_ms(_right_trail)])
+	return "\n".join(lines)
+
+func _build_signal_text() -> String:
+	if harness_mode == HarnessMode.BOXING:
+		return _build_boxing_signal_text()
+	return _build_flow_signal_text()
+
+func _build_boxing_signal_text() -> String:
+	var state: Dictionary = _latest_state
+	var metrics: Dictionary = state.get("metrics", {})
+	var measurements: Dictionary = metrics.get("measurements", {})
+	var gesture_states: Dictionary = state.get("gesture_states", {})
+	var gesture_debug: Dictionary = state.get("gesture_debug", {})
+	var ready_map: Dictionary = gesture_debug.get("ready", {})
+	var guard_active := bool(gesture_states.get("guard", false))
+	var lines := [
+		"Boxing signal board",
+		"===================",
+		"Persistent status/counters for the supported Boxing surface.",
+		"guard suppression: %s" % ("ON" if guard_active else "OFF"),
+		"",
+		"Punch / hook / uppercut families",
+		"-----------------------------",
+	]
+	for event_name: String in BOXING_ATTACK_EVENTS:
+		lines.append(_format_attack_signal_row(event_name, ready_map, guard_active))
+	lines.append("")
+	lines.append("Guard + body-state transitions")
+	lines.append("-----------------------------")
+	for row_variant: Variant in BOXING_STATE_ROWS:
+		var row: Dictionary = row_variant
+		lines.append(_format_state_signal_row(String(row.get("label", "")), String(row.get("state", "")), String(row.get("start", "")), String(row.get("end", "")), gesture_states))
+	lines.append("")
+	lines.append("Knees / leg lifts")
+	lines.append("-----------------")
+	for event_name: String in BOXING_KNEE_EVENTS:
+		lines.append(_format_attack_signal_row(event_name, ready_map, false))
+	lines.append(_format_state_signal_row("leg_lift_left", "leg_lift_left", "leg_lift_left_start", "leg_lift_left_end", gesture_states))
+	lines.append(_format_state_signal_row("leg_lift_right", "leg_lift_right", "leg_lift_right_start", "leg_lift_right_end", gesture_states))
+	lines.append("")
+	lines.append("Current detector inputs")
+	lines.append("----------------------")
+	lines.append("L extension=%s  elbow=%s°" % [_fmt_float(measurements.get("left_arm_extension", 0.0)), _fmt_float(measurements.get("left_elbow_bend_deg", 0.0))])
+	lines.append("R extension=%s  elbow=%s°" % [_fmt_float(measurements.get("right_arm_extension", 0.0)), _fmt_float(measurements.get("right_elbow_bend_deg", 0.0))])
+	lines.append("squat depth=%s  head drop=%s" % [_fmt_float(measurements.get("squat_depth", 0.0)), _fmt_float(measurements.get("head_drop_ratio", 0.0))])
+	lines.append("lateral body/head/hip=%s / %s / %s" % [_fmt_float(measurements.get("lateral_offset", 0.0)), _fmt_float(measurements.get("head_lateral_offset", 0.0)), _fmt_float(measurements.get("hip_lateral_offset", 0.0))])
+	lines.append("L knee/foot rise=%s / %s" % [_fmt_float(measurements.get("left_knee_rise", 0.0)), _fmt_float(measurements.get("left_foot_rise", 0.0))])
+	lines.append("R knee/foot rise=%s / %s" % [_fmt_float(measurements.get("right_knee_rise", 0.0)), _fmt_float(measurements.get("right_foot_rise", 0.0))])
+	return "\n".join(lines)
+
+func _build_flow_signal_text() -> String:
+	var state: Dictionary = _latest_state
+	var gesture_states: Dictionary = state.get("gesture_states", {})
+	var lines := [
+		"Flow signal board",
+		"=================",
+		"swing_left  count=%d  last=%s" % [_event_count("swing_left"), _last_seen_text("swing_left")],
+		"swing_right count=%d  last=%s" % [_event_count("swing_right"), _last_seen_text("swing_right")],
+		"trail_left  active=%s count=%d last=%s" % [str(bool(gesture_states.get("trail_left", false))), _event_count("trail_left"), _last_seen_text("trail_left")],
+		"trail_right active=%s count=%d last=%s" % [str(bool(gesture_states.get("trail_right", false))), _event_count("trail_right"), _last_seen_text("trail_right")],
+		"",
+		"This panel is shared. Boxing uses the deep persistent coverage board.",
+	]
 	return "\n".join(lines)
 
 func _build_metrics_text() -> String:
@@ -437,6 +532,10 @@ func _build_events_text() -> String:
 
 func _record_event(event_name: String, payload: Dictionary) -> void:
 	var timestamp := Time.get_time_string_from_system()
+	var timestamp_ms := Time.get_ticks_msec()
+	_event_counts[event_name] = int(_event_counts.get(event_name, 0)) + 1
+	_last_event_payloads[event_name] = payload.duplicate(true)
+	_last_event_timestamps_ms[event_name] = timestamp_ms
 	var line := "%s  %s%s" % [timestamp, event_name, _format_event_payload(payload)]
 	_event_lines.push_front(line)
 	while _event_lines.size() > MAX_EVENT_LINES:
@@ -475,6 +574,51 @@ func _reset_last_flow_events() -> void:
 		"trail_left": {},
 		"trail_right": {},
 	}
+
+func _reset_event_tracking() -> void:
+	_event_lines = []
+	_event_counts = {}
+	_last_event_payloads = {}
+	_last_event_timestamps_ms = {}
+	for event_name: String in BOXING_EVENT_ORDER + FLOW_EVENT_ORDER + ["provider_started", "tracking_lost", "tracking_restored", "camera_stream_failed", "server_failed"]:
+		_event_counts[event_name] = 0
+
+func _format_attack_signal_row(event_name: String, ready_map: Dictionary, guard_suppressed: bool) -> String:
+	var status := "READY" if bool(ready_map.get(event_name, true)) else "RESET"
+	if guard_suppressed and BOXING_ATTACK_EVENTS.has(event_name):
+		status = "SUPPRESSED"
+	var power_text := ""
+	var payload: Dictionary = _last_event_payloads.get(event_name, {})
+	if payload.has("power"):
+		power_text = " power=%s" % _fmt_float(payload.get("power", 0.0))
+	return "%s  status=%s  count=%d  last=%s%s" % [event_name, status, _event_count(event_name), _last_seen_text(event_name), power_text]
+
+func _format_state_signal_row(label: String, state_name: String, start_event: String, end_event: String, gesture_states: Dictionary) -> String:
+	var active := bool(gesture_states.get(state_name, false))
+	return "%s  active=%s  start/end=%d/%d  last=%s" % [label, str(active), _event_count(start_event), _event_count(end_event), _last_transition_text(start_event, end_event)]
+
+func _event_count(event_name: String) -> int:
+	return int(_event_counts.get(event_name, 0))
+
+func _last_seen_text(event_name: String) -> String:
+	var timestamp_ms := int(_last_event_timestamps_ms.get(event_name, 0))
+	if timestamp_ms <= 0:
+		return "never"
+	return _fmt_age_ms(Time.get_ticks_msec() - timestamp_ms)
+
+func _last_transition_text(start_event: String, end_event: String) -> String:
+	var start_ts := int(_last_event_timestamps_ms.get(start_event, 0))
+	var end_ts := int(_last_event_timestamps_ms.get(end_event, 0))
+	if start_ts <= 0 and end_ts <= 0:
+		return "never"
+	if start_ts >= end_ts:
+		return "%s %s ago" % [start_event, _fmt_age_ms(Time.get_ticks_msec() - start_ts)]
+	return "%s %s ago" % [end_event, _fmt_age_ms(Time.get_ticks_msec() - end_ts)]
+
+func _fmt_age_ms(age_ms: int) -> String:
+	if age_ms < 1000:
+		return "%dms" % age_ms
+	return "%.1fs" % (float(age_ms) / 1000.0)
 
 func _mode_name() -> String:
 	return "Boxing" if harness_mode == HarnessMode.BOXING else "Flow"

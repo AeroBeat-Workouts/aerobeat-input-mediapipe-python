@@ -143,6 +143,7 @@ func process_landmarks(landmarks: Array, timestamp_ms: int = 0) -> Dictionary:
 		"metrics": metrics,
 		"events": events.duplicate(true),
 		"gesture_states": _gesture_state.get("states", {}).duplicate(true),
+		"gesture_debug": _build_gesture_debug_state(),
 	}
 	_last_processed_timestamp_ms = timestamp_ms
 	return _latest_state
@@ -162,6 +163,7 @@ func mark_tracking_timeout(timestamp_ms: int) -> void:
 	_latest_state["tracking_state"] = TRACKING_LOST
 	_latest_state["events"] = []
 	_latest_state["gesture_states"] = _gesture_state.get("states", {}).duplicate(true)
+	_latest_state["gesture_debug"] = _build_gesture_debug_state()
 	var metrics: Dictionary = _latest_state.get("metrics", {})
 	metrics["tracking_state"] = TRACKING_LOST
 	_latest_state["metrics"] = metrics
@@ -211,6 +213,7 @@ func _build_empty_state() -> Dictionary:
 		},
 		"events": [],
 		"gesture_states": _gesture_state.get("states", {}).duplicate(true),
+		"gesture_debug": _build_gesture_debug_state(),
 	}
 
 func _build_metrics(landmarks_by_id: Dictionary, timestamp_ms: int) -> Dictionary:
@@ -460,6 +463,11 @@ func _get_metric_dictionary(key: String) -> Dictionary:
 		if value is Dictionary:
 			return value
 	return {}
+
+func _build_gesture_debug_state() -> Dictionary:
+	return {
+		"ready": _gesture_state.get("ready", {}).duplicate(true),
+	}
 
 func _get_smoothing_window_size() -> int:
 	if _config == null:

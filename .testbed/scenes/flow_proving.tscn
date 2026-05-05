@@ -118,7 +118,7 @@ theme_override_constants/separation = 10
 
 [node name="SummaryPanel" type="PanelContainer" parent="Margin/VSplit/Content/RightColumn"]
 layout_mode = 2
-custom_minimum_size = Vector2(0, 220)
+custom_minimum_size = Vector2(0, 180)
 size_flags_vertical = 3
 
 [node name="Summary" type="RichTextLabel" parent="Margin/VSplit/Content/RightColumn/SummaryPanel"]
@@ -127,9 +127,20 @@ bbcode_enabled = false
 scroll_active = true
 text = "Waiting for provider..."
 
+[node name="SignalPanel" type="PanelContainer" parent="Margin/VSplit/Content/RightColumn"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 220)
+size_flags_vertical = 3
+
+[node name="SignalStatus" type="RichTextLabel" parent="Margin/VSplit/Content/RightColumn/SignalPanel"]
+layout_mode = 2
+bbcode_enabled = false
+scroll_active = true
+text = "Waiting for persistent signal coverage..."
+
 [node name="MetricsPanel" type="PanelContainer" parent="Margin/VSplit/Content/RightColumn"]
 layout_mode = 2
-custom_minimum_size = Vector2(0, 280)
+custom_minimum_size = Vector2(0, 240)
 size_flags_vertical = 3
 
 [node name="Metrics" type="RichTextLabel" parent="Margin/VSplit/Content/RightColumn/MetricsPanel"]
