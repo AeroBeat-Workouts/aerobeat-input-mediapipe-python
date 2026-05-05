@@ -128,6 +128,28 @@ Because Derrick plans to sync this repo onto Cookie and test there, this plan sh
 
 ---
 
+### Task 3B: Annotate YAML fixture files with field explanations and required/optional guidance
+
+**Bead ID:** `oc-lgt`  
+**SubAgent:** `primary` (for `research` / `coder` workflow roles)  
+**Role:** `research` then `coder`  
+**References:** `REF-01`, `REF-02`, `REF-03`, `REF-04`, `REF-05`  
+**Prompt:** Add inline YAML comments to the human-facing fixture template and the first concrete Boxing example so Derrick can see what each field means, what it affects, and whether it is required or optional. Keep the files valid YAML and prefer practical plain-English comments over abstract schema language.
+
+**Folders Created/Deleted/Modified:**
+- `/home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-input-mediapipe-python/docs/`
+- `/home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-input-mediapipe-python/.testbed/assets/fixtures/boxing/punch_left/`
+- `/home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-input-mediapipe-python/.plans/`
+
+**Files Created/Deleted/Modified:**
+- YAML template and first Boxing example sidecar
+
+**Status:** ✅ Complete
+
+**Results:** Added plain-English inline YAML comments directly into both the shared template and the first concrete Boxing example so human authors can understand the format without cross-referencing external docs. The comments now explain what nearly every field/section is for, whether it is required, optional, or conditionally optional, what kind of value belongs there, and why the field matters for review, regression truth, or detector interpretation. Nested areas such as `camera`, `clip_timing`, `review`, `expected_detector_behavior`, `expected_observability`, and `artifacts` now include practical authoring guidance, including notes about when empty arrays/values are appropriate for one-shot vs state fixtures. Both YAML files were re-validated successfully with `python3` + `yaml.safe_load`. Changes were committed and pushed in `18c1c52` (`docs: annotate fixture yaml fields`).
+
+---
+
 ### Task 4: Build first reusable Boxing/Flow fixture set and automation entrypoints
 
 **Bead ID:** `oc-qu0`  
