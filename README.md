@@ -256,8 +256,9 @@ Human verification workflow docs for live Cookie testing now live at:
 
 Video fixture workflow docs for reusable Boxing / Flow regression clips now live at:
 
-- `docs/proving-scene-video-fixtures.md`
-- `docs/proving-scene-video-fixture-template.fixture.json`
+- `docs/proving-scene-video-fixtures-plain-language.md` — start here for the quick human guide
+- `docs/proving-scene-video-fixtures.md` — technical design/source of truth
+- `docs/proving-scene-video-fixture-template.fixture.json` — sidecar template
 
 If auto-start fails on this host, the test scene under `.testbed/scenes/` includes manual recovery guidance pointing back to the repo root and `python_mediapipe/assets/runtimes/linux-x64/`.
 
