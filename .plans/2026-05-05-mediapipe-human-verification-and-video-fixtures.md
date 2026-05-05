@@ -47,14 +47,15 @@ Because Derrick plans to sync this repo onto Cookie and test there, this plan sh
 
 **Folders Created/Deleted/Modified:**
 - `/home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-input-mediapipe-python/.plans/`
-- `/home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-input-mediapipe-python/docs/` (if created)
+- `/home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-input-mediapipe-python/docs/`
 
 **Files Created/Deleted/Modified:**
-- human verification checklist/workflow docs
+- `/home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-input-mediapipe-python/docs/proving-scene-human-verification-checklist.md`
+- `/home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-input-mediapipe-python/docs/proving-scene-human-verification-log-template.md`
 
-**Status:** ⏳ Pending
+**Status:** ✅ Complete
 
-**Results:** Pending
+**Results:** Added durable repo-local human verification docs under `docs/`: `proving-scene-human-verification-checklist.md` and `proving-scene-human-verification-log-template.md`. The checklist now covers global harness readiness/tracking/readability checks; every shipped Boxing feature/state (`punch_*`, `hook_*`, `uppercut_*`, `guard`, `squat`, `lean_*`, `sidestep_*`, `knee_*`, `leg_lift_*`); every shipped Flow feature family/state (`swing_*`, `trail_*`, ready/reset/active behavior); and the practical evidence workflow Derrick should capture on Cookie, including screenshots, clips, rep counts, ambiguity tags, false-positive/false-negative counts, reset/re-arm notes, readability notes, and framing/occlusion notes. It also includes an honest Flow payload-coverage strategy: first-pass minimum coverage plus a durable full hand × family × placement × direction tracker for later sessions.
 
 ---
 

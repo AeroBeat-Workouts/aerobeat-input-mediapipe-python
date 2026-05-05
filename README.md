@@ -249,6 +249,11 @@ Suggested use:
 - use the right-side readouts to compare raw substrate measurements against emitted gameplay-intent events
 - keep conclusions scoped to the current mirrored 2D-camera baseline; these scenes are for proving/tuning the shipped detector surface, not for claiming 3D parity
 
+Human verification workflow docs for live Cookie testing now live at:
+
+- `docs/proving-scene-human-verification-checklist.md`
+- `docs/proving-scene-human-verification-log-template.md`
+
 If auto-start fails on this host, the test scene under `.testbed/scenes/` includes manual recovery guidance pointing back to the repo root and `python_mediapipe/assets/runtimes/linux-x64/`.
 
 ## Desktop build/export guidance
