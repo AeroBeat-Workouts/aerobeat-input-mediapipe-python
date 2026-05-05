@@ -21,8 +21,8 @@ This repo is now wired into the broader AeroBeat input-provider contract, but st
 - `python_mediapipe/assets/models/` — committed MediaPipe `.task` model assets used by the sidecar
 - `python_mediapipe/assets/runtimes/` — generated desktop runtime roots under the unified runtime contract, **not committed**
   - `python_mediapipe/assets/runtimes/linux-x64/` — current host's prepared Linux dev runtime on this machine
-  - `python_mediapipe/assets/runtimes/macos-x64/` — scaffolded target location for macOS desktop runtimes
-  - `python_mediapipe/assets/runtimes/windows-x64/` — scaffolded target location for Windows desktop runtimes
+  - `python_mediapipe/assets/runtimes/windows-x64/` — generated Windows desktop runtime root currently present in this checkout
+  - `python_mediapipe/assets/runtimes/macos-x64/` — reserved platform-key path under the unified runtime contract, **not currently present in this checkout**
 - `.testbed/` — hidden Godot workbench project restored via GodotEnv
 - `.testbed/scenes/` — proving scenes and manual workbench content, including `boxing_proving.tscn` and `flow_proving.tscn`
 - `.testbed/tests/` — repo-local Godot automated test scripts
@@ -33,8 +33,8 @@ This repo is now wired into the broader AeroBeat input-provider contract, but st
 Desktop sidecar execution now uses **one platform-keyed runtime family** instead of a generic `python_mediapipe/assets/venv/` path:
 
 - `python_mediapipe/assets/runtimes/linux-x64/`
-- `python_mediapipe/assets/runtimes/macos-x64/`
 - `python_mediapipe/assets/runtimes/windows-x64/`
+- reserved platform key/path: `python_mediapipe/assets/runtimes/macos-x64/` (**not currently present in this checkout**)
 
 These runtime roots are:
 
