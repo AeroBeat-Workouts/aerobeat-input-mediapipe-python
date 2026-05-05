@@ -106,6 +106,32 @@ func test_detects_flow_swing_events_with_distinct_placement_and_direction() -> v
 	assert_eq(flow_events[0]["placement"], "left")
 	assert_eq(flow_events[0]["direction"], "left")
 
+func test_exposes_flow_debug_candidates_and_last_emit_metadata() -> void:
+	_calibrate_stance()
+	substrate.process_landmarks(_make_pose_frame(), 1100)
+	substrate.process_landmarks(_make_pose_frame({
+		PoseLandmarkIds.LEFT_ELBOW: {"x": 0.28, "y": 0.66},
+		PoseLandmarkIds.LEFT_WRIST: {"x": 0.18, "y": 0.62},
+	}), 1180)
+	var swing_state := substrate.process_landmarks(_make_pose_frame({
+		PoseLandmarkIds.LEFT_ELBOW: {"x": 0.21, "y": 0.70},
+		PoseLandmarkIds.LEFT_WRIST: {"x": 0.08, "y": 0.70},
+	}), 1260)
+	var gesture_debug: Dictionary = swing_state.get("gesture_debug", {})
+	var flow_debug: Dictionary = gesture_debug.get("flow", {})
+	var left_flow: Dictionary = flow_debug.get("left", {})
+	var swing_meta: Dictionary = left_flow.get("swing_meta", {})
+	var swing_analysis: Dictionary = left_flow.get("swing_analysis", {})
+	assert_false(bool(gesture_debug.get("ready", {}).get("swing_left", true)))
+	assert_eq(String(left_flow.get("placement_candidate", "")), "left")
+	assert_eq(String(left_flow.get("direction_candidate", "")), "left")
+	assert_true(int(left_flow.get("history_points", 0)) >= 3)
+	assert_eq(String(swing_meta.get("placement", "")), "left")
+	assert_eq(String(swing_meta.get("direction", "")), "left")
+	assert_true(int(swing_meta.get("duration_ms", 0)) >= 120)
+	assert_true(float(swing_analysis.get("arc_length", 0.0)) > 0.0)
+	assert_true(float(swing_analysis.get("avg_confidence", 0.0)) >= 0.62)
+
 func test_detects_flow_trail_as_continuation_motion() -> void:
 	_calibrate_stance()
 	substrate.process_landmarks(_make_pose_frame(), 2000)

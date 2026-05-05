@@ -467,7 +467,48 @@ func _get_metric_dictionary(key: String) -> Dictionary:
 func _build_gesture_debug_state() -> Dictionary:
 	return {
 		"ready": _gesture_state.get("ready", {}).duplicate(true),
+		"flow": _build_flow_debug_state(),
 	}
+
+func _build_flow_debug_state() -> Dictionary:
+	var shoulder_width := maxf(float(_baseline.get("shoulder_width", _latest_state.get("metrics", {}).get("measurements", {}).get("shoulder_width", 0.0))), 0.000001)
+	return {
+		"left": _build_flow_side_debug("left", shoulder_width),
+		"right": _build_flow_side_debug("right", shoulder_width),
+	}
+
+func _build_flow_side_debug(side: String, shoulder_width: float) -> Dictionary:
+	var history: Array = _get_flow_history("%s_hand" % side)
+	var current_analysis := _analyze_flow_motion(side, shoulder_width, FLOW_HISTORY_MAX_MS)
+	var swing_analysis := _analyze_flow_motion(side, shoulder_width, FLOW_SWING_WINDOW_MAX_MS)
+	var trail_meta: Dictionary = _get_flow_meta("trail_%s" % side)
+	var swing_meta: Dictionary = _get_flow_meta("swing_%s" % side)
+	var latest_sample: Dictionary = history[history.size() - 1] if history.size() > 0 else {}
+	var center_x := float(_baseline.get("shoulder_center_x", current_analysis.get("avg_x", swing_analysis.get("avg_x", 0.0))))
+	var placement_candidate: StringName = StringName(current_analysis.get("placement", swing_analysis.get("placement", StringName())))
+	var avg_x := float(current_analysis.get("avg_x", swing_analysis.get("avg_x", 0.0)))
+	var center_offset_ratio := PoseMetrics.normalized_ratio(avg_x - center_x, shoulder_width) if placement_candidate != StringName() else 0.0
+	return {
+		"history_points": history.size(),
+		"history_duration_ms": _flow_history_duration_ms(history),
+		"latest_position": latest_sample.get("position", Vector2.ZERO),
+		"latest_confidence": float(latest_sample.get("confidence", 0.0)),
+		"placement_candidate": placement_candidate,
+		"direction_candidate": StringName(current_analysis.get("direction", swing_analysis.get("direction", StringName()))),
+		"center_x": center_x,
+		"avg_x": avg_x,
+		"center_offset_ratio": center_offset_ratio,
+		"current_analysis": current_analysis.duplicate(true),
+		"swing_analysis": swing_analysis.duplicate(true),
+		"trail_analysis": current_analysis.duplicate(true),
+		"trail_meta": trail_meta.duplicate(true),
+		"swing_meta": swing_meta.duplicate(true),
+	}
+
+func _flow_history_duration_ms(history: Array) -> int:
+	if history.size() < 2:
+		return 0
+	return maxi(int(history[history.size() - 1].get("timestamp_ms", 0)) - int(history[0].get("timestamp_ms", 0)), 0)
 
 func _get_smoothing_window_size() -> int:
 	if _config == null:
@@ -520,6 +561,8 @@ func _reset_gesture_state() -> void:
 		"flow": {
 			"left_hand": [],
 			"right_hand": [],
+			"swing_left": {"last_emit_ms": 0},
+			"swing_right": {"last_emit_ms": 0},
 			"trail_left": {"last_emit_ms": 0},
 			"trail_right": {"last_emit_ms": 0},
 		},
@@ -670,6 +713,17 @@ func _process_flow_swing(events: Array, side: String, hand_velocity: Vector3, sh
 	var direction := StringName(analysis.get("direction", StringName()))
 	if direction == StringName():
 		return
+	var flow_meta := _get_flow_meta(event_name)
+	flow_meta["last_emit_ms"] = timestamp_ms
+	flow_meta["placement"] = StringName(analysis.get("placement", &"center"))
+	flow_meta["direction"] = direction
+	flow_meta["duration_ms"] = int(analysis.get("duration_ms", 0))
+	flow_meta["arc_length"] = float(analysis.get("arc_length", 0.0))
+	flow_meta["net_distance"] = float(analysis.get("net_distance", 0.0))
+	flow_meta["directional_consistency"] = float(analysis.get("directional_consistency", 0.0))
+	flow_meta["lane_spread"] = float(analysis.get("lane_spread", 0.0))
+	flow_meta["avg_confidence"] = float(analysis.get("avg_confidence", 0.0))
+	_set_flow_meta(event_name, flow_meta)
 	_emit_flow_event(events, event_name, StringName(analysis.get("placement", &"center")), direction)
 	_set_ready(event_name, false)
 
@@ -704,6 +758,12 @@ func _process_flow_trail(events: Array, side: String, hand_velocity: Vector3, sh
 	trail_meta["last_emit_ms"] = timestamp_ms
 	trail_meta["placement"] = StringName(analysis.get("placement", &"center"))
 	trail_meta["direction"] = direction
+	trail_meta["duration_ms"] = int(analysis.get("duration_ms", 0))
+	trail_meta["arc_length"] = float(analysis.get("arc_length", 0.0))
+	trail_meta["net_distance"] = float(analysis.get("net_distance", 0.0))
+	trail_meta["directional_consistency"] = float(analysis.get("directional_consistency", 0.0))
+	trail_meta["lane_spread"] = float(analysis.get("lane_spread", 0.0))
+	trail_meta["avg_confidence"] = float(analysis.get("avg_confidence", 0.0))
 	_set_flow_meta(state_name, trail_meta)
 	_emit_flow_event(events, state_name, StringName(analysis.get("placement", &"center")), direction)
 
@@ -767,16 +827,22 @@ func _analyze_flow_motion(side: String, shoulder_width: float, max_window_ms: in
 	var direction_name := _flow_direction_name(net_delta)
 	if direction_name == StringName():
 		return {}
+	var avg_x := avg_x_total / float(samples.size())
 	return {
 		"duration_ms": maxi(int(last.get("timestamp_ms", 0)) - int(first.get("timestamp_ms", 0)), 0),
+		"sample_count": samples.size(),
 		"arc_length": arc_length,
 		"net_distance": net_delta.length(),
 		"net_delta": net_delta,
 		"avg_confidence": confidence_total / float(samples.size()),
 		"directional_consistency": direction_sum.length() / maxf(arc_length, 0.000001),
-		"placement": _flow_placement_name(avg_x_total / float(samples.size()), shoulder_width),
+		"placement": _flow_placement_name(avg_x, shoulder_width),
 		"direction": direction_name,
 		"lane_spread": max_x - min_x,
+		"avg_x": avg_x,
+		"min_x": min_x,
+		"max_x": max_x,
+		"latest_position": last_pos,
 	}
 
 func _flow_direction_name(net_delta: Vector2) -> StringName:

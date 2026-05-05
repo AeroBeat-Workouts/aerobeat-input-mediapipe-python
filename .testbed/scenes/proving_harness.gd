@@ -352,6 +352,9 @@ func _build_quick_stats_text() -> String:
 	var gesture_states: Dictionary = state.get("gesture_states", {})
 	var gesture_debug: Dictionary = state.get("gesture_debug", {})
 	var ready_map: Dictionary = gesture_debug.get("ready", {})
+	var flow_debug: Dictionary = gesture_debug.get("flow", {})
+	var left_flow: Dictionary = flow_debug.get("left", {})
+	var right_flow: Dictionary = flow_debug.get("right", {})
 	var pose_count := int(provider.get_num_poses()) if provider != null else 0
 	var visible_landmarks := int((state.get("landmarks_by_id", {}) as Dictionary).size())
 	var lines := [
@@ -376,6 +379,12 @@ func _build_quick_stats_text() -> String:
 		lines.append("Guard active: %s" % str(bool(gesture_states.get("guard", false))))
 		lines.append("Attack gates armed: %d / %d" % [armed_count, BOXING_ATTACK_EVENTS.size() + BOXING_KNEE_EVENTS.size()])
 	else:
+		var swing_ready := int(bool(ready_map.get("swing_left", true))) + int(bool(ready_map.get("swing_right", true)))
+		var active_trails := int(bool(gesture_states.get("trail_left", false))) + int(bool(gesture_states.get("trail_right", false)))
+		lines.append("Swing gates armed: %d / 2" % swing_ready)
+		lines.append("Active trails: %d / 2" % active_trails)
+		lines.append("Flow candidate L: %s / %s" % [_fmt_flow_candidate(left_flow), _fmt_flow_direction_candidate(left_flow)])
+		lines.append("Flow candidate R: %s / %s" % [_fmt_flow_candidate(right_flow), _fmt_flow_direction_candidate(right_flow)])
 		lines.append("Trail L points/duration: %d / %dms" % [_left_trail.size(), _trail_duration_ms(_left_trail)])
 		lines.append("Trail R points/duration: %d / %dms" % [_right_trail.size(), _trail_duration_ms(_right_trail)])
 	return "\n".join(lines)
@@ -407,12 +416,24 @@ func _build_summary_text() -> String:
 		lines.append("height=%s ratio=%s squat_depth=%s" % [String(measurements.get("height_state", &"unknown")), _fmt_float(measurements.get("height_ratio", 0.0)), _fmt_float(measurements.get("squat_depth", 0.0))])
 		lines.append("head/hip lateral=%s / %s" % [_fmt_float(measurements.get("head_lateral_offset", 0.0)), _fmt_float(measurements.get("hip_lateral_offset", 0.0))])
 	else:
+		var gesture_debug: Dictionary = state.get("gesture_debug", {})
+		var ready_map: Dictionary = gesture_debug.get("ready", {})
+		var flow_debug: Dictionary = gesture_debug.get("flow", {})
+		var left_flow: Dictionary = flow_debug.get("left", {})
+		var right_flow: Dictionary = flow_debug.get("right", {})
 		lines.append("")
 		lines.append("Flow event summary")
 		lines.append("------------------")
 		for key: String in ["swing_left", "swing_right", "trail_left", "trail_right"]:
 			lines.append("%s: %s" % [key, _describe_last_flow_event(key)])
-		lines.append("trail_left_active=%s trail_right_active=%s" % [str(bool(gesture_states.get("trail_left", false))), str(bool(gesture_states.get("trail_right", false)))])
+		lines.append("swing_ready L/R=%s / %s" % [str(bool(ready_map.get("swing_left", true))), str(bool(ready_map.get("swing_right", true)))])
+		lines.append("trail_active L/R=%s / %s" % [str(bool(gesture_states.get("trail_left", false))), str(bool(gesture_states.get("trail_right", false)))])
+		lines.append("placement vs direction L=%s / %s" % [_fmt_flow_candidate(left_flow), _fmt_flow_direction_candidate(left_flow)])
+		lines.append("placement vs direction R=%s / %s" % [_fmt_flow_candidate(right_flow), _fmt_flow_direction_candidate(right_flow)])
+		lines.append("Mirrored-hand sanity")
+		lines.append("-------------------")
+		lines.append(_format_flow_sanity_line("left", left_flow))
+		lines.append(_format_flow_sanity_line("right", right_flow))
 		lines.append("Local continuity: L=%d pts (%dms), R=%d pts (%dms)" % [_left_trail.size(), _trail_duration_ms(_left_trail), _right_trail.size(), _trail_duration_ms(_right_trail)])
 	return "\n".join(lines)
 
@@ -467,15 +488,27 @@ func _build_boxing_signal_text() -> String:
 func _build_flow_signal_text() -> String:
 	var state: Dictionary = _latest_state
 	var gesture_states: Dictionary = state.get("gesture_states", {})
+	var gesture_debug: Dictionary = state.get("gesture_debug", {})
+	var ready_map: Dictionary = gesture_debug.get("ready", {})
+	var flow_debug: Dictionary = gesture_debug.get("flow", {})
+	var left_flow: Dictionary = flow_debug.get("left", {})
+	var right_flow: Dictionary = flow_debug.get("right", {})
 	var lines := [
 		"Flow signal board",
 		"=================",
-		"swing_left  count=%d  last=%s" % [_event_count("swing_left"), _last_seen_text("swing_left")],
-		"swing_right count=%d  last=%s" % [_event_count("swing_right"), _last_seen_text("swing_right")],
-		"trail_left  active=%s count=%d last=%s" % [str(bool(gesture_states.get("trail_left", false))), _event_count("trail_left"), _last_seen_text("trail_left")],
-		"trail_right active=%s count=%d last=%s" % [str(bool(gesture_states.get("trail_right", false))), _event_count("trail_right"), _last_seen_text("trail_right")],
+		"Persistent status/counters for swings, trails, readiness, and candidate truth.",
 		"",
-		"This panel is shared. Boxing uses the deep persistent coverage board.",
+		"Left hand surface",
+		"-----------------",
+		_format_flow_event_row("swing_left", left_flow, ready_map, false),
+		_format_flow_event_row("trail_left", left_flow, ready_map, bool(gesture_states.get("trail_left", false))),
+		_format_flow_candidate_row("left", left_flow),
+		"",
+		"Right hand surface",
+		"------------------",
+		_format_flow_event_row("swing_right", right_flow, ready_map, false),
+		_format_flow_event_row("trail_right", right_flow, ready_map, bool(gesture_states.get("trail_right", false))),
+		_format_flow_candidate_row("right", right_flow),
 	]
 	return "\n".join(lines)
 
@@ -510,17 +543,98 @@ func _build_metrics_text() -> String:
 		lines.append("R knee/foot rise=%s / %s" % [_fmt_float(measurements.get("right_knee_rise", 0.0)), _fmt_float(measurements.get("right_foot_rise", 0.0))])
 		lines.append("L leg angle=%s°  R leg angle=%s°" % [_fmt_float(measurements.get("left_leg_angle_from_core_deg", 0.0)), _fmt_float(measurements.get("right_leg_angle_from_core_deg", 0.0))])
 	else:
+		var gesture_debug: Dictionary = state.get("gesture_debug", {})
+		var flow_debug: Dictionary = gesture_debug.get("flow", {})
+		var left_flow: Dictionary = flow_debug.get("left", {})
+		var right_flow: Dictionary = flow_debug.get("right", {})
 		lines.append("")
 		lines.append("Flow / continuity readouts")
 		lines.append("-------------------------")
-		lines.append("Last swing_left: %s" % _describe_last_flow_event("swing_left"))
-		lines.append("Last swing_right: %s" % _describe_last_flow_event("swing_right"))
-		lines.append("Last trail_left: %s" % _describe_last_flow_event("trail_left"))
-		lines.append("Last trail_right: %s" % _describe_last_flow_event("trail_right"))
-		lines.append("L trail points=%d duration=%dms" % [_left_trail.size(), _trail_duration_ms(_left_trail)])
-		lines.append("R trail points=%d duration=%dms" % [_right_trail.size(), _trail_duration_ms(_right_trail)])
-		lines.append("Placement feed is detector-emitted. Continuity timing above is local harness visualization.")
+		lines.append("Left hand")
+		lines.append(_format_flow_analysis_line("swing window", left_flow.get("swing_analysis", {})))
+		lines.append(_format_flow_analysis_line("trail window", left_flow.get("trail_analysis", {})))
+		lines.append("latest pos=%s conf=%s avg_x=%s offset=%s" % [_fmt_vec2(left_flow.get("latest_position", Vector2.ZERO)), _fmt_float(left_flow.get("latest_confidence", 0.0)), _fmt_float(left_flow.get("avg_x", 0.0)), _fmt_float(left_flow.get("center_offset_ratio", 0.0))])
+		lines.append("vel=%s dir=%s" % [_fmt_vec3(velocities.get("left_hand", Vector3.ZERO)), _fmt_vec2(directions.get("left_hand", Vector2.ZERO))])
+		lines.append("")
+		lines.append("Right hand")
+		lines.append(_format_flow_analysis_line("swing window", right_flow.get("swing_analysis", {})))
+		lines.append(_format_flow_analysis_line("trail window", right_flow.get("trail_analysis", {})))
+		lines.append("latest pos=%s conf=%s avg_x=%s offset=%s" % [_fmt_vec2(right_flow.get("latest_position", Vector2.ZERO)), _fmt_float(right_flow.get("latest_confidence", 0.0)), _fmt_float(right_flow.get("avg_x", 0.0)), _fmt_float(right_flow.get("center_offset_ratio", 0.0))])
+		lines.append("vel=%s dir=%s" % [_fmt_vec3(velocities.get("right_hand", Vector3.ZERO)), _fmt_vec2(directions.get("right_hand", Vector2.ZERO))])
+		lines.append("")
+		lines.append("Placement is detector-emitted; local trail durations remain on-screen for continuity sanity only.")
 	return "\n".join(lines)
+
+func _format_flow_event_row(event_name: String, hand_debug: Dictionary, ready_map: Dictionary, active: bool) -> String:
+	var event_kind := "swing" if event_name.begins_with("swing_") else "trail"
+	var analysis: Dictionary = hand_debug.get("swing_analysis", {}) if event_kind == "swing" else hand_debug.get("trail_analysis", {})
+	var meta: Dictionary = hand_debug.get("swing_meta", {}) if event_kind == "swing" else hand_debug.get("trail_meta", {})
+	var status := "ACTIVE" if event_kind == "trail" and active else ("READY" if bool(ready_map.get(event_name, true)) else "RESET")
+	if event_kind == "trail" and not active:
+		status = "IDLE"
+	return "%s  status=%s  count=%d  last=%s  emitted=%s/%s  cand=%s/%s  dur=%dms  arc=%s  net=%s  cons=%s  lane=%s  conf=%s" % [
+		event_name,
+		status,
+		_event_count(event_name),
+		_last_seen_text(event_name),
+		String(meta.get("placement", &"-")),
+		String(meta.get("direction", &"-")),
+		_fmt_flow_candidate(hand_debug),
+		_fmt_flow_direction_candidate(hand_debug),
+		int(analysis.get("duration_ms", 0)),
+		_fmt_float(analysis.get("arc_length", 0.0)),
+		_fmt_float(analysis.get("net_distance", 0.0)),
+		_fmt_float(analysis.get("directional_consistency", 0.0)),
+		_fmt_float(analysis.get("lane_spread", 0.0)),
+		_fmt_float(analysis.get("avg_confidence", 0.0)),
+	]
+
+func _format_flow_candidate_row(side: String, hand_debug: Dictionary) -> String:
+	return "%s hand  history=%d pts / %dms  latest=%s  avg_x=%s  center_offset=%s  placement=%s  direction=%s" % [
+		side,
+		int(hand_debug.get("history_points", 0)),
+		int(hand_debug.get("history_duration_ms", 0)),
+		_fmt_vec2(hand_debug.get("latest_position", Vector2.ZERO)),
+		_fmt_float(hand_debug.get("avg_x", 0.0)),
+		_fmt_float(hand_debug.get("center_offset_ratio", 0.0)),
+		_fmt_flow_candidate(hand_debug),
+		_fmt_flow_direction_candidate(hand_debug),
+	]
+
+func _format_flow_analysis_line(label: String, analysis_variant: Variant) -> String:
+	var analysis: Dictionary = analysis_variant if analysis_variant is Dictionary else {}
+	if analysis.is_empty():
+		return "%s: no candidate yet" % label
+	return "%s: samples=%d dur=%dms arc=%s net=%s cons=%s lane=%s conf=%s placement=%s direction=%s" % [
+		label,
+		int(analysis.get("sample_count", 0)),
+		int(analysis.get("duration_ms", 0)),
+		_fmt_float(analysis.get("arc_length", 0.0)),
+		_fmt_float(analysis.get("net_distance", 0.0)),
+		_fmt_float(analysis.get("directional_consistency", 0.0)),
+		_fmt_float(analysis.get("lane_spread", 0.0)),
+		_fmt_float(analysis.get("avg_confidence", 0.0)),
+		String(analysis.get("placement", &"-")),
+		String(analysis.get("direction", &"-")),
+	]
+
+func _format_flow_sanity_line(side: String, hand_debug: Dictionary) -> String:
+	return "%s hand: latest=%s avg_x=%s offset=%s placement=%s direction=%s" % [
+		side,
+		_fmt_vec2(hand_debug.get("latest_position", Vector2.ZERO)),
+		_fmt_float(hand_debug.get("avg_x", 0.0)),
+		_fmt_float(hand_debug.get("center_offset_ratio", 0.0)),
+		_fmt_flow_candidate(hand_debug),
+		_fmt_flow_direction_candidate(hand_debug),
+	]
+
+func _fmt_flow_candidate(hand_debug: Dictionary) -> String:
+	var candidate := String(hand_debug.get("placement_candidate", StringName()))
+	return candidate if candidate != "" else "-"
+
+func _fmt_flow_direction_candidate(hand_debug: Dictionary) -> String:
+	var candidate := String(hand_debug.get("direction_candidate", StringName()))
+	return candidate if candidate != "" else "-"
 
 func _build_events_text() -> String:
 	var lines := ["Live events", "==========="]
