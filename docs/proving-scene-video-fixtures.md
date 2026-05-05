@@ -23,7 +23,7 @@ Do **not** use these fixtures to claim:
 
 ## High-level design
 
-The fixture system should use **short, feature-specific source videos** plus a **sidecar metadata file** describing what the clip is supposed to prove.
+The fixture system should use **short, feature-specific source videos** plus a **sidecar metadata file** describing what the clip is supposed to prove. For human-authored sidecars, prefer **YAML** so authors can keep comments, descriptive notes, and review context inline without fighting dense JSON syntax.
 
 Each fixture consists of:
 
@@ -45,7 +45,7 @@ Use this repo-local layout:
   boxing/
     punch_left/
       boxing__punch_left__positive__cam-cookie-logitech-c920__take-01.mp4
-      boxing__punch_left__positive__cam-cookie-logitech-c920__take-01.fixture.json
+      boxing__punch_left__positive__cam-cookie-logitech-c920__take-01.fixture.yaml
       boxing__punch_left__positive__cam-cookie-logitech-c920__take-01.notes.md   # optional
     guard/
     squat/
@@ -209,13 +209,13 @@ Squat, lean, sidestep, and leg-lift fixtures should follow immediately after the
 
 ## Metadata contract
 
-Each `.mp4` should have a sibling `.fixture.json` file.
+Each `.mp4` should have a sibling `.fixture.yaml` file.
 
-Why JSON:
+Why YAML for the human-authored source of truth:
 
-- easy to read from Godot, Python, and shell tooling
-- explicit enough for automation without custom parsing rules
-- stable for later schema evolution
+- comments and short descriptions matter when Derrick is capturing/reviewing clips
+- easier to scan and edit during real fixture authoring than dense JSON
+- still explicit enough for automation, which can ingest YAML directly or translate it to JSON later if a harness wants that
 
 The metadata file should include:
 
@@ -277,7 +277,8 @@ The metadata file should include:
 
 A starter template lives in:
 
-- `docs/proving-scene-video-fixture-template.fixture.json`
+- `docs/proving-scene-video-fixture-template.fixture.yaml`
+- `.testbed/assets/fixtures/boxing/punch_left/boxing__punch_left__positive__cam-cookie-logitech-c920__take-01.fixture.yaml`
 
 ---
 
@@ -448,7 +449,7 @@ Rule: if a fixture passes but Derrick reports the live feature feels bad, the li
 The next coding slice should not try to solve everything. A good first implementation is:
 
 1. create `.testbed/assets/fixtures/boxing/` and `.testbed/assets/fixtures/flow/`
-2. support loading one `.fixture.json` sidecar for one `.mp4`
+2. support loading one `.fixture.yaml` sidecar for one `.mp4`
 3. implement a replay/evaluation path for a narrow first slice:
    - one Boxing one-shot fixture
    - one Boxing sustained-state fixture
@@ -486,7 +487,7 @@ Then add:
 The reusable fixture format is:
 
 - **source clip**: short, feature-specific, camera-style `.mp4`
-- **sidecar metadata**: `<same-basename>.fixture.json`
+- **sidecar metadata**: `<same-basename>.fixture.yaml` (human-authored source of truth)
 - **canonical storage**: `.testbed/assets/fixtures/<family>/<feature>/`
 - **automation outputs**: summary JSON, detector trace, optional screenshots/report
 - **truth boundary**: regression aid for detector/proving-scene behavior, not a substitute for live human verification

@@ -258,7 +258,8 @@ Video fixture workflow docs for reusable Boxing / Flow regression clips now live
 
 - `docs/proving-scene-video-fixtures-plain-language.md` — start here for the quick human guide
 - `docs/proving-scene-video-fixtures.md` — technical design/source of truth
-- `docs/proving-scene-video-fixture-template.fixture.json` — sidecar template
+- `docs/proving-scene-video-fixture-template.fixture.yaml` — sidecar template
+- `.testbed/assets/fixtures/boxing/punch_left/boxing__punch_left__positive__cam-cookie-logitech-c920__take-01.fixture.yaml` — concrete example sidecar
 
 If auto-start fails on this host, the test scene under `.testbed/scenes/` includes manual recovery guidance pointing back to the repo root and `python_mediapipe/assets/runtimes/linux-x64/`.
 

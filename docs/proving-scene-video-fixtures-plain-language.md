@@ -8,7 +8,7 @@ The technical design doc (`docs/proving-scene-video-fixtures.md`) is the source 
 
 If you only remember one thing, remember this:
 
-> A video fixture is a short recorded clip plus a small JSON sidecar file that says what that clip is supposed to prove.
+> A video fixture is a short recorded clip plus a small YAML sidecar file that says what that clip is supposed to prove.
 
 The goal is to make future detector checks **repeatable** without pretending prerecorded clips can replace live testing.
 
@@ -23,15 +23,15 @@ A fixture is a **saved test example**.
 For this repo, one fixture usually means:
 
 - one short `.mp4` video
-- one `.fixture.json` file with the same basename
+- one `.fixture.yaml` file with the same basename
 - optional notes/screenshots if something about the clip matters
 
 Example:
 
 - `boxing__punch_left__positive__cam-cookie-logitech-c920__take-01.mp4`
-- `boxing__punch_left__positive__cam-cookie-logitech-c920__take-01.fixture.json`
+- `boxing__punch_left__positive__cam-cookie-logitech-c920__take-01.fixture.yaml`
 
-Think of the video as the **evidence** and the JSON file as the **label + expectations**.
+Think of the video as the **evidence** and the YAML file as the **label + expectations**.
 
 ### What problem do fixtures solve?
 
@@ -142,7 +142,7 @@ How trusted the clip is.
 
 ### Sidecar / metadata file
 
-This is the `.fixture.json` file beside the video.
+This is the `.fixture.yaml` file beside the video. YAML is preferred here because fixture authoring is human-facing and comments/descriptions matter while reviewing takes and truth boundaries.
 
 Its job is to answer questions a filename cannot answer cleanly, such as:
 
@@ -316,7 +316,7 @@ flow__trail_left__positive__cam-cookie-logitech-c920__take-03.mp4
 - say what the clip is trying to prove (`positive`, `negative`, etc.)
 - include the capture rig at a high level
 - use `take-01`, `take-02`, and so on
-- the `.mp4` and `.fixture.json` should share the exact same basename
+- the `.mp4` and `.fixture.yaml` should share the exact same basename
 
 ### Where files should live
 
@@ -584,9 +584,9 @@ Example:
 
 - `.testbed/assets/fixtures/boxing/punch_left/`
 
-### 6. Create the matching `.fixture.json`
+### 6. Create the matching `.fixture.yaml`
 
-Use `docs/proving-scene-video-fixture-template.fixture.json` as the starter template.
+Use `docs/proving-scene-video-fixture-template.fixture.yaml` as the starter template.
 
 ### 7. Fill out the truth carefully
 
@@ -639,7 +639,8 @@ If Derrick wants the shortest useful path:
 
 1. `docs/proving-scene-video-fixtures-plain-language.md` — this guide
 2. `docs/proving-scene-video-fixtures.md` — technical source-of-truth design
-3. `docs/proving-scene-video-fixture-template.fixture.json` — template for making actual fixtures
+3. `docs/proving-scene-video-fixture-template.fixture.yaml` — template for making actual fixtures
+4. `.testbed/assets/fixtures/boxing/punch_left/boxing__punch_left__positive__cam-cookie-logitech-c920__take-01.fixture.yaml` — concrete example
 
 ---
 
@@ -649,7 +650,7 @@ The durable rule is simple:
 
 - record **short, clear, single-purpose camera clips**
 - name them predictably
-- pair each one with a truthful sidecar JSON file
+- pair each one with a truthful sidecar YAML file
 - use them for repeatable regression checks
 - do **not** confuse fixture success with live human verification success
 

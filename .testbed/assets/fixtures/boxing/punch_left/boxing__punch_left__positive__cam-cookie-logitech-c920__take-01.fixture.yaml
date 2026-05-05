@@ -1,0 +1,86 @@
+# Concrete example fixture for a human-reviewed Boxing one-shot candidate.
+# This example is intentionally YAML-first so authors can annotate why the clip
+# is trustworthy, what it proves, and what it does not prove.
+
+schema_version: 1
+fixture_id: boxing__punch_left__positive__cam-cookie-logitech-c920__take-01
+approval_level: candidate
+family: boxing
+feature: punch_left
+intent: positive
+motion_shape: oneshot
+video_file: boxing__punch_left__positive__cam-cookie-logitech-c920__take-01.mp4
+captured_at: 2026-05-05T00:00:00-04:00
+captured_by: Derrick Barra
+capture_host: cookie
+camera:
+  label: logitech-c920
+  mode: front-facing
+  mirrored_input: true
+  frame_rate: 30
+  resolution:
+    width: 1920
+    height: 1080
+environment:
+  room_notes: even front lighting, neutral background, full upper body visible
+  lighting_notes: no major backlight; punch arm remains readable through extension
+  wardrobe_notes: arms/hands clearly visible
+clip_timing:
+  duration_ms: 2200
+  lead_in_ms: 650
+  action_start_ms: 760
+  action_end_ms: 1120
+  settle_end_ms: 2050
+claims:
+  - regression check for one emitted punch_left event in the expected window
+  - regression check for punch ready/reset observability on the Boxing proving scene
+  - regression check that sibling one-shot Boxing events stay suppressed for this take
+non_claims:
+  - does not prove live workout ergonomics or fatigue behavior
+  - does not prove universal threshold correctness across rooms/cameras/body types
+  - does not replace live human verification on Cookie
+review:
+  status: pending
+  reviewed_by: ''
+  reviewed_at: ''
+  notes: Keep as candidate until a human reviewer agrees the left-straight read is clearly canonical.
+expected_detector_behavior:
+  expected_events:
+    - name: punch_left
+      count: 1
+      window_ms:
+        start: 780
+        end: 1180
+      payload: {}
+  forbidden_events:
+    - punch_right
+    - hook_left
+    - hook_right
+    - uppercut_left
+    - uppercut_right
+    - knee_left
+    - knee_right
+  expected_state_windows: []
+  expected_ready_transitions:
+    - signal: punch_left
+      must_be_ready_before_ms: 760
+      may_be_reset_during_ms:
+        start: 780
+        end: 1500
+      must_be_ready_again_by_ms: 2050
+expected_observability:
+  scene: boxing_proving.tscn
+  required_scene_surfaces:
+    - signal_board.punch_left.status
+    - signal_board.punch_left.count
+    - signal_board.punch_left.last
+    - signal_board.punch_left.last_power
+  required_debug_fields:
+    - gesture_debug.ready.punch_left
+    - gesture_debug.boxing.left.punch_distance
+    - gesture_debug.boxing.left.punch_velocity
+    - gesture_debug.boxing.left.punch_extension
+artifacts:
+  notes_file: boxing__punch_left__positive__cam-cookie-logitech-c920__take-01.notes.md
+  source_session_ref: human-verification-session-2026-05-05-cookie
+  screenshots: []

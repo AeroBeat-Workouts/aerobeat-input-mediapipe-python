@@ -99,7 +99,32 @@ Because Derrick plans to sync this repo onto Cookie and test there, this plan sh
 
 **Status:** ✅ Complete
 
-**Results:** Added durable repo-local fixture-design docs: `docs/proving-scene-video-fixtures.md` and `docs/proving-scene-video-fixture-template.fixture.json`, plus a README pointer to both. The design now defines a canonical fixture tree under `.testbed/assets/fixtures/`, a strict basename convention, fixture taxonomy (`positive` / `negative` / `boundary` / `rearm` / `occlusion` / `framing`; `canonical` / `candidate` / `deprecated`), capture rules, per-fixture JSON sidecar metadata, expected automation outputs, and the three-layer validation model (detector events, reset/state truth, proving-scene observability truth). It also keeps the claims honest: fixtures are regression aids for repeatable detector/proving checks and do not replace live human verification for ergonomics, latency, framing, occlusion, or threshold confidence.
+**Results:** Added durable repo-local fixture-design docs: `docs/proving-scene-video-fixtures.md` and `docs/proving-scene-video-fixture-template.fixture.json`, plus a README pointer to both. The design now defines a canonical fixture tree under `.testbed/assets/fixtures/`, a strict basename convention, fixture taxonomy (`positive` / `negative` / `boundary` / `rearm` / `occlusion` / `framing`; `canonical` / `candidate` / `deprecated`), capture rules, per-fixture JSON sidecar metadata, expected automation outputs, and the three-layer validation model (detector events, reset/state truth, proving-scene observability truth). It also keeps the claims honest: fixtures are regression aids for repeatable detector/proving checks and do not replace live human verification for ergonomics, latency, framing, occlusion, or threshold confidence. This initial JSON-oriented draft is now being revised in follow-up bead `oc-7qr` so the human-authored fixture format uses YAML instead.
+
+---
+
+### Task 3A: Switch fixture sidecars/docs to YAML and add first human-facing example
+
+**Bead ID:** `oc-7qr`  
+**SubAgent:** `primary` (for `research` / `coder` workflow roles)  
+**Role:** `research` then `coder`  
+**References:** `REF-01`, `REF-02`, `REF-03`, `REF-04`, `REF-05`  
+**Prompt:** Revise the fixture design from JSON sidecars to YAML sidecars because this is human-authored fixture metadata and comments/descriptions matter. Update the docs, template, and README references accordingly, and add a concrete example fixture for Boxing / oneshot / `punch_left` / `candidate` / `positive`. Keep the naming, capture, and truth-boundary guidance intact while making the format friendlier for human authors.
+
+**Folders Created/Deleted/Modified:**
+- `/home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-input-mediapipe-python/docs/`
+- `/home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-input-mediapipe-python/.plans/`
+
+**Files Created/Deleted/Modified:**
+- `/home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-input-mediapipe-python/docs/proving-scene-video-fixtures.md`
+- `/home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-input-mediapipe-python/docs/proving-scene-video-fixtures-plain-language.md`
+- `/home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-input-mediapipe-python/docs/proving-scene-video-fixture-template.fixture.yaml`
+- `/home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-input-mediapipe-python/.testbed/assets/fixtures/boxing/punch_left/boxing__punch_left__positive__cam-cookie-logitech-c920__take-01.fixture.yaml`
+- `/home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-input-mediapipe-python/README.md`
+
+**Status:** ✅ Complete
+
+**Results:** Reworked the human-facing fixture authoring guidance from JSON to YAML across the technical doc, plain-language guide, and README pointers, while preserving the same naming convention, taxonomy axes, capture rules, and truth-boundary warnings from `REF-01` through `REF-05`. Added an explicit YAML rationale in the docs: fixture sidecars are human-authored and benefit from comments/descriptions during capture/review, while automation outputs can remain JSON. Replaced the old JSON starter template with `docs/proving-scene-video-fixture-template.fixture.yaml` and added the first concrete example sidecar at `.testbed/assets/fixtures/boxing/punch_left/boxing__punch_left__positive__cam-cookie-logitech-c920__take-01.fixture.yaml` for Boxing / oneshot / `punch_left` / `candidate` / `positive`. Both YAML files were sanity-checked by loading them successfully with `python3` + `yaml.safe_load`. 
 
 ---
 
