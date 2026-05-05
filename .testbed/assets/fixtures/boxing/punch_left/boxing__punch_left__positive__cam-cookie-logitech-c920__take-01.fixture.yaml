@@ -7,24 +7,34 @@
 
 # Required: schema version for the fixture metadata format.
 schema_version: 1
+
 # Required: unique id for this fixture; usually the same as the shared file basename.
 fixture_id: boxing__punch_left__positive__cam-cookie-logitech-c920__take-01
+
 # Required: current review maturity. This stays candidate until a human approves it as canonical.
 approval_level: candidate
+
 # Required: top-level detector family.
 family: boxing
+
 # Required: specific Boxing feature expected from this take.
 feature: punch_left
+
 # Required: clip intent. Here positive means the target event should happen.
 intent: positive
+
 # Required: motion pattern category. A single punch is a oneshot event.
 motion_shape: oneshot
+
 # Required: sibling source video filename stored next to this sidecar.
 video_file: boxing__punch_left__positive__cam-cookie-logitech-c920__take-01.mp4
+
 # Required: when the take was captured, in ISO-8601 form.
 captured_at: 2026-05-05T00:00:00-04:00
+
 # Required: who recorded/performed this take.
 captured_by: Derrick Barra
+
 # Required: host/rig name used during capture.
 capture_host: cookie
 
@@ -32,16 +42,21 @@ capture_host: cookie
 camera:
   # Required: human-readable camera/model label.
   label: logitech-c920
+
   # Required: camera setup/orientation note.
   mode: front-facing
+
   # Required: whether the detector input was mirrored. This matters for left/right interpretation.
   mirrored_input: true
+
   # Required: source frame rate.
   frame_rate: 30
+
   # Required: source resolution in pixels.
   resolution:
     # Required: video width.
     width: 1920
+
     # Required: video height.
     height: 1080
 
@@ -49,8 +64,10 @@ camera:
 environment:
   # Optional: quick room/framing context for the take.
   room_notes: even front lighting, neutral background, full upper body visible
+
   # Optional: lighting-specific caveats or strengths.
   lighting_notes: no major backlight; punch arm remains readable through extension
+
   # Optional: clothing/visibility note relevant to body-part tracking.
   wardrobe_notes: arms/hands clearly visible
 
@@ -58,12 +75,16 @@ environment:
 clip_timing:
   # Required: full clip duration.
   duration_ms: 2200
+
   # Required: neutral lead-in before the punch.
   lead_in_ms: 650
+
   # Required: approximate moment the punch starts.
   action_start_ms: 760
+
   # Required: approximate moment the punch action ends.
   action_end_ms: 1120
+
   # Required: by this time the motion should have settled and the detector should be able to re-arm.
   settle_end_ms: 2050
 
@@ -83,10 +104,13 @@ non_claims:
 review:
   # Required: current review status.
   status: pending
+
   # Optional until someone reviews the take.
   reviewed_by: ''
+
   # Optional until reviewed.
   reviewed_at: ''
+
   # Optional but useful: why the clip is still pending or what the reviewer should look for.
   notes: Keep as candidate until a human reviewer agrees the left-straight read is clearly canonical.
 
@@ -96,14 +120,18 @@ expected_detector_behavior:
   expected_events:
     - # Required per entry: event name expected from the detector.
       name: punch_left
+
       # Required per entry: how many times that event should occur.
       count: 1
+
       # Recommended: acceptable event timing window in milliseconds.
       window_ms:
         # Required when window_ms is used: earliest allowed punch emission.
         start: 780
+
         # Required when window_ms is used: latest allowed punch emission.
         end: 1180
+
       # Conditionally optional: payload expectations for this event. Empty is fine because punch_left has no asserted payload fields here.
       payload: {}
 
@@ -124,14 +152,18 @@ expected_detector_behavior:
   expected_ready_transitions:
     - # Required when used: the specific signal whose readiness lifecycle is under test.
       signal: punch_left
+
       # Required: punch_left should already be armed before the action begins.
       must_be_ready_before_ms: 760
+
       # Conditionally optional: period where reset/not-ready is acceptable after firing.
       may_be_reset_during_ms:
         # Required when reset window is present: start of allowed reset period.
         start: 780
+
         # Required when reset window is present: end of allowed reset period.
         end: 1500
+
       # Required: punch_left should be ready again by the end of settle.
       must_be_ready_again_by_ms: 2050
 
@@ -139,12 +171,14 @@ expected_detector_behavior:
 expected_observability:
   # Required: proving scene used to inspect Boxing truth surfaces.
   scene: boxing_proving.tscn
+
   # Required: visible proving-scene fields that should exist for this feature.
   required_scene_surfaces:
     - signal_board.punch_left.status
     - signal_board.punch_left.count
     - signal_board.punch_left.last
     - signal_board.punch_left.last_power
+
   # Required: lower-level debug fields used to explain why the detector fired or did not fire.
   required_debug_fields:
     - gesture_debug.ready.punch_left
@@ -156,7 +190,9 @@ expected_observability:
 artifacts:
   # Conditionally optional: notes file for human context, review notes, or capture quirks.
   notes_file: boxing__punch_left__positive__cam-cookie-logitech-c920__take-01.notes.md
+
   # Optional: reference to the broader live testing session this take came from.
   source_session_ref: human-verification-session-2026-05-05-cookie
+
   # Optional: screenshots or stills worth preserving with the fixture.
   screenshots: []
