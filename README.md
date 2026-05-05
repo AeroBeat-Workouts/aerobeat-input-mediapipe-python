@@ -57,6 +57,8 @@ Mobile is intentionally outside this contract and should continue using the nati
 
 This repo now uses the AeroBeat GodotEnv package convention for the local workbench.
 
+Important truth boundary: `python_mediapipe/prepare_runtime.py` prepares the Python sidecar runtime under `python_mediapipe/assets/runtimes/<platform>/`. It does **not** restore `.testbed/addons/`. If `.testbed/addons/aerobeat-input-mediapipe-python` is missing, the proving scenes and other workbench scenes that load `res://addons/aerobeat-input-mediapipe-python/...` will fail to parse/open until GodotEnv restores the addon mounts.
+
 - Canonical dev/test manifest: `.testbed/addons.jsonc`
 - Installed dev/test addons: `.testbed/addons/`
 - GodotEnv cache: `.testbed/.addons/`
@@ -73,6 +75,8 @@ From the repo root:
 cd .testbed
 godotenv addons install
 ```
+
+This is the required addon-restore step for fresh checkouts and Cookie-style reruns. `prepare_runtime.py` will not create these `.testbed/addons/*` mounts for you.
 
 That restores:
 
@@ -155,6 +159,12 @@ From the repo root:
 python3 python_mediapipe/prepare_runtime.py --platform linux-x64 --mode dev --install-requirements --validate
 ```
 
+If you are preparing the runtime **so you can open the repo-local `.testbed` project afterward**, restore the workbench mounts too:
+
+```bash
+cd .testbed && godotenv addons install && cd ..
+```
+
 Equivalent explicit two-step flow if you want to see the stages separately:
 
 ```bash
@@ -220,6 +230,8 @@ cd .testbed
 godotenv addons install
 cd ..
 ```
+
+This step is separate from runtime prep. If you only ran `python3 python_mediapipe/prepare_runtime.py ...`, that is not enough to make `.testbed/scenes/boxing_proving.tscn` or `flow_proving.tscn` load, because those scenes intentionally depend on the GodotEnv-installed addon mount at `res://addons/aerobeat-input-mediapipe-python/`.
 
 Then open it in Godot 4.6:
 

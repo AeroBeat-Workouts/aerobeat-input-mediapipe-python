@@ -79,6 +79,10 @@ For every feature family below, try to capture:
 
 ### Launch checklist
 
+- From the repo root, restore the GodotEnv workbench mounts before opening Godot:
+  - `cd .testbed && godotenv addons install && cd ..`
+- If you also need the local Python sidecar runtime on Cookie, prepare that separately from the repo root:
+  - `python3 python_mediapipe/prepare_runtime.py --platform linux-x64 --mode dev --install-requirements --validate`
 - Open `.testbed` in Godot.
 - Run **Boxing Detector Proving** first.
 - Later run **Flow Detector Proving**.

@@ -110,6 +110,10 @@ def main() -> int:
             "--create-venv or --install-requirements is requested."
         )
 
+    workbench_warning = _get_testbed_addon_restore_warning()
+    if workbench_warning:
+        warnings.append(workbench_warning)
+
     manifest = build_runtime_manifest(
         mode=args.mode,
         platform_key=requested_platform_key,
@@ -160,6 +164,24 @@ def _install_requirements(*, runtime_root: Path, platform_key: str) -> None:
     subprocess.run(
         [str(python_executable), "-m", "pip", "install", "-r", str(requirements_path)],
         check=True,
+    )
+
+
+
+def _get_testbed_addon_restore_warning() -> str | None:
+    repo_root = Path(__file__).resolve().parent.parent
+    testbed_root = repo_root / ".testbed"
+    if not testbed_root.exists():
+        return None
+
+    self_addon_mount = testbed_root / "addons" / "aerobeat-input-mediapipe-python"
+    if self_addon_mount.exists():
+        return None
+
+    return (
+        "Runtime prep does not restore GodotEnv addon mounts. If you plan to open the repo-local "
+        ".testbed project or proving scenes, run 'cd .testbed && godotenv addons install' from the "
+        "repo root first so res://addons/aerobeat-input-mediapipe-python/... exists again."
     )
 
 
