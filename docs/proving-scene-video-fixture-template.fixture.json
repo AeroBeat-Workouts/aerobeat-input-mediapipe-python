@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "fixture_id": "flow__swing_left__positive__cam-cookie-logitech-c920__take-01",
+  "approval_level": "candidate",
+  "family": "flow",
+  "feature": "swing_left",
+  "intent": "positive",
+  "motion_shape": "oneshot",
+  "video_file": "flow__swing_left__positive__cam-cookie-logitech-c920__take-01.mp4",
+  "captured_at": "2026-05-05T00:00:00-04:00",
+  "captured_by": "Derrick Barra",
+  "capture_host": "cookie",
+  "camera": {
+    "label": "logitech-c920",
+    "mode": "front-facing",
+    "mirrored_input": true,
+    "frame_rate": 30,
+    "resolution": {
+      "width": 1920,
+      "height": 1080
+    }
+  },
+  "environment": {
+    "room_notes": "even front lighting, neutral background",
+    "lighting_notes": "no major backlight",
+    "wardrobe_notes": "arms/hands clearly visible"
+  },
+  "clip_timing": {
+    "duration_ms": 2600,
+    "lead_in_ms": 700,
+    "action_start_ms": 800,
+    "action_end_ms": 1400,
+    "settle_end_ms": 2400
+  },
+  "claims": [
+    "regression check for emitted swing_left event class",
+    "regression check for emitted placement/direction payload",
+    "regression check for swing ready/reset observability fields"
+  ],
+  "non_claims": [
+    "does not prove live camera ergonomics",
+    "does not prove universal threshold correctness",
+    "does not replace human verification"
+  ],
+  "review": {
+    "status": "pending",
+    "reviewed_by": "",
+    "reviewed_at": "",
+    "notes": ""
+  },
+  "expected_detector_behavior": {
+    "expected_events": [
+      {
+        "name": "swing_left",
+        "count": 1,
+        "window_ms": {
+          "start": 850,
+          "end": 1500
+        },
+        "payload": {
+          "placement": "center",
+          "direction": "left"
+        }
+      }
+    ],
+    "forbidden_events": [
+      "swing_right",
+      "trail_left",
+      "trail_right"
+    ],
+    "expected_state_windows": [],
+    "expected_ready_transitions": [
+      {
+        "signal": "swing_left",
+        "must_be_ready_before_ms": 800,
+        "may_be_reset_during_ms": {
+          "start": 850,
+          "end": 1700
+        },
+        "must_be_ready_again_by_ms": 2400
+      }
+    ]
+  },
+  "expected_observability": {
+    "scene": "flow_proving.tscn",
+    "required_scene_surfaces": [
+      "signal_board.swing_left.status",
+      "signal_board.swing_left.count",
+      "signal_board.swing_left.last",
+      "signal_board.swing_left.emitted_placement",
+      "signal_board.swing_left.emitted_direction",
+      "signal_board.swing_left.candidate_placement",
+      "signal_board.swing_left.candidate_direction"
+    ],
+    "required_debug_fields": [
+      "gesture_debug.ready.swing_left",
+      "gesture_debug.flow.left.placement_candidate",
+      "gesture_debug.flow.left.direction_candidate",
+      "gesture_debug.flow.left.swing_meta.placement",
+      "gesture_debug.flow.left.swing_meta.direction",
+      "gesture_debug.flow.left.swing_analysis.duration_ms",
+      "gesture_debug.flow.left.swing_analysis.arc_length",
+      "gesture_debug.flow.left.swing_analysis.net_distance",
+      "gesture_debug.flow.left.swing_analysis.directional_consistency"
+    ]
+  },
+  "artifacts": {
+    "notes_file": "flow__swing_left__positive__cam-cookie-logitech-c920__take-01.notes.md",
+    "source_session_ref": "human-verification-session-2026-05-05-cookie",
+    "screenshots": []
+  }
+}

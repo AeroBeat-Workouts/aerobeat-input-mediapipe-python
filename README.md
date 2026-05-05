@@ -254,6 +254,11 @@ Human verification workflow docs for live Cookie testing now live at:
 - `docs/proving-scene-human-verification-checklist.md`
 - `docs/proving-scene-human-verification-log-template.md`
 
+Video fixture workflow docs for reusable Boxing / Flow regression clips now live at:
+
+- `docs/proving-scene-video-fixtures.md`
+- `docs/proving-scene-video-fixture-template.fixture.json`
+
 If auto-start fails on this host, the test scene under `.testbed/scenes/` includes manual recovery guidance pointing back to the repo root and `python_mediapipe/assets/runtimes/linux-x64/`.
 
 ## Desktop build/export guidance

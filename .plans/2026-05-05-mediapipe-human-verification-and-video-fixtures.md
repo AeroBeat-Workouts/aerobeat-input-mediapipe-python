@@ -89,15 +89,17 @@ Because Derrick plans to sync this repo onto Cookie and test there, this plan sh
 
 **Folders Created/Deleted/Modified:**
 - `/home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-input-mediapipe-python/.plans/`
-- `/home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-input-mediapipe-python/docs/` (if created)
-- potential future fixture directories documented but not necessarily created yet
+- `/home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-input-mediapipe-python/docs/`
+- documented future canonical fixture tree under `/home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-input-mediapipe-python/.testbed/assets/fixtures/`
 
 **Files Created/Deleted/Modified:**
-- fixture design/workflow docs
+- `/home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-input-mediapipe-python/docs/proving-scene-video-fixtures.md`
+- `/home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-input-mediapipe-python/docs/proving-scene-video-fixture-template.fixture.json`
+- `/home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-input-mediapipe-python/README.md`
 
-**Status:** ⏳ Pending
+**Status:** ✅ Complete
 
-**Results:** Pending
+**Results:** Added durable repo-local fixture-design docs: `docs/proving-scene-video-fixtures.md` and `docs/proving-scene-video-fixture-template.fixture.json`, plus a README pointer to both. The design now defines a canonical fixture tree under `.testbed/assets/fixtures/`, a strict basename convention, fixture taxonomy (`positive` / `negative` / `boundary` / `rearm` / `occlusion` / `framing`; `canonical` / `candidate` / `deprecated`), capture rules, per-fixture JSON sidecar metadata, expected automation outputs, and the three-layer validation model (detector events, reset/state truth, proving-scene observability truth). It also keeps the claims honest: fixtures are regression aids for repeatable detector/proving checks and do not replace live human verification for ergonomics, latency, framing, occlusion, or threshold confidence.
 
 ---
 
