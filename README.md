@@ -4,12 +4,13 @@ The official current AeroBeat v1 gameplay-input path for **PC-first camera play*
 
 MediaPipe pose tracking for AeroBeat using a Python sidecar plus Godot glue. This repo should be read through the locked downscoped v1 truth: **camera-only official gameplay input**, **Boxing + Flow official gameplay features**, and **PC community first**. The architecture remains modular and future-friendly, but that should not be mistaken for present-tense parity across non-camera inputs or every platform target.
 
-This repo is **partially migrated** into the broader AeroBeat input-provider contract:
+This repo is now wired into the broader AeroBeat input-provider contract, but still with an intentionally narrow v1 scope:
 
-- it now has an addon entrypoint at `src/input_provider.gd`
-- it includes a thin assembly-facing `AeroInputProvider` adapter for lifecycle + polling access
-- it now includes a reusable detector substrate in `src/detectors/` for smoothing, confidence gating, baseline calibration, normalization, velocity estimation, and body-state primitives
-- it **does not** yet implement the full contract surface such as gameplay gesture callbacks, haptics, or 6DOF transforms
+- it has an addon entrypoint at `src/input_provider.gd`
+- that entrypoint instantiates the local provider path and relays shipped Boxing signals plus first-pass Flow motion-family signals
+- it includes a reusable detector substrate in `src/detectors/` for smoothing, confidence gating, baseline calibration, normalization, velocity estimation, and body-state primitives
+- the current gameplay-intent detector work is conservative **2D camera** logic, not a claim of richer 3D/body-volume semantics
+- it **does not** yet implement the full optional contract surface such as haptics or 6DOF transforms
 - provider registration / consumer wiring in `aerobeat-assembly-community` remains follow-on work in that repo, not hidden here
 
 ## Repo layout
@@ -23,6 +24,7 @@ This repo is **partially migrated** into the broader AeroBeat input-provider con
   - `python_mediapipe/assets/runtimes/macos-x64/` — scaffolded target location for macOS desktop runtimes
   - `python_mediapipe/assets/runtimes/windows-x64/` — scaffolded target location for Windows desktop runtimes
 - `.testbed/` — hidden Godot workbench project restored via GodotEnv
+- `.testbed/scenes/` — proving scenes and manual workbench content, including `boxing_proving.tscn` and `flow_proving.tscn`
 - `.testbed/tests/` — repo-local Godot automated test scripts
 - `.testbed/addons.jsonc` — committed dev/test dependency contract for the workbench
 
@@ -87,10 +89,13 @@ Manual `.testbed/src`, `.testbed/python_mediapipe`, and repo-owned `.testbed/add
 - run the Python sidecar directly from this repo on Linux using the prepared `linux-x64` runtime
 - create and validate the current host's repo-owned Linux dev runtime at `python_mediapipe/assets/runtimes/linux-x64/`
 - scaffold the macOS and Windows runtime roots / manifests for contract work, without claiming they are host-validated here
-- receive pose landmarks in Godot and expose head/hand/foot polling helpers
+- receive pose landmarks in Godot and expose head/hand/foot polling helpers plus normalized detector-state observations
+- emit shipped Boxing gameplay-intent signals: punches, hooks, uppercuts, guard, squat, lean, sidestep, knees, and leg-lift state changes
+- emit shipped first-pass Flow gameplay-intent signals: `swing_left/right(placement, direction)` and `trail_left/right(placement, direction)`
 - use either a webcam (`--camera 0`) or a video path (`--camera path/to/file.mp4`) when launching the Python sidecar directly
 - look up MediaPipe models from committed assets under `python_mediapipe/assets/models/`
 - fail fast in Godot when the expected desktop runtime manifest, sentinel, Python executable, or model assets are missing or invalid
+- open repo-local proving scenes under `.testbed/scenes/` for live detector verification and tuning
 
 ### What is still manual / partial
 
@@ -229,6 +234,21 @@ The workbench will:
 - resolve the unified platform-keyed desktop runtime family and fail fast if the prepared runtime is missing or invalid
 - use the Linux launcher path that is validated on this host; other desktop launcher branches exist in code but are not claimed as validated here
 
+### Proving scenes
+
+For detector truth/tuning work, the repo now includes dedicated proving scenes under `.testbed/scenes/`:
+
+- `boxing_proving.tscn` — live Boxing detector proving for punches, guard, squat, lean, sidestep, knees, and leg lifts
+- `flow_proving.tscn` — live Flow detector proving for swing/trail families, placement, direction, and continuity timing
+- `proving_harness.gd` — shared harness used by both scenes for event feed and threshold readouts
+
+Suggested use:
+
+- open the `.testbed` project in the editor
+- run either proving scene directly when tuning that detector family
+- use the right-side readouts to compare raw substrate measurements against emitted gameplay-intent events
+- keep conclusions scoped to the current mirrored 2D-camera baseline; these scenes are for proving/tuning the shipped detector surface, not for claiming 3D parity
+
 If auto-start fails on this host, the test scene under `.testbed/scenes/` includes manual recovery guidance pointing back to the repo root and `python_mediapipe/assets/runtimes/linux-x64/`.
 
 ## Desktop build/export guidance
@@ -280,14 +300,32 @@ python_mediapipe/assets/runtimes/linux-x64/venv/bin/python python_mediapipe/test
 
 ## Provider contract stance
 
-This repo now exposes an assembly-facing `src/input_provider.gd` via `plugin.cfg`, but the current implementation is intentionally narrow and honest:
+This repo now exposes an assembly-facing `src/input_provider.gd` via `plugin.cfg`, and the current implementation is intentionally narrow and honest:
 
 - `start()` / `stop()` / `is_tracking()` are adapted
 - head/hand/foot position polling is adapted
 - lower-body support is reported because foot polling exists
-- estimated per-limb velocity polling is implemented from normalized 2D landmark deltas
+- estimated per-limb velocity polling is implemented from normalized **2D** landmark deltas
 - detector-substrate observation primitives now include smoothing, confidence gating, standing baseline calibration, shoulder/torso normalization, elbow bend / arm extension, centerline tracking, lateral offset, height-state estimation, and degraded/reacquire tracking state
-- gesture callbacks are **not** implemented here yet
+- shipped Boxing detector surface is relayed through the provider path:
+  - `punch_left` / `punch_right`
+  - `hook_left` / `hook_right`
+  - `uppercut_left` / `uppercut_right`
+  - `guard_start` / `guard_end`
+  - `squat_start` / `squat_end`
+  - `lean_left_start` / `lean_left_end`
+  - `lean_right_start` / `lean_right_end`
+  - `sidestep_left_start` / `sidestep_left_end`
+  - `sidestep_right_start` / `sidestep_right_end`
+  - `knee_left` / `knee_right`
+  - `leg_lift_left_start` / `leg_lift_left_end`
+  - `leg_lift_right_start` / `leg_lift_right_end`
+- shipped first-pass Flow detector surface is relayed through the provider path:
+  - `swing_left(placement, direction)`
+  - `swing_right(placement, direction)`
+  - `trail_left(placement, direction)`
+  - `trail_right(placement, direction)`
+- `run_in_place` remains a legitimate authored/chart beat, but it is **not** a tracked provider input event in this pass
 - haptics are **not** implemented here yet
 - rotation / full `tracking_updated` spatial output are **not** implemented here yet
 
