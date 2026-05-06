@@ -1,9 +1,6 @@
 class_name PoseDetectorSubstrate
 extends RefCounted
 
-const PoseLandmarkIds = preload("res://addons/aerobeat-input-mediapipe-python/src/detectors/pose_landmark_ids.gd")
-const LandmarkSmoother = preload("res://addons/aerobeat-input-mediapipe-python/src/detectors/landmark_smoother.gd")
-const PoseMetrics = preload("res://addons/aerobeat-input-mediapipe-python/src/detectors/pose_metrics.gd")
 
 const TRACKING_TRACKING := &"tracking"
 const TRACKING_DEGRADED := &"degraded"

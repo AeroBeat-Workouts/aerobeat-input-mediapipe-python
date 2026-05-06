@@ -3,8 +3,6 @@ extends Node
 ## MediaPipe implementation of the current AeroBeat camera input provider with multi-pose support
 ## Works within the aerobeat-input-core assembly contract while staying truthful to this repo's PC-first camera path
 
-const PoseLandmarkIds = preload("res://addons/aerobeat-input-mediapipe-python/src/detectors/pose_landmark_ids.gd")
-const PoseDetectorSubstrate = preload("res://addons/aerobeat-input-mediapipe-python/src/detectors/pose_detector_substrate.gd")
 
 signal pose_updated(landmarks: Array)
 signal multi_pose_updated(poses: Array)  # Array of {pose_id, landmarks}
