@@ -1,8 +1,18 @@
 class_name AutoStartManager
 extends Node
 
-const DesktopSidecarRuntime = preload("res://addons/aerobeat-input-mediapipe-python/src/runtime/desktop_sidecar_runtime.gd")
-const DesktopSidecarLauncher = preload("res://addons/aerobeat-input-mediapipe-python/src/process/desktop_sidecar_launcher.gd")
+var _desktop_sidecar_runtime_script: GDScript = null
+var _desktop_sidecar_launcher_script: GDScript = null
+
+func _desktop_sidecar_runtime() -> GDScript:
+	if _desktop_sidecar_runtime_script == null:
+		_desktop_sidecar_runtime_script = load("%s/runtime/desktop_sidecar_runtime.gd" % get_script().resource_path.get_base_dir())
+	return _desktop_sidecar_runtime_script
+
+func _desktop_sidecar_launcher() -> GDScript:
+	if _desktop_sidecar_launcher_script == null:
+		_desktop_sidecar_launcher_script = load("%s/process/desktop_sidecar_launcher.gd" % get_script().resource_path.get_base_dir())
+	return _desktop_sidecar_launcher_script
 
 signal check_progress(percentage: int, message: String)
 signal installation_progress(percentage: int, message: String)
@@ -47,34 +57,34 @@ func _start_if_not_running() -> void:
 		_check_and_start()
 
 func _find_python() -> String:
-	return DesktopSidecarRuntime.get_sidecar_python_path(get_script().resource_path)
+	return _desktop_sidecar_runtime().get_sidecar_python_path(get_script().resource_path)
 
 func _resolve_package_path(relative_path: String) -> String:
-	return DesktopSidecarRuntime.resolve_package_path(get_script().resource_path, relative_path)
+	return _desktop_sidecar_runtime().resolve_package_path(get_script().resource_path, relative_path)
 
 func _get_runtime_mode() -> String:
-	return DesktopSidecarRuntime.get_runtime_mode()
+	return _desktop_sidecar_runtime().get_runtime_mode()
 
 func _get_platform_arch_key() -> String:
-	return DesktopSidecarRuntime.get_platform_arch_key()
+	return _desktop_sidecar_runtime().get_platform_arch_key()
 
 func _get_desktop_platform_key() -> String:
-	return DesktopSidecarRuntime.get_desktop_platform_key()
+	return _desktop_sidecar_runtime().get_desktop_platform_key()
 
 func _get_sidecar_runtime_root() -> String:
-	return DesktopSidecarRuntime.get_sidecar_runtime_root(get_script().resource_path)
+	return _desktop_sidecar_runtime().get_sidecar_runtime_root(get_script().resource_path)
 
 func _get_runtime_prepare_command_hint() -> String:
-	return DesktopSidecarRuntime.get_runtime_prepare_command_hint(get_script().resource_path, _get_runtime_mode())
+	return _desktop_sidecar_runtime().get_runtime_prepare_command_hint(get_script().resource_path, _get_runtime_mode())
 
 func _get_required_model_name() -> String:
-	return DesktopSidecarRuntime.get_required_model_name(model_complexity)
+	return _desktop_sidecar_runtime().get_required_model_name(model_complexity)
 
 func _get_model_asset_path() -> String:
-	return DesktopSidecarRuntime.get_model_asset_path(get_script().resource_path, _get_required_model_name())
+	return _desktop_sidecar_runtime().get_model_asset_path(get_script().resource_path, _get_required_model_name())
 
 func _validate_sidecar_runtime() -> Dictionary:
-	return DesktopSidecarRuntime.validate_runtime(get_script().resource_path, _get_required_model_name())
+	return _desktop_sidecar_runtime().validate_runtime(get_script().resource_path, _get_required_model_name())
 
 func get_server_pid() -> int:
 	return server_pid
@@ -82,7 +92,7 @@ func get_server_pid() -> int:
 func is_server_running() -> bool:
 	if _launch_info.is_empty():
 		return false
-	if DesktopSidecarLauncher.is_process_alive(_launch_info):
+	if _desktop_sidecar_launcher().is_process_alive(_launch_info):
 		return true
 	if OS.get_name() == "Linux":
 		var log_path := _get_server_log_path()
@@ -120,7 +130,7 @@ func stop_server() -> void:
 	OS.delay_msec(200)
 
 	if not _launch_info.is_empty():
-		var termination_result := await DesktopSidecarLauncher.terminate(self, _launch_info, 2000)
+		var termination_result: Dictionary = await _desktop_sidecar_launcher().terminate(self, _launch_info, 2000)
 		for note in termination_result.get("notes", PackedStringArray()):
 			push_warning("[AutoStartManager] %s" % note)
 
@@ -157,7 +167,7 @@ func _cleanup_server_state() -> void:
 func _is_process_alive(pid: int) -> bool:
 	if pid <= 1:
 		return false
-	return DesktopSidecarLauncher.is_process_alive(_launch_info)
+	return _desktop_sidecar_launcher().is_process_alive(_launch_info)
 
 func _check_and_start() -> bool:
 	_emit_progress(0, "Starting sidecar runtime validation...")
@@ -259,14 +269,14 @@ func _build_linux_prelaunch_commands() -> PackedStringArray:
 func _get_server_log_path() -> String:
 	if _launch_info.has("log_file"):
 		return String(_launch_info.get("log_file", ""))
-	return DesktopSidecarLauncher.get_state_dir().path_join("autostart-last.log")
+	return _desktop_sidecar_launcher().get_state_dir().path_join("autostart-last.log")
 
 func _start_detached_server() -> int:
 	await _kill_existing_servers()
 
 	var python: String = _find_python()
 	var script: String = ProjectSettings.globalize_path(_resolve_package_path("python_mediapipe/main.py"))
-	var project_dir: String = ProjectSettings.globalize_path(DesktopSidecarRuntime.get_package_root(get_script().resource_path))
+	var project_dir: String = ProjectSettings.globalize_path(_desktop_sidecar_runtime().get_package_root(get_script().resource_path))
 	var args := PackedStringArray([
 		"-u",
 		script,
@@ -289,7 +299,7 @@ func _start_detached_server() -> int:
 	if OS.get_name() == "Linux":
 		options["prelaunch_commands"] = _build_linux_prelaunch_commands()
 
-	_launch_info = await DesktopSidecarLauncher.launch_detached(self, "autostart-mediapipe", python, args, options)
+	_launch_info = await _desktop_sidecar_launcher().launch_detached(self, "autostart-mediapipe", python, args, options)
 	if not bool(_launch_info.get("ok", false)):
 		print("[AutoStartManager] ERROR: Failed to create detached sidecar launch")
 		for note in _launch_info.get("notes", PackedStringArray()):
@@ -399,7 +409,7 @@ func _stop_sync() -> void:
 		return
 	_stop_heartbeat()
 	OS.delay_msec(200)
-	DesktopSidecarLauncher.terminate_sync(_launch_info)
+	_desktop_sidecar_launcher().terminate_sync(_launch_info)
 	if OS.get_name() == "Linux":
 		var output: Array = []
 		OS.execute("pkill", ["-9", "-f", "python_mediapipe/main.py"], output, false)

@@ -6,9 +6,18 @@ extends Node
 ## silently inheriting Linux-only shell assumptions. Those non-Linux paths are structure,
 ## not parity claims; they remain unvalidated on this Linux host.
 
-const DesktopSidecarRuntime = preload("res://addons/aerobeat-input-mediapipe-python/src/runtime/desktop_sidecar_runtime.gd")
-const DesktopSidecarLauncher = preload("res://addons/aerobeat-input-mediapipe-python/src/process/desktop_sidecar_launcher.gd")
-const MediaPipeConfig = preload("res://addons/aerobeat-input-mediapipe-python/src/config/mediapipe_config.gd")
+var _desktop_sidecar_runtime_script: GDScript = null
+var _desktop_sidecar_launcher_script: GDScript = null
+
+func _desktop_sidecar_runtime() -> GDScript:
+	if _desktop_sidecar_runtime_script == null:
+		_desktop_sidecar_runtime_script = load("%s/../runtime/desktop_sidecar_runtime.gd" % get_script().resource_path.get_base_dir())
+	return _desktop_sidecar_runtime_script
+
+func _desktop_sidecar_launcher() -> GDScript:
+	if _desktop_sidecar_launcher_script == null:
+		_desktop_sidecar_launcher_script = load("%s/desktop_sidecar_launcher.gd" % get_script().resource_path.get_base_dir())
+	return _desktop_sidecar_launcher_script
 
 signal process_started()
 signal process_stopped(exit_code: int)
@@ -22,7 +31,7 @@ signal process_output(line: String)
 var _pid: int = -1
 var _pgid: int = -1
 var _python_path: String = ""
-var _config: MediaPipeConfig
+var _config = null
 var _is_shutting_down := false
 var _launch_info: Dictionary = {}
 var _runtime_validation: Dictionary = {}
@@ -30,7 +39,7 @@ var _runtime_validation: Dictionary = {}
 var _heartbeat_timer: Timer = null
 var _heartbeat_udp: PacketPeerUDP = null
 
-func start(config: MediaPipeConfig) -> bool:
+func start(config: Variant) -> bool:
 	if is_running():
 		process_error.emit("Process already running")
 		return false
@@ -63,13 +72,13 @@ func start(config: MediaPipeConfig) -> bool:
 		"--model-complexity", str(config.model_complexity),
 	])
 
-	_launch_info = await DesktopSidecarLauncher.launch_detached(
+	_launch_info = await _desktop_sidecar_launcher().launch_detached(
 		self,
 		"mediapipe-process",
 		_python_path,
 		args,
 		{
-			"working_directory": ProjectSettings.globalize_path(DesktopSidecarRuntime.get_package_root(get_script().resource_path)),
+			"working_directory": ProjectSettings.globalize_path(_desktop_sidecar_runtime().get_package_root(get_script().resource_path)),
 			"redirect_to_log": false,
 			"startup_probe_delay_sec": 0.2,
 		}
@@ -97,11 +106,11 @@ func start(config: MediaPipeConfig) -> bool:
 
 func _get_required_model_name() -> String:
 	if _config == null:
-		return DesktopSidecarRuntime.get_required_model_name(1)
-	return DesktopSidecarRuntime.get_required_model_name(_config.model_complexity)
+		return _desktop_sidecar_runtime().get_required_model_name(1)
+	return _desktop_sidecar_runtime().get_required_model_name(_config.model_complexity)
 
 func _validate_sidecar_runtime() -> Dictionary:
-	return DesktopSidecarRuntime.validate_runtime(get_script().resource_path, _get_required_model_name())
+	return _desktop_sidecar_runtime().validate_runtime(get_script().resource_path, _get_required_model_name())
 
 func _setup_heartbeat(heartbeat_port: int) -> void:
 	if _heartbeat_udp == null:
@@ -139,7 +148,7 @@ func stop() -> void:
 	_stop_heartbeat()
 	OS.delay_msec(100)
 
-	var termination_result := await DesktopSidecarLauncher.terminate(self, _launch_info, termination_timeout_ms)
+	var termination_result: Dictionary = await _desktop_sidecar_launcher().terminate(self, _launch_info, termination_timeout_ms)
 	var termination_notes: PackedStringArray = termination_result.get("notes", PackedStringArray())
 	for note in termination_notes:
 		push_warning("[MediaPipeProcess] %s" % note)
@@ -164,7 +173,7 @@ func _has_active_process_state() -> bool:
 func is_running() -> bool:
 	if _launch_info.is_empty():
 		return false
-	return DesktopSidecarLauncher.is_process_alive(_launch_info)
+	return _desktop_sidecar_launcher().is_process_alive(_launch_info)
 
 func get_pid() -> int:
 	return _pid
@@ -173,16 +182,16 @@ func get_process_group_id() -> int:
 	return _pgid
 
 func _resolve_package_path(relative_path: String) -> String:
-	return DesktopSidecarRuntime.resolve_package_path(get_script().resource_path, relative_path)
+	return _desktop_sidecar_runtime().resolve_package_path(get_script().resource_path, relative_path)
 
 func _get_platform_arch_key() -> String:
-	return DesktopSidecarRuntime.get_platform_arch_key()
+	return _desktop_sidecar_runtime().get_platform_arch_key()
 
 func _get_desktop_platform_key() -> String:
-	return DesktopSidecarRuntime.get_desktop_platform_key()
+	return _desktop_sidecar_runtime().get_desktop_platform_key()
 
 func _get_sidecar_runtime_root() -> String:
-	return DesktopSidecarRuntime.get_sidecar_runtime_root(get_script().resource_path)
+	return _desktop_sidecar_runtime().get_sidecar_runtime_root(get_script().resource_path)
 
 func _find_python() -> String:
 	var validation := _validate_sidecar_runtime()
@@ -214,14 +223,14 @@ func _stop_sync() -> void:
 		return
 	_stop_heartbeat()
 	OS.delay_msec(200)
-	DesktopSidecarLauncher.terminate_sync(_launch_info)
+	_desktop_sidecar_launcher().terminate_sync(_launch_info)
 	_cleanup_process_state()
 
 func _force_kill_immediate() -> void:
 	if not _has_active_process_state():
 		return
 	_stop_heartbeat()
-	DesktopSidecarLauncher.terminate_sync(_launch_info)
+	_desktop_sidecar_launcher().terminate_sync(_launch_info)
 	_cleanup_process_state()
 
 func check_dependencies() -> Dictionary:
