@@ -88,10 +88,10 @@ enum HarnessMode {
 @onready var landmark_drawer: Control = $Margin/VSplit/Content/LeftColumn/CameraPanel/CameraDisplay/LandmarkDrawer
 @onready var trail_drawer: Control = $Margin/VSplit/Content/LeftColumn/CameraPanel/CameraDisplay/TrailDrawer
 @onready var quick_stats_label: RichTextLabel = $Margin/VSplit/Content/LeftColumn/QuickStatsPanel/QuickStats
-@onready var summary_label: RichTextLabel = $Margin/VSplit/Content/RightColumn/SummaryPanel/Summary
-@onready var signal_status_label: RichTextLabel = $Margin/VSplit/Content/RightColumn/SignalPanel/SignalStatus
-@onready var metrics_label: RichTextLabel = $Margin/VSplit/Content/RightColumn/MetricsPanel/Metrics
-@onready var events_label: RichTextLabel = $Margin/VSplit/Content/RightColumn/EventsPanel/Events
+@onready var summary_label: RichTextLabel = $Margin/VSplit/Content/RightPanelScroll/RightColumn/SummaryPanel/Summary
+@onready var signal_status_label: RichTextLabel = $Margin/VSplit/Content/RightPanelScroll/RightColumn/SignalPanel/SignalStatus
+@onready var metrics_label: RichTextLabel = $Margin/VSplit/Content/RightPanelScroll/RightColumn/MetricsPanel/Metrics
+@onready var events_label: RichTextLabel = $Margin/VSplit/Content/RightPanelScroll/RightColumn/EventsPanel/Events
 
 var provider: MediaPipeProvider = null
 var auto_start_manager: Node = null

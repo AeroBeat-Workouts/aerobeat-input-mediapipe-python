@@ -117,51 +117,56 @@ scroll_active = false
 bbcode_enabled = false
 text = "Waiting for provider..."
 
-[node name="RightColumn" type="VBoxContainer" parent="Margin/VSplit/Content"]
+[node name="RightPanelScroll" type="ScrollContainer" parent="Margin/VSplit/Content"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="RightColumn" type="VBoxContainer" parent="Margin/VSplit/Content/RightPanelScroll"]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 theme_override_constants/separation = 10
 
-[node name="SummaryPanel" type="PanelContainer" parent="Margin/VSplit/Content/RightColumn"]
+[node name="SummaryPanel" type="PanelContainer" parent="Margin/VSplit/Content/RightPanelScroll/RightColumn"]
 layout_mode = 2
 custom_minimum_size = Vector2(0, 180)
 size_flags_vertical = 3
 
-[node name="Summary" type="RichTextLabel" parent="Margin/VSplit/Content/RightColumn/SummaryPanel"]
+[node name="Summary" type="RichTextLabel" parent="Margin/VSplit/Content/RightPanelScroll/RightColumn/SummaryPanel"]
 layout_mode = 2
 bbcode_enabled = false
 scroll_active = true
 text = "Waiting for provider..."
 
-[node name="SignalPanel" type="PanelContainer" parent="Margin/VSplit/Content/RightColumn"]
+[node name="SignalPanel" type="PanelContainer" parent="Margin/VSplit/Content/RightPanelScroll/RightColumn"]
 layout_mode = 2
 custom_minimum_size = Vector2(0, 280)
 size_flags_vertical = 3
 
-[node name="SignalStatus" type="RichTextLabel" parent="Margin/VSplit/Content/RightColumn/SignalPanel"]
+[node name="SignalStatus" type="RichTextLabel" parent="Margin/VSplit/Content/RightPanelScroll/RightColumn/SignalPanel"]
 layout_mode = 2
 bbcode_enabled = false
 scroll_active = true
 text = "Waiting for persistent Boxing signal coverage..."
 
-[node name="MetricsPanel" type="PanelContainer" parent="Margin/VSplit/Content/RightColumn"]
+[node name="MetricsPanel" type="PanelContainer" parent="Margin/VSplit/Content/RightPanelScroll/RightColumn"]
 layout_mode = 2
 custom_minimum_size = Vector2(0, 240)
 size_flags_vertical = 3
 
-[node name="Metrics" type="RichTextLabel" parent="Margin/VSplit/Content/RightColumn/MetricsPanel"]
+[node name="Metrics" type="RichTextLabel" parent="Margin/VSplit/Content/RightPanelScroll/RightColumn/MetricsPanel"]
 layout_mode = 2
 bbcode_enabled = false
 scroll_active = true
 text = "Waiting for detector metrics..."
 
-[node name="EventsPanel" type="PanelContainer" parent="Margin/VSplit/Content/RightColumn"]
+[node name="EventsPanel" type="PanelContainer" parent="Margin/VSplit/Content/RightPanelScroll/RightColumn"]
 layout_mode = 2
 custom_minimum_size = Vector2(0, 260)
 size_flags_vertical = 3
 
-[node name="Events" type="RichTextLabel" parent="Margin/VSplit/Content/RightColumn/EventsPanel"]
+[node name="Events" type="RichTextLabel" parent="Margin/VSplit/Content/RightPanelScroll/RightColumn/EventsPanel"]
 layout_mode = 2
 bbcode_enabled = false
 scroll_active = true
