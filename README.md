@@ -24,7 +24,8 @@ This repo is now wired into the broader AeroBeat input-provider contract, but st
   - `python_mediapipe/assets/runtimes/windows-x64/` — generated Windows desktop runtime root currently present in this checkout
   - `python_mediapipe/assets/runtimes/macos-x64/` — reserved platform-key path under the unified runtime contract, **not currently present in this checkout**
 - `.testbed/` — hidden Godot workbench project restored via GodotEnv
-- `.testbed/scenes/` — proving scenes and manual workbench content, including `boxing_proving.tscn` and `flow_proving.tscn`
+- `.testbed/scenes/` — scene files only for the repo-local proving/manual workbench, including `boxing_proving.tscn` and `flow_proving.tscn`
+- `.testbed/scripts/` — scene support scripts used by the repo-local proving/manual workbench
 - `.testbed/tests/` — repo-local Godot automated test scripts
 - `.testbed/addons.jsonc` — committed dev/test dependency contract for the workbench
 
@@ -248,11 +249,11 @@ The workbench will:
 
 ### Proving scenes
 
-For detector truth/tuning work, the repo now includes dedicated proving scenes under `.testbed/scenes/`:
+For detector truth/tuning work, the repo now keeps dedicated proving scenes under `.testbed/scenes/` and their backing scripts under `.testbed/scripts/`:
 
 - `boxing_proving.tscn` — live Boxing detector proving for punches, guard, squat, lean, sidestep, knees, and leg lifts
 - `flow_proving.tscn` — live Flow detector proving for swing/trail families, placement, direction, and continuity timing
-- `proving_harness.gd` — shared harness used by both scenes for event feed and threshold readouts
+- `.testbed/scripts/proving_harness.gd` — shared harness used by both scenes for event feed and threshold readouts
 
 Suggested use:
 

@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://c0wvu1t7h6xqr"]
 
-[ext_resource type="Script" uid="uid://bbfhj1hd8vw8k" path="res://scenes/test_scene.gd" id="1_3x72q"]
-[ext_resource type="Script" uid="uid://b7yrfwv07ycys" path="res://scenes/landmark_drawer.gd" id="2_landmark"]
+[ext_resource type="Script" uid="uid://bbfhj1hd8vw8k" path="res://scripts/test_scene.gd" id="1_3x72q"]
+[ext_resource type="Script" uid="uid://b7yrfwv07ycys" path="res://scripts/landmark_drawer.gd" id="2_landmark"]
 [ext_resource type="Script" path="res://addons/aerobeat-input-mediapipe-python/src/autostart_manager.gd" id="3_autostart"]
 
 [node name="TestScene" type="Node2D" unique_id=1655484709]

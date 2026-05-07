@@ -81,6 +81,7 @@ enum HarnessMode {
 @export var show_trails := true
 
 @onready var status_label: Label = $Margin/VSplit/Header/StatusLabel
+@onready var live_status_label: RichTextLabel = $Margin/VSplit/Header/LiveStatusLabel
 @onready var title_label: Label = $Margin/VSplit/Header/TitleLabel
 @onready var notes_label: Label = $Margin/VSplit/Header/NotesLabel
 @onready var camera_display: TextureRect = $Margin/VSplit/Content/LeftColumn/CameraPanel/CameraDisplay
@@ -106,13 +107,16 @@ var _last_flow_events := {}
 var _event_counts: Dictionary = {}
 var _last_event_payloads: Dictionary = {}
 var _last_event_timestamps_ms: Dictionary = {}
+var _last_console_snapshot := ""
 
 func _ready() -> void:
 	title_label.text = scene_title
 	notes_label.text = scene_notes
-	for label_variant: Variant in [quick_stats_label, summary_label, signal_status_label, metrics_label, events_label]:
+	for label_variant: Variant in [live_status_label, quick_stats_label, summary_label, signal_status_label, metrics_label, events_label]:
 		if label_variant is RichTextLabel:
 			label_variant.bbcode_enabled = false
+	if live_status_label:
+		live_status_label.scroll_active = false
 	_reset_last_flow_events()
 	_reset_event_tracking()
 	_update_status("Initializing...", Color.WHITE)
@@ -150,6 +154,9 @@ func _process(_delta: float) -> void:
 		if provider != null:
 			_latest_state = provider.get_detector_state()
 		_refresh_debug_panels()
+
+	if _frame_count % 30 == 0:
+		_emit_console_snapshot_if_changed()
 
 func _on_check_progress(percentage: int, message: String) -> void:
 	_update_status("%d%% - %s" % [percentage, message], Color.YELLOW)
@@ -338,11 +345,28 @@ func _start_camera_feed() -> void:
 		_record_event("camera_stream_failed", {})
 
 func _refresh_debug_panels() -> void:
+	live_status_label.text = _build_live_status_text()
 	quick_stats_label.text = _build_quick_stats_text()
 	summary_label.text = _build_summary_text()
 	signal_status_label.text = _build_signal_text()
 	metrics_label.text = _build_metrics_text()
 	events_label.text = _build_events_text()
+
+func _build_live_status_text() -> String:
+	var state: Dictionary = _latest_state
+	var tracking_state := String(state.get("tracking_state", &"lost"))
+	var pose_count := int(provider.get_num_poses()) if provider != null else 0
+	var last_event_name := _latest_event_name()
+	var last_event_age := _last_seen_text(last_event_name) if last_event_name != "" else "never"
+	return "Live status  |  mode=%s  server=%s  camera=%s  tracking=%s  poses=%d  last_event=%s (%s)" % [
+		_mode_name(),
+		("ready" if _server_ready else "starting"),
+		("streaming" if camera_view and camera_view.is_streaming() else "offline"),
+		tracking_state,
+		pose_count,
+		(last_event_name if last_event_name != "" else "none"),
+		last_event_age,
+	]
 
 func _build_quick_stats_text() -> String:
 	var state: Dictionary = _latest_state
@@ -654,7 +678,9 @@ func _record_event(event_name: String, payload: Dictionary) -> void:
 	_event_lines.push_front(line)
 	while _event_lines.size() > MAX_EVENT_LINES:
 		_event_lines.pop_back()
+	print("[ProvingHarness][%s] %s%s" % [_mode_name(), event_name, _format_event_payload(payload)])
 	_refresh_debug_panels()
+	_emit_console_snapshot_if_changed(true)
 
 func _format_event_payload(payload: Dictionary) -> String:
 	if payload.is_empty():
@@ -734,6 +760,58 @@ func _fmt_age_ms(age_ms: int) -> String:
 		return "%dms" % age_ms
 	return "%.1fs" % (float(age_ms) / 1000.0)
 
+func _latest_event_name() -> String:
+	var latest_name := ""
+	var latest_timestamp := -1
+	for event_name_variant: Variant in _last_event_timestamps_ms.keys():
+		var event_name := String(event_name_variant)
+		var timestamp_ms := int(_last_event_timestamps_ms.get(event_name_variant, 0))
+		if timestamp_ms > latest_timestamp:
+			latest_timestamp = timestamp_ms
+			latest_name = event_name
+	return latest_name
+
+func _build_console_snapshot() -> String:
+	var state: Dictionary = _latest_state
+	var metrics: Dictionary = state.get("metrics", {})
+	var measurements: Dictionary = metrics.get("measurements", {})
+	var gesture_states: Dictionary = state.get("gesture_states", {})
+	var base := "[ProvingHarness][%s] status=%s server=%s camera=%s poses=%d" % [
+		_mode_name(),
+		String(state.get("tracking_state", &"lost")),
+		("ready" if _server_ready else "starting"),
+		("streaming" if camera_view and camera_view.is_streaming() else "offline"),
+		(int(provider.get_num_poses()) if provider != null else 0),
+	]
+	if harness_mode == HarnessMode.BOXING:
+		return "%s guard=%s squat=%s height=%s latest=%s" % [
+			base,
+			str(bool(gesture_states.get("guard", false))),
+			str(bool(gesture_states.get("squat", false))),
+			String(measurements.get("height_state", &"unknown")),
+			(_latest_event_name() if _latest_event_name() != "" else "none"),
+		]
+	var flow_debug: Dictionary = (state.get("gesture_debug", {}) as Dictionary).get("flow", {})
+	var left_flow: Dictionary = flow_debug.get("left", {})
+	var right_flow: Dictionary = flow_debug.get("right", {})
+	return "%s trail_left=%s trail_right=%s cand_left=%s/%s cand_right=%s/%s latest=%s" % [
+		base,
+		str(bool(gesture_states.get("trail_left", false))),
+		str(bool(gesture_states.get("trail_right", false))),
+		_fmt_flow_candidate(left_flow),
+		_fmt_flow_direction_candidate(left_flow),
+		_fmt_flow_candidate(right_flow),
+		_fmt_flow_direction_candidate(right_flow),
+		(_latest_event_name() if _latest_event_name() != "" else "none"),
+	]
+
+func _emit_console_snapshot_if_changed(force: bool = false) -> void:
+	var snapshot := _build_console_snapshot()
+	if not force and snapshot == _last_console_snapshot:
+		return
+	_last_console_snapshot = snapshot
+	print(snapshot)
+
 func _mode_name() -> String:
 	return "Boxing" if harness_mode == HarnessMode.BOXING else "Flow"
 
@@ -753,15 +831,19 @@ func _fmt_vec3(value: Variant) -> String:
 func _update_status(text: String, color: Color) -> void:
 	status_label.text = text
 	status_label.modulate = color
+	print("[ProvingHarness][%s] %s" % [_mode_name(), text])
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		print("[ProvingHarness][%s] Window close request" % _mode_name())
 		_stop_everything()
 		get_tree().quit()
 	elif what == NOTIFICATION_EXIT_TREE or what == NOTIFICATION_PREDELETE:
+		print("[ProvingHarness][%s] Scene teardown notification=%d" % [_mode_name(), what])
 		_stop_everything()
 
 func _stop_everything() -> void:
+	print("[ProvingHarness][%s] Stopping harness resources" % _mode_name())
 	if camera_view and camera_view.is_streaming():
 		camera_view.stop_stream()
 	if camera_view and is_instance_valid(camera_view):
