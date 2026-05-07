@@ -79,7 +79,7 @@ size_flags_horizontal = 3
 size_flags_vertical = 3
 
 [node name="CameraDisplay" type="TextureRect" parent="Margin/VSplit/Content/LeftColumn/CameraPanel"]
-custom_minimum_size = Vector2(960, 640)
+custom_minimum_size = Vector2(640, 360)
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
@@ -118,6 +118,7 @@ bbcode_enabled = false
 text = "Waiting for provider..."
 
 [node name="RightPanelScroll" type="ScrollContainer" parent="Margin/VSplit/Content"]
+custom_minimum_size = Vector2(380, 0)
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
