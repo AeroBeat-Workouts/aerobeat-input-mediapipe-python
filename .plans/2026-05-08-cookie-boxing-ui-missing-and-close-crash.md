@@ -788,9 +788,9 @@ Follow-up research tightened that further: the screenshot is not the proving har
 **Files Created/Deleted/Modified:**
 - plan updates only unless a tiny proof step is required
 
-**Status:** ⏳ Pending
+**Status:** ✅ Complete
 
-**Results:** Pending.
+**Results:** Research completed and bead `oc-30v` is ready to close. The smallest truthful hardening target is not the collector internals or artifact layout; it is the controller lifetime anchor in `workspace/scripts/desktop-app-forensics.sh`. Today the harness writes good durable artifacts, but `start` still detaches the controller with `nohup "$SELF_PATH" _run "$LOG_DIR" &` and then manages it mainly through `state/controller.pid`, which is weaker against a GNOME/Xorg desktop-session reset than a transient service anchored in the user systemd manager. Recommended design: keep `_run`, the existing `meta/`, `logs/`, and `state/` contract, and the existing app/journal/session-poll behavior; replace only the controller launch/management path with `systemd-run --user` (transient unit), record the unit name in `state/controller.unit`, teach `status` and `stop` to prefer `systemctl --user` when that unit file exists, and add a TERM/INT trap inside `_run` so unit stop still produces `stop.requested` plus a final snapshot. Operator caveat: this depends on a live user systemd manager and is materially stronger when `loginctl show-user` reports `Linger=yes`; it does not promise survival if the entire user manager dies, but it is the narrowest real improvement for capturing the desktop-reset boundary. Clear recommendation for `oc-8pl`: implement a systemd-user transient-service launch mode first, preserve backward compatibility for existing pid-based runs, and avoid broader harness redesign unless QA proves that the user-manager boundary still is not durable enough.
 
 ---
 
@@ -810,9 +810,9 @@ Follow-up research tightened that further: the screenshot is not the proving har
 **Files Created/Deleted/Modified:**
 - owning shared script/docs/test files as required
 
-**Status:** ⏳ Pending
+**Status:** ✅ Complete
 
-**Results:** Pending.
+**Results:** Coder pass completed and bead `oc-8pl` is ready to close. The shared `workspace/scripts/desktop-app-forensics.sh` now implements the narrow systemd-user hardening from `oc-30v` while keeping the existing `_run` harness/artifact contract intact: `start` prefers `systemd-run --user` transient-unit launch, records the unit name in `state/controller.unit`, still falls back to `nohup` when a user manager is unavailable, and writes `controller.pid` from the transient unit `MainPID` when available. `status` / `stop` now prefer `systemctl --user` when that unit marker exists, while remaining backward-compatible with older pid-only runs. `_run` also traps `TERM`/`INT` so stop/unit shutdown still writes `state/stop.requested` and a final snapshot / `finished_at` marker before exit. Terminal-safe validation only: `bash -n` passed; `help` output passed; a no-GUI lifecycle run at `/tmp/desktop-app-forensics-test` on Pico’s host successfully started in `controller mode: systemd-user`, recorded `state/controller.unit`, reported `controller=active` plus collector pids in `status`, then `stop` returned `Harness stopped cleanly` and a follow-up `status` showed `controller=inactive` with collectors stopped. Validation artifacts also confirmed durable final markers (`state/stop.requested`, `meta/summary.txt` with `finished_at`, launcher log showing `systemd-run --user`, and a final session snapshot tail). Operator caveat kept explicit: this improves survival against the common desktop-session reset boundary when a live user systemd manager exists, but it does not guarantee capture survival if the entire user manager is torn down.
 
 ---
 
