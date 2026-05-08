@@ -621,9 +621,9 @@ Follow-up research tightened that further: the screenshot is not the proving har
 **Files Created/Deleted/Modified:**
 - plan updates only unless tiny instrumentation is required
 
-**Status:** ⏳ Pending
+**Status:** ✅ Complete
 
-**Results:** Pending.
+**Results:** Research/instrumentation completed and bead `oc-if1` was closed. Minimal trail-path instrumentation was added to the Boxing proving flow so the right-side UI / console now expose per-hand point counts, drawable segment counts, tail segment counts, continuity break counts, reseed counts, out-of-bounds clears, missing-sample skips, low-visibility skips, last jump distance, last action, and retained trail duration. The endpoint-only symptom is now mechanically explained: the renderer only draws a line with 2+ contiguous valid points, but it always draws the endpoint circle. Derrick’s first live read of the new counters is the decisive clue: the left trail action is repeatedly only `low_visibility`, `break_reseed`, or `clear_oob`. That means the live path is not accumulating enough stable contiguous points to ever render a visible trail, so the next fix should target the actual left-hand live data conditions rather than further abstract theory.
 
 ---
 
@@ -633,7 +633,7 @@ Follow-up research tightened that further: the screenshot is not the proving har
 **SubAgent:** `primary` (for `coder` workflow role)  
 **Role:** `coder`  
 **References:** `REF-04`, `REF-06`, `REF-17`  
-**Prompt:** After the instrumentation pass identifies the real failure, implement the smallest truthful fix so Boxing shows believable short hand trails in the real proving path instead of only endpoint circles, without reintroducing the slash bug.
+**Prompt:** After the instrumentation pass identifies the real failure, implement the smallest truthful fix so Boxing shows believable short hand trails in the real proving path instead of only endpoint circles, without reintroducing the slash bug. Current live evidence says the left trail action is repeatedly `low_visibility`, `break_reseed`, or `clear_oob`, so the fix should directly address those real conditions.
 
 **Folders Created/Deleted/Modified:**
 - `.plans/`
