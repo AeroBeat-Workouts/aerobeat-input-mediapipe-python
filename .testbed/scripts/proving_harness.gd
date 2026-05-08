@@ -10,7 +10,7 @@ const RIGHT_WRIST_ID := 16
 const MAX_EVENT_LINES := 22
 const MAX_TRAIL_POINTS := 36
 const MAX_TRAIL_AGE_MS := 1800
-const MAX_TRAIL_FRAME_JUMP := 0.20
+const MAX_TRAIL_FRAME_JUMP := 0.28
 
 const BOXING_EVENT_ORDER := [
 	"punch_left",
@@ -293,27 +293,50 @@ func _append_trail_point(trail: Array, landmark: Dictionary, timestamp_ms: int) 
 		trail.clear()
 		return
 	if _trail_jump_exceeds_limit(trail, point):
-		trail.clear()
-	trail.append({
-		"x": point.x,
-		"y": point.y,
-		"v": visibility,
-		"timestamp_ms": timestamp_ms,
-	})
+		_append_trail_break(trail, timestamp_ms)
+	trail.append(_make_trail_point(point, visibility, timestamp_ms))
 	while trail.size() > MAX_TRAIL_POINTS:
 		trail.remove_at(0)
 
 func _trail_jump_exceeds_limit(trail: Array, point: Vector2) -> bool:
 	if trail.is_empty():
 		return false
+	for index: int in range(trail.size() - 1, -1, -1):
+		var point_variant: Variant = trail[index]
+		if not point_variant is Dictionary:
+			continue
+		var trail_point: Dictionary = point_variant
+		if not trail_point.has("x") or not trail_point.has("y"):
+			continue
+		var previous := Vector2(float(trail_point.get("x", 0.0)), float(trail_point.get("y", 0.0)))
+		if not _is_normalized_point_in_bounds(previous):
+			continue
+		return previous.distance_to(point) > MAX_TRAIL_FRAME_JUMP
+	return false
+
+func _append_trail_break(trail: Array, timestamp_ms: int) -> void:
+	if trail.is_empty():
+		return
 	var last_point_variant: Variant = trail[trail.size() - 1]
-	if not last_point_variant is Dictionary:
-		return false
-	var last_point: Dictionary = last_point_variant
-	if not last_point.has("x") or not last_point.has("y"):
-		return false
-	var previous := Vector2(float(last_point.get("x", 0.0)), float(last_point.get("y", 0.0)))
-	return previous.distance_to(point) > MAX_TRAIL_FRAME_JUMP
+	if last_point_variant is Dictionary:
+		var last_point: Dictionary = last_point_variant
+		var last_break_point := Vector2(float(last_point.get("x", 0.0)), float(last_point.get("y", 0.0)))
+		if not _is_normalized_point_in_bounds(last_break_point):
+			return
+	trail.append({
+		"x": -1.0,
+		"y": -1.0,
+		"v": 0.0,
+		"timestamp_ms": timestamp_ms,
+	})
+
+func _make_trail_point(point: Vector2, visibility: float, timestamp_ms: int) -> Dictionary:
+	return {
+		"x": point.x,
+		"y": point.y,
+		"v": visibility,
+		"timestamp_ms": timestamp_ms,
+	}
 
 func _is_normalized_point_in_bounds(point: Vector2) -> bool:
 	return point.x >= 0.0 and point.x <= 1.0 and point.y >= 0.0 and point.y <= 1.0
