@@ -836,6 +836,29 @@ Follow-up research tightened that further: the screenshot is not the proving har
 
 ---
 
+## Session Handoff / Current Stopping Point
+
+- Derrick confirmed the Boxing proving UI is now visible on both Pico's terminal and Cookie, but the hand-trail branch remains unresolved and should no longer be advanced by theory-only fixes.
+- New explicit rule from this session: subagent claims are not enough on GUI-sensitive branches without deterministic artifacts or exact-path visual proof.
+- Two new recorded boxing videos now exist as candidate fixtures and should become the first deterministic proving-validation inputs:
+  - `.testbed/assets/fixtures/boxing/punch_left/boxing__punch_left__positive__guard_start_end__take_01.mp4`
+  - `.testbed/assets/fixtures/boxing/punch_right/boxing__punch_right__positive__guard_start_end__take_01.mp4`
+  - matching candidate fixture YAMLs were created and partially filled from Derrick's metadata
+- Deterministic validation branch is active:
+  - `oc-9wd` research completed: existing videos + durable logs + screenshotable rendered output is the right primitive
+  - `oc-b10` implementation is/was in flight at stop time
+  - `oc-amo` QA remains pending behind that implementation
+- Crash-forensics branch is also active:
+  - `oc-a8h` armed the first Cookie host-local harness and `oc-73r` audited the result
+  - that first capture was useful only as a pre-crash slice; it did not survive long enough to capture the actual stop-playback desktop reset boundary
+  - next required improvement is a systemd-hardened detached capture mode that survives a GNOME/Xorg desktop-session reset better
+  - hardened harness branch is active: `oc-30v` research, `oc-8pl` implementation, `oc-dn7` QA
+- Important new truth from this session: Pico's own Zorin GUI also crashed twice during risky local GUI-coupled work, and host journal evidence showed an actual session-reset family with `Connection to xwayland lost`, `Xwayland terminated, exiting since it was mandatory`, and `Xwayland exited unexpectedly`.
+- Therefore next session should avoid unsafe local live GUI proving on Pico's host and prioritize:
+  1. systemd-hardened crash capture on Cookie / potentially Pico host too
+  2. deterministic video-driven proving validation using the new prerecorded boxing fixtures
+  3. only then return to trail/overlay behavior using artifact-backed evidence rather than webcam-only live retests
+
 ## Final Results
 
 **Status:** ⏳ Pending
