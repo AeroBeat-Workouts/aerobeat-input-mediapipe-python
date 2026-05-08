@@ -287,14 +287,21 @@ func _append_trail_point(trail: Array, landmark: Dictionary, timestamp_ms: int) 
 	var visibility := float(landmark.get("v", 0.0))
 	if visibility < overlay_visibility_threshold:
 		return
+	var point := Vector2(float(landmark.get("x", 0.0)), float(landmark.get("y", 0.0)))
+	if not _is_normalized_point_in_bounds(point):
+		trail.clear()
+		return
 	trail.append({
-		"x": float(landmark.get("x", 0.0)),
-		"y": float(landmark.get("y", 0.0)),
+		"x": point.x,
+		"y": point.y,
 		"v": visibility,
 		"timestamp_ms": timestamp_ms,
 	})
 	while trail.size() > MAX_TRAIL_POINTS:
 		trail.remove_at(0)
+
+func _is_normalized_point_in_bounds(point: Vector2) -> bool:
+	return point.x >= 0.0 and point.x <= 1.0 and point.y >= 0.0 and point.y <= 1.0
 
 func _prune_trail(trail: Array, timestamp_ms: int) -> void:
 	while trail.size() > 0 and timestamp_ms - int(trail[0].get("timestamp_ms", timestamp_ms)) > MAX_TRAIL_AGE_MS:
@@ -312,6 +319,8 @@ func _find_landmark(landmarks: Array, landmark_id: int) -> Dictionary:
 func _on_tracking_lost() -> void:
 	_update_status("Tracking lost", Color.ORANGE)
 	_record_event("tracking_lost", {})
+	_left_trail.clear()
+	_right_trail.clear()
 	if landmark_drawer:
 		landmark_drawer.clear_landmarks()
 	if trail_drawer:

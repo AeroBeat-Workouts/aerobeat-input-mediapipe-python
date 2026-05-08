@@ -30,21 +30,40 @@ func _draw_trail(points: Array, line_color: Color, point_color: Color, image_bou
 	if points.is_empty():
 		return
 
-	var screen_points: PackedVector2Array = []
+	var screen_segments: Array[PackedVector2Array] = []
+	var current_segment: PackedVector2Array = PackedVector2Array()
+	var last_valid_point := Vector2.ZERO
+	var has_last_valid_point := false
 	for point_variant: Variant in points:
 		if not point_variant is Dictionary:
 			continue
 		if not point_variant.has("x") or not point_variant.has("y"):
 			continue
-		screen_points.append(_normalized_to_screen(Vector2(float(point_variant.x), float(point_variant.y)), image_bounds))
+		var normalized_point := Vector2(float(point_variant.x), float(point_variant.y))
+		if not _is_normalized_point_in_bounds(normalized_point):
+			if current_segment.size() >= 2:
+				screen_segments.append(current_segment)
+			current_segment = PackedVector2Array()
+			continue
+		var screen_point := _normalized_to_screen(normalized_point, image_bounds)
+		current_segment.append(screen_point)
+		last_valid_point = screen_point
+		has_last_valid_point = true
 
-	if screen_points.size() >= 2:
-		draw_polyline(screen_points, line_color, TRAIL_WIDTH, true)
+	if current_segment.size() >= 2:
+		screen_segments.append(current_segment)
 
-	var last_point: Vector2 = screen_points[screen_points.size() - 1]
-	draw_circle(last_point, POINT_RADIUS, point_color)
-	draw_arc(last_point, POINT_RADIUS, 0.0, TAU, 18, Color.BLACK, 1.0)
-	draw_string(ThemeDB.fallback_font, last_point + Vector2(10.0, -10.0), label_text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 14, point_color)
+	for segment: PackedVector2Array in screen_segments:
+		draw_polyline(segment, line_color, TRAIL_WIDTH, true)
+
+	if not has_last_valid_point:
+		return
+	draw_circle(last_valid_point, POINT_RADIUS, point_color)
+	draw_arc(last_valid_point, POINT_RADIUS, 0.0, TAU, 18, Color.BLACK, 1.0)
+	draw_string(ThemeDB.fallback_font, last_valid_point + Vector2(10.0, -10.0), label_text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 14, point_color)
+
+func _is_normalized_point_in_bounds(point: Vector2) -> bool:
+	return point.x >= 0.0 and point.x <= 1.0 and point.y >= 0.0 and point.y <= 1.0
 
 func _normalized_to_screen(point: Vector2, image_bounds: Rect2) -> Vector2:
 	# Trail points come from provider-normalized gameplay space, matching the landmark drawer.
