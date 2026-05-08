@@ -79,7 +79,7 @@ size_flags_horizontal = 3
 size_flags_vertical = 3
 
 [node name="CameraDisplay" type="TextureRect" parent="Margin/VSplit/Content/LeftColumn/CameraPanel"]
-custom_minimum_size = Vector2(426, 240)
+custom_minimum_size = Vector2(448, 252)
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3

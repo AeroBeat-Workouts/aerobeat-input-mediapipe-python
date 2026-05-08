@@ -80,6 +80,7 @@ enum HarnessMode {
 @export var overlay_visibility_threshold := 0.35
 @export var show_landmarks := true
 @export var show_trails := true
+@export var trail_debug_logging := true
 
 @onready var status_label: Label = $Margin/VSplit/Header/StatusLabel
 @onready var live_status_label: RichTextLabel = $Margin/VSplit/Header/LiveStatusLabel
@@ -104,6 +105,8 @@ var _latest_state: Dictionary = {}
 var _event_lines: Array[String] = []
 var _left_trail: Array = []
 var _right_trail: Array = []
+var _left_trail_debug := {}
+var _right_trail_debug := {}
 var _last_flow_events := {}
 var _event_counts: Dictionary = {}
 var _last_event_payloads: Dictionary = {}
@@ -118,6 +121,8 @@ func _ready() -> void:
 			label_variant.bbcode_enabled = false
 	if live_status_label:
 		live_status_label.scroll_active = false
+	_left_trail_debug = _make_trail_debug_state("left")
+	_right_trail_debug = _make_trail_debug_state("right")
 	_reset_last_flow_events()
 	_reset_event_tracking()
 	_update_status("Initializing...", Color.WHITE)
@@ -273,34 +278,55 @@ func _update_motion_trails(landmarks: Array) -> void:
 	var timestamp_ms := Time.get_ticks_msec()
 	var left_wrist := _find_landmark(landmarks, LEFT_WRIST_ID)
 	var right_wrist := _find_landmark(landmarks, RIGHT_WRIST_ID)
-	_append_trail_point(_left_trail, left_wrist, timestamp_ms)
-	_append_trail_point(_right_trail, right_wrist, timestamp_ms)
+	_append_trail_point(_left_trail, left_wrist, timestamp_ms, _left_trail_debug)
+	_append_trail_point(_right_trail, right_wrist, timestamp_ms, _right_trail_debug)
 	_prune_trail(_left_trail, timestamp_ms)
 	_prune_trail(_right_trail, timestamp_ms)
+	_update_trail_debug_state(_left_trail, _left_trail_debug, timestamp_ms)
+	_update_trail_debug_state(_right_trail, _right_trail_debug, timestamp_ms)
 	if show_trails and trail_drawer:
 		trail_drawer.update_trails(_left_trail, _right_trail)
 	elif trail_drawer:
 		trail_drawer.clear_trails()
 
-func _append_trail_point(trail: Array, landmark: Dictionary, timestamp_ms: int) -> void:
+func _append_trail_point(trail: Array, landmark: Dictionary, timestamp_ms: int, debug_state: Dictionary) -> void:
+	debug_state["frame_samples"] = int(debug_state.get("frame_samples", 0)) + 1
 	if landmark.is_empty():
+		_note_trail_debug_skip(debug_state, "missing")
 		return
 	var visibility := float(landmark.get("v", 0.0))
 	if visibility < overlay_visibility_threshold:
+		_note_trail_debug_skip(debug_state, "low_visibility")
+		debug_state["last_visibility"] = visibility
 		return
 	var point := Vector2(float(landmark.get("x", 0.0)), float(landmark.get("y", 0.0)))
+	debug_state["last_visibility"] = visibility
+	debug_state["last_point"] = point
 	if not _is_normalized_point_in_bounds(point):
 		trail.clear()
+		debug_state["out_of_bounds_clears"] = int(debug_state.get("out_of_bounds_clears", 0)) + 1
+		debug_state["last_action"] = "clear_oob"
 		return
-	if _trail_jump_exceeds_limit(trail, point):
+	var jump_distance := _trail_jump_distance(trail, point)
+	debug_state["last_jump_distance"] = jump_distance
+	if jump_distance > MAX_TRAIL_FRAME_JUMP:
 		_append_trail_break(trail, timestamp_ms)
+		debug_state["continuity_breaks"] = int(debug_state.get("continuity_breaks", 0)) + 1
+		debug_state["last_action"] = "break_reseed"
+	else:
+		debug_state["last_action"] = "append"
+	if _trail_needs_reseed(trail):
+		debug_state["reseeds"] = int(debug_state.get("reseeds", 0)) + 1
+		if debug_state["last_action"] == "append":
+			debug_state["last_action"] = "seed"
 	trail.append(_make_trail_point(point, visibility, timestamp_ms))
+	debug_state["appends"] = int(debug_state.get("appends", 0)) + 1
 	while trail.size() > MAX_TRAIL_POINTS:
 		trail.remove_at(0)
 
-func _trail_jump_exceeds_limit(trail: Array, point: Vector2) -> bool:
+func _trail_jump_distance(trail: Array, point: Vector2) -> float:
 	if trail.is_empty():
-		return false
+		return 0.0
 	for index: int in range(trail.size() - 1, -1, -1):
 		var point_variant: Variant = trail[index]
 		if not point_variant is Dictionary:
@@ -311,8 +337,8 @@ func _trail_jump_exceeds_limit(trail: Array, point: Vector2) -> bool:
 		var previous := Vector2(float(trail_point.get("x", 0.0)), float(trail_point.get("y", 0.0)))
 		if not _is_normalized_point_in_bounds(previous):
 			continue
-		return previous.distance_to(point) > MAX_TRAIL_FRAME_JUMP
-	return false
+		return previous.distance_to(point)
+	return 0.0
 
 func _append_trail_break(trail: Array, timestamp_ms: int) -> void:
 	if trail.is_empty():
@@ -329,6 +355,91 @@ func _append_trail_break(trail: Array, timestamp_ms: int) -> void:
 		"v": 0.0,
 		"timestamp_ms": timestamp_ms,
 	})
+
+func _trail_needs_reseed(trail: Array) -> bool:
+	if trail.is_empty():
+		return true
+	var last_point_variant: Variant = trail[trail.size() - 1]
+	if not last_point_variant is Dictionary:
+		return false
+	var last_point: Dictionary = last_point_variant
+	if not last_point.has("x") or not last_point.has("y"):
+		return false
+	return not _is_normalized_point_in_bounds(Vector2(float(last_point.get("x", 0.0)), float(last_point.get("y", 0.0))))
+
+func _make_trail_debug_state(side: String) -> Dictionary:
+	return {
+		"side": side,
+		"frame_samples": 0,
+		"appends": 0,
+		"reseeds": 0,
+		"continuity_breaks": 0,
+		"out_of_bounds_clears": 0,
+		"missing_skips": 0,
+		"low_visibility_skips": 0,
+		"last_action": "idle",
+		"last_jump_distance": 0.0,
+		"last_visibility": 0.0,
+		"last_live_points": 0,
+		"last_break_markers": 0,
+		"last_drawable_segments": 0,
+		"last_segment_points": 0,
+		"last_duration_ms": 0,
+	}
+
+func _note_trail_debug_skip(debug_state: Dictionary, reason: String) -> void:
+	match reason:
+		"missing":
+			debug_state["missing_skips"] = int(debug_state.get("missing_skips", 0)) + 1
+		"low_visibility":
+			debug_state["low_visibility_skips"] = int(debug_state.get("low_visibility_skips", 0)) + 1
+	debug_state["last_action"] = reason
+	debug_state["last_jump_distance"] = 0.0
+
+func _update_trail_debug_state(trail: Array, debug_state: Dictionary, timestamp_ms: int) -> void:
+	var live_points := 0
+	var break_markers := 0
+	var drawable_segments := 0
+	var current_segment_points := 0
+	for point_variant: Variant in trail:
+		if not point_variant is Dictionary:
+			continue
+		var trail_point: Dictionary = point_variant
+		if not trail_point.has("x") or not trail_point.has("y"):
+			continue
+		var point := Vector2(float(trail_point.get("x", 0.0)), float(trail_point.get("y", 0.0)))
+		if not _is_normalized_point_in_bounds(point):
+			break_markers += 1
+			if current_segment_points >= 2:
+				drawable_segments += 1
+			current_segment_points = 0
+			continue
+		live_points += 1
+		current_segment_points += 1
+	if current_segment_points >= 2:
+		drawable_segments += 1
+	debug_state["last_live_points"] = live_points
+	debug_state["last_break_markers"] = break_markers
+	debug_state["last_drawable_segments"] = drawable_segments
+	debug_state["last_segment_points"] = current_segment_points
+	debug_state["last_duration_ms"] = _trail_duration_ms(trail)
+	debug_state["last_age_ms"] = timestamp_ms
+
+func _format_trail_debug_line(debug_state: Dictionary) -> String:
+	return "%s trail | pts=%d segs=%d tail=%d breaks=%d reseeds=%d clears=%d miss=%d low=%d jump=%s action=%s dur=%dms" % [
+		String(debug_state.get("side", "?")),
+		int(debug_state.get("last_live_points", 0)),
+		int(debug_state.get("last_drawable_segments", 0)),
+		int(debug_state.get("last_segment_points", 0)),
+		int(debug_state.get("continuity_breaks", 0)),
+		int(debug_state.get("reseeds", 0)),
+		int(debug_state.get("out_of_bounds_clears", 0)),
+		int(debug_state.get("missing_skips", 0)),
+		int(debug_state.get("low_visibility_skips", 0)),
+		_fmt_float(debug_state.get("last_jump_distance", 0.0)),
+		String(debug_state.get("last_action", "idle")),
+		int(debug_state.get("last_duration_ms", 0)),
+	]
 
 func _make_trail_point(point: Vector2, visibility: float, timestamp_ms: int) -> Dictionary:
 	return {
@@ -448,6 +559,9 @@ func _build_quick_stats_text() -> String:
 		lines.append("Height state: %s" % String(measurements.get("height_state", &"unknown")))
 		lines.append("Guard active: %s" % str(bool(gesture_states.get("guard", false))))
 		lines.append("Attack gates armed: %d / %d" % [armed_count, BOXING_ATTACK_EVENTS.size() + BOXING_KNEE_EVENTS.size()])
+		if trail_debug_logging:
+			lines.append(_format_trail_debug_line(_left_trail_debug))
+			lines.append(_format_trail_debug_line(_right_trail_debug))
 	else:
 		var swing_ready := int(bool(ready_map.get("swing_left", true))) + int(bool(ready_map.get("swing_right", true)))
 		var active_trails := int(bool(gesture_states.get("trail_left", false))) + int(bool(gesture_states.get("trail_right", false)))
@@ -485,6 +599,12 @@ func _build_summary_text() -> String:
 		lines.append("leg_lift_left=%s leg_lift_right=%s" % [str(bool(gesture_states.get("leg_lift_left", false))), str(bool(gesture_states.get("leg_lift_right", false)))])
 		lines.append("height=%s ratio=%s squat_depth=%s" % [String(measurements.get("height_state", &"unknown")), _fmt_float(measurements.get("height_ratio", 0.0)), _fmt_float(measurements.get("squat_depth", 0.0))])
 		lines.append("head/hip lateral=%s / %s" % [_fmt_float(measurements.get("head_lateral_offset", 0.0)), _fmt_float(measurements.get("hip_lateral_offset", 0.0))])
+		if trail_debug_logging:
+			lines.append("")
+			lines.append("Trail continuity")
+			lines.append("----------------")
+			lines.append(_format_trail_debug_line(_left_trail_debug))
+			lines.append(_format_trail_debug_line(_right_trail_debug))
 	else:
 		var gesture_debug: Dictionary = state.get("gesture_debug", {})
 		var ready_map: Dictionary = gesture_debug.get("ready", {})
@@ -830,6 +950,16 @@ func _build_console_snapshot() -> String:
 		(int(provider.get_num_poses()) if provider != null else 0),
 	]
 	if harness_mode == HarnessMode.BOXING:
+		if trail_debug_logging:
+			return "%s guard=%s squat=%s height=%s latest=%s | %s | %s" % [
+				base,
+				str(bool(gesture_states.get("guard", false))),
+				str(bool(gesture_states.get("squat", false))),
+				String(measurements.get("height_state", &"unknown")),
+				(_latest_event_name() if _latest_event_name() != "" else "none"),
+				_format_trail_debug_line(_left_trail_debug),
+				_format_trail_debug_line(_right_trail_debug),
+			]
 		return "%s guard=%s squat=%s height=%s latest=%s" % [
 			base,
 			str(bool(gesture_states.get("guard", false))),
