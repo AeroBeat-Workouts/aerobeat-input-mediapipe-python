@@ -60,3 +60,6 @@ test_report*.json
 .dolt/
 *.db
 .beads-credential-key
+
+# Tests
+.temp/
