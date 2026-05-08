@@ -47,9 +47,10 @@ func _draw_trail(points: Array, line_color: Color, point_color: Color, image_bou
 	draw_string(ThemeDB.fallback_font, last_point + Vector2(10.0, -10.0), label_text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 14, point_color)
 
 func _normalized_to_screen(point: Vector2, image_bounds: Rect2) -> Vector2:
+	# Trail points come from provider-normalized gameplay space, matching the landmark drawer.
 	return Vector2(
-		image_bounds.position.x + (1.0 - point.x) * image_bounds.size.x,
-		image_bounds.position.y + point.y * image_bounds.size.y
+		image_bounds.position.x + point.x * image_bounds.size.x,
+		image_bounds.position.y + (1.0 - point.y) * image_bounds.size.y
 	)
 
 func _get_displayed_image_bounds() -> Rect2:

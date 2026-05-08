@@ -84,10 +84,11 @@ func _draw_landmarks(width: float, height: float, offset: Vector2 = Vector2.ZERO
 		draw_arc(pos, LANDMARK_RADIUS, 0.0, TAU, 16, Color.BLACK, 1.0)
 
 func _landmark_to_screen(lm: Dictionary, width: float, height: float, offset: Vector2 = Vector2.ZERO) -> Vector2:
-	# Apply horizontal flip to match mirrored camera feed
-	# MediaPipe: (0,0) = top-left, (1,1) = bottom-right
-	var x: float = offset.x + (1.0 - lm.x) * width
-	var y: float = offset.y + lm.y * height
+	# Provider landmarks are already normalized into AeroBeat's mirrored gameplay space:
+	# x is already mirrored when flip_horizontal=true, and y is already inverted to bottom-left origin.
+	# Convert that normalized gameplay space into screen space without applying a second mirror.
+	var x: float = offset.x + lm.x * width
+	var y: float = offset.y + (1.0 - lm.y) * height
 	return Vector2(x, y)
 
 func _get_displayed_image_bounds() -> Rect2:
