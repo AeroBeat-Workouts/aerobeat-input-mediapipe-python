@@ -271,16 +271,27 @@ func _get_server_log_path() -> String:
 		return String(_launch_info.get("log_file", ""))
 	return _desktop_sidecar_launcher().get_state_dir().path_join("autostart-last.log")
 
+func _get_camera_source_override() -> String:
+	var override_value := OS.get_environment("AEROBEAT_MEDIAPIPE_CAMERA_SOURCE").strip_edges()
+	if override_value.is_empty():
+		return "0"
+	return ProjectSettings.globalize_path(override_value) if not override_value.is_valid_int() else override_value
+
+func _sidecar_show_window_requested() -> bool:
+	var raw_value := OS.get_environment("AEROBEAT_MEDIAPIPE_SHOW_WINDOW").strip_edges().to_lower()
+	return raw_value in ["1", "true", "yes", "on"]
+
 func _start_detached_server() -> int:
 	await _kill_existing_servers()
 
 	var python: String = _find_python()
 	var script: String = ProjectSettings.globalize_path(_resolve_package_path("python_mediapipe/main.py"))
 	var project_dir: String = ProjectSettings.globalize_path(_desktop_sidecar_runtime().get_package_root(get_script().resource_path))
+	var camera_source := _get_camera_source_override()
 	var args := PackedStringArray([
 		"-u",
 		script,
-		"--camera", "0",
+		"--camera", camera_source,
 		"--port", str(server_port),
 		"--model-complexity", str(model_complexity),
 	])
@@ -290,6 +301,8 @@ func _start_detached_server() -> int:
 		args.append_array(PackedStringArray(["--stream-camera", "--stream-port", str(stream_port)]))
 	if no_filter:
 		args.append("--no-filter")
+	if _sidecar_show_window_requested():
+		args.append("--show-window")
 
 	var options := {
 		"working_directory": project_dir,

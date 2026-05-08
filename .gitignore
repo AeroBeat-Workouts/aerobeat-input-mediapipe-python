@@ -63,3 +63,4 @@ test_report*.json
 
 # Tests
 .temp/
+.testbed/test-results/

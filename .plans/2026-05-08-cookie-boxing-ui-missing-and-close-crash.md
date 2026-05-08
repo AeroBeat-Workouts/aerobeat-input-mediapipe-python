@@ -668,6 +668,111 @@ Follow-up research tightened that further: the screenshot is not the proving har
 
 ---
 
+### Task 27: Investigate deterministic proving validation using existing test videos + logs
+
+**Bead ID:** `oc-9wd`  
+**SubAgent:** `primary` (for `research` workflow role)  
+**Role:** `research`  
+**References:** `REF-04`, `REF-06`, `REF-17`  
+**Prompt:** Investigate how to turn the existing project test videos into a deterministic proving-validation primitive for the Boxing scene. The goal is to stop relying on theory-only fixes by producing logs plus screenshotable rendered output that can verify trail/overlay behavior against repeatable input.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- `.testbed/`
+- supporting test/log locations only if needed
+
+**Files Created/Deleted/Modified:**
+- plan updates only unless a tiny truth-revealing probe is required
+
+**Status:** ⏳ Pending
+
+**Results:** Pending.
+
+---
+
+### Task 28: Implement video-driven proving logs + screenshot validation
+
+**Bead ID:** `oc-b10`  
+**SubAgent:** `primary` (for `coder` workflow role)  
+**Role:** `coder`  
+**References:** `REF-04`, `REF-06`, `REF-17`  
+**Prompt:** Using the existing project test videos, implement the smallest truthful deterministic proving-validation primitive: logs that expose trail/overlay decisions and a repeatable rendered run path that can be captured with screenshots so subagents can verify their own fixes against stable input.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- `.testbed/`
+- logging / validation support paths as required
+
+**Files Created/Deleted/Modified:**
+- owning proving-scene / validation harness files as required by the implementation
+
+**Status:** ⏳ Pending
+
+**Results:** Pending.
+
+---
+
+### Task 29: QA deterministic proving validation workflow
+
+**Bead ID:** `oc-amo`  
+**SubAgent:** `primary` (for `qa` workflow role)  
+**Role:** `qa`  
+**References:** `REF-04`, `REF-06`, `REF-17`  
+**Prompt:** Independently verify that the new deterministic proving-validation workflow really lets us validate overlay/trail behavior from test videos using logs plus screenshotable rendered output, instead of relying only on theory and live human retests.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+
+**Files Created/Deleted/Modified:**
+- plan updates / verification notes only unless a truthful docs correction is required
+
+**Status:** ⏳ Pending
+
+**Results:** Pending.
+
+---
+
+### Task 30: Run Cookie stop-playback forensic capture on the real close-crash path
+
+**Bead ID:** `oc-a8h`  
+**SubAgent:** `primary` (for `research` workflow role)  
+**Role:** `research`  
+**References:** `REF-01`, `REF-08`, `REF-09`, `REF-10`  
+**Prompt:** Use the already-identified host-local forensic harness path on Cookie to capture one clean stop-playback crash run from the real Godot proving/test-scene path. Focus on durable evidence that survives the desktop-session reset.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- Cookie forensic artifact folders / logs as needed
+
+**Files Created/Deleted/Modified:**
+- plan updates and forensic notes only unless tiny capture glue is required
+
+**Status:** ⏳ Pending
+
+**Results:** Pending.
+
+---
+
+### Task 31: Audit Cookie stop-playback forensic capture and recommend the next isolation branch
+
+**Bead ID:** `oc-73r`  
+**SubAgent:** `primary` (for `auditor` workflow role)  
+**Role:** `auditor`  
+**References:** `REF-01`, `REF-08`, `REF-09`, `REF-10`  
+**Prompt:** Audit the Cookie host-local forensic capture from the real stop-playback crash path, summarize what it proves, and recommend the strongest next isolation or mitigation step.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+
+**Files Created/Deleted/Modified:**
+- plan updates and audit notes only
+
+**Status:** ⏳ Pending
+
+**Results:** Pending.
+
+---
+
 ## Final Results
 
 **Status:** ⏳ Pending
