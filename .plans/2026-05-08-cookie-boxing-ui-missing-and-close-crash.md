@@ -773,6 +773,69 @@ Follow-up research tightened that further: the screenshot is not the proving har
 
 ---
 
+### Task 32: Research a systemd-hardened forensic capture mode that survives desktop-session resets
+
+**Bead ID:** `oc-30v`  
+**SubAgent:** `primary` (for `research` workflow role)  
+**Role:** `research`  
+**References:** `REF-01`, `REF-08`, `REF-09`, `REF-10`  
+**Prompt:** Research the smallest truthful change to the desktop forensics harness so capture survives a GNOME/Xorg desktop-session reset better. Prefer a systemd-managed detached mode with durable journal/poll artifacts rather than a user-session-tied background shell process.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- shared `workspace/scripts/` and related docs/tests if needed
+
+**Files Created/Deleted/Modified:**
+- plan updates only unless a tiny proof step is required
+
+**Status:** ⏳ Pending
+
+**Results:** Pending.
+
+---
+
+### Task 33: Implement a systemd-hardened forensic capture mode
+
+**Bead ID:** `oc-8pl`  
+**SubAgent:** `primary` (for `coder` workflow role)  
+**Role:** `coder`  
+**References:** `REF-01`, `REF-08`, `REF-09`, `REF-10`  
+**Prompt:** Implement the smallest truthful hardening to `workspace/scripts/desktop-app-forensics.sh` so capture can survive a desktop-session reset better. Prefer a transient systemd-run/service anchored outside the crashing GUI session, durable artifact writing, and a workflow that can cover the stop action plus post-crash window.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- shared `workspace/scripts/`
+- shared docs/tests if needed
+
+**Files Created/Deleted/Modified:**
+- owning shared script/docs/test files as required
+
+**Status:** ⏳ Pending
+
+**Results:** Pending.
+
+---
+
+### Task 34: QA the systemd-hardened forensic capture mode
+
+**Bead ID:** `oc-dn7`  
+**SubAgent:** `primary` (for `qa` workflow role)  
+**Role:** `qa`  
+**References:** `REF-01`, `REF-08`, `REF-09`, `REF-10`  
+**Prompt:** Independently verify whether the new hardened capture mode is actually more likely to survive a desktop-session reset and whether the operator workflow is clear enough for Derrick to use on Cookie.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+
+**Files Created/Deleted/Modified:**
+- plan updates / verification notes only unless a truthful docs correction is required
+
+**Status:** ⏳ Pending
+
+**Results:** Pending.
+
+---
+
 ## Final Results
 
 **Status:** ⏳ Pending
