@@ -54,6 +54,28 @@ func test_preserves_shorter_boxing_jump_as_contiguous_motion() -> void:
 	assert_eq(int(debug_state.get("continuity_breaks", 0)), 0)
 	assert_lt(float(debug_state.get("last_jump_distance", 0.0)), 0.28)
 
+func test_resolves_trail_hand_point_from_visible_finger_landmarks_when_wrist_is_low_visibility() -> void:
+	var resolved := harness._resolve_trail_hand_point([
+		{"id": 15, "x": 0.25, "y": 0.40, "v": 0.10},
+		{"id": 19, "x": 0.31, "y": 0.46, "v": 0.62},
+		{"id": 17, "x": 0.29, "y": 0.44, "v": 0.58},
+		{"id": 21, "x": 0.33, "y": 0.42, "v": 0.54},
+	], harness.LEFT_WRIST_ID, [harness.LEFT_INDEX_ID, harness.LEFT_PINKY_ID, harness.LEFT_THUMB_ID])
+	assert_false(resolved.is_empty())
+	assert_true(float(resolved.get("v", 0.0)) >= 0.54)
+	assert_true(float(resolved.get("x", 0.0)) > 0.29 and float(resolved.get("x", 0.0)) < 0.32)
+	assert_true(float(resolved.get("y", 0.0)) > 0.43 and float(resolved.get("y", 0.0)) < 0.45)
+
+func test_resolves_trail_hand_point_by_clamping_near_edge_jitter() -> void:
+	var resolved := harness._resolve_trail_hand_point([
+		{"id": 16, "x": 1.03, "y": 0.41, "v": 0.44},
+		{"id": 20, "x": 0.99, "y": 0.43, "v": 0.61},
+		{"id": 18, "x": 1.02, "y": 0.39, "v": 0.57},
+	], harness.RIGHT_WRIST_ID, [harness.RIGHT_INDEX_ID, harness.RIGHT_PINKY_ID, harness.RIGHT_THUMB_ID])
+	assert_false(resolved.is_empty())
+	assert_true(float(resolved.get("x", 0.0)) >= 0.98 and float(resolved.get("x", 0.0)) <= 1.0)
+	assert_true(float(resolved.get("y", 0.0)) >= 0.39 and float(resolved.get("y", 0.0)) <= 0.43)
+
 func test_out_of_bounds_point_still_clears_trail() -> void:
 	var trail: Array = []
 	var debug_state := _debug_state()

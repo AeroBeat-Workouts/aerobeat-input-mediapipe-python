@@ -7,10 +7,18 @@ const MediaPipeConfig = preload("res://addons/aerobeat-input-mediapipe-python/sr
 
 const LEFT_WRIST_ID := 15
 const RIGHT_WRIST_ID := 16
+const LEFT_PINKY_ID := 17
+const RIGHT_PINKY_ID := 18
+const LEFT_INDEX_ID := 19
+const RIGHT_INDEX_ID := 20
+const LEFT_THUMB_ID := 21
+const RIGHT_THUMB_ID := 22
 const MAX_EVENT_LINES := 22
 const MAX_TRAIL_POINTS := 36
 const MAX_TRAIL_AGE_MS := 1800
 const MAX_TRAIL_FRAME_JUMP := 0.28
+const TRAIL_VISIBILITY_THRESHOLD_FLOOR := 0.18
+const TRAIL_NEAR_BOUNDS_MARGIN := 0.08
 
 const BOXING_EVENT_ORDER := [
 	"punch_left",
@@ -276,8 +284,8 @@ func _on_pose_updated(landmarks: Array) -> void:
 
 func _update_motion_trails(landmarks: Array) -> void:
 	var timestamp_ms := Time.get_ticks_msec()
-	var left_wrist := _find_landmark(landmarks, LEFT_WRIST_ID)
-	var right_wrist := _find_landmark(landmarks, RIGHT_WRIST_ID)
+	var left_wrist := _resolve_trail_hand_point(landmarks, LEFT_WRIST_ID, [LEFT_INDEX_ID, LEFT_PINKY_ID, LEFT_THUMB_ID])
+	var right_wrist := _resolve_trail_hand_point(landmarks, RIGHT_WRIST_ID, [RIGHT_INDEX_ID, RIGHT_PINKY_ID, RIGHT_THUMB_ID])
 	_append_trail_point(_left_trail, left_wrist, timestamp_ms, _left_trail_debug)
 	_append_trail_point(_right_trail, right_wrist, timestamp_ms, _right_trail_debug)
 	_prune_trail(_left_trail, timestamp_ms)
@@ -295,7 +303,8 @@ func _append_trail_point(trail: Array, landmark: Dictionary, timestamp_ms: int, 
 		_note_trail_debug_skip(debug_state, "missing")
 		return
 	var visibility := float(landmark.get("v", 0.0))
-	if visibility < overlay_visibility_threshold:
+	var trail_visibility_threshold := _trail_visibility_threshold()
+	if visibility < trail_visibility_threshold:
 		_note_trail_debug_skip(debug_state, "low_visibility")
 		debug_state["last_visibility"] = visibility
 		return
@@ -323,6 +332,60 @@ func _append_trail_point(trail: Array, landmark: Dictionary, timestamp_ms: int, 
 	debug_state["appends"] = int(debug_state.get("appends", 0)) + 1
 	while trail.size() > MAX_TRAIL_POINTS:
 		trail.remove_at(0)
+
+func _resolve_trail_hand_point(landmarks: Array, wrist_id: int, fallback_ids: Array[int]) -> Dictionary:
+	var wrist := _find_landmark(landmarks, wrist_id)
+	var trail_visibility_threshold := _trail_visibility_threshold()
+	if _trail_landmark_is_directly_usable(wrist, trail_visibility_threshold):
+		return wrist
+
+	var candidates: Array[Dictionary] = []
+	if _trail_landmark_is_candidate(wrist):
+		candidates.append(wrist)
+	for landmark_id: int in fallback_ids:
+		var candidate := _find_landmark(landmarks, landmark_id)
+		if _trail_landmark_is_candidate(candidate):
+			candidates.append(candidate)
+	if candidates.is_empty():
+		return wrist
+	return _synthesize_trail_hand_point(candidates)
+
+func _trail_visibility_threshold() -> float:
+	return minf(overlay_visibility_threshold, TRAIL_VISIBILITY_THRESHOLD_FLOOR)
+
+func _trail_landmark_is_directly_usable(landmark: Dictionary, min_visibility: float) -> bool:
+	if landmark.is_empty():
+		return false
+	if float(landmark.get("v", 0.0)) < min_visibility:
+		return false
+	var point := Vector2(float(landmark.get("x", 0.0)), float(landmark.get("y", 0.0)))
+	return _is_normalized_point_in_bounds(point)
+
+func _trail_landmark_is_candidate(landmark: Dictionary) -> bool:
+	if landmark.is_empty():
+		return false
+	if float(landmark.get("v", 0.0)) < _trail_visibility_threshold():
+		return false
+	var point := Vector2(float(landmark.get("x", 0.0)), float(landmark.get("y", 0.0)))
+	return _is_point_within_trail_near_bounds(point)
+
+func _synthesize_trail_hand_point(candidates: Array[Dictionary]) -> Dictionary:
+	var total_weight := 0.0
+	var blended_point := Vector2.ZERO
+	var best_visibility := 0.0
+	for candidate: Dictionary in candidates:
+		var visibility := float(candidate.get("v", 0.0))
+		var point := Vector2(float(candidate.get("x", 0.0)), float(candidate.get("y", 0.0)))
+		var clamped_point := Vector2(clampf(point.x, 0.0, 1.0), clampf(point.y, 0.0, 1.0))
+		blended_point += clamped_point * visibility
+		total_weight += visibility
+		best_visibility = maxf(best_visibility, visibility)
+	if total_weight <= 0.000001:
+		return {}
+	return _make_trail_point(blended_point / total_weight, best_visibility, Time.get_ticks_msec())
+
+func _is_point_within_trail_near_bounds(point: Vector2) -> bool:
+	return point.x >= -TRAIL_NEAR_BOUNDS_MARGIN and point.x <= 1.0 + TRAIL_NEAR_BOUNDS_MARGIN and point.y >= -TRAIL_NEAR_BOUNDS_MARGIN and point.y <= 1.0 + TRAIL_NEAR_BOUNDS_MARGIN
 
 func _trail_jump_distance(trail: Array, point: Vector2) -> float:
 	if trail.is_empty():
