@@ -65,7 +65,7 @@ text = "Live proving ground for punches, guard, squat, lean, sidestep, knees, an
 [node name="Content" type="HSplitContainer" parent="Margin/VSplit"]
 layout_mode = 2
 size_flags_vertical = 3
-split_offset = 740
+split_offset = 0
 
 [node name="LeftColumn" type="VBoxContainer" parent="Margin/VSplit/Content"]
 layout_mode = 2
@@ -79,7 +79,7 @@ size_flags_horizontal = 3
 size_flags_vertical = 3
 
 [node name="CameraDisplay" type="TextureRect" parent="Margin/VSplit/Content/LeftColumn/CameraPanel"]
-custom_minimum_size = Vector2(640, 360)
+custom_minimum_size = Vector2(480, 270)
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
@@ -118,7 +118,7 @@ bbcode_enabled = false
 text = "Waiting for provider..."
 
 [node name="RightPanelScroll" type="ScrollContainer" parent="Margin/VSplit/Content"]
-custom_minimum_size = Vector2(380, 0)
+custom_minimum_size = Vector2(320, 0)
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
