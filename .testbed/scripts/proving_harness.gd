@@ -10,6 +10,7 @@ const RIGHT_WRIST_ID := 16
 const MAX_EVENT_LINES := 22
 const MAX_TRAIL_POINTS := 36
 const MAX_TRAIL_AGE_MS := 1800
+const MAX_TRAIL_FRAME_JUMP := 0.20
 
 const BOXING_EVENT_ORDER := [
 	"punch_left",
@@ -291,6 +292,8 @@ func _append_trail_point(trail: Array, landmark: Dictionary, timestamp_ms: int) 
 	if not _is_normalized_point_in_bounds(point):
 		trail.clear()
 		return
+	if _trail_jump_exceeds_limit(trail, point):
+		trail.clear()
 	trail.append({
 		"x": point.x,
 		"y": point.y,
@@ -299,6 +302,18 @@ func _append_trail_point(trail: Array, landmark: Dictionary, timestamp_ms: int) 
 	})
 	while trail.size() > MAX_TRAIL_POINTS:
 		trail.remove_at(0)
+
+func _trail_jump_exceeds_limit(trail: Array, point: Vector2) -> bool:
+	if trail.is_empty():
+		return false
+	var last_point_variant: Variant = trail[trail.size() - 1]
+	if not last_point_variant is Dictionary:
+		return false
+	var last_point: Dictionary = last_point_variant
+	if not last_point.has("x") or not last_point.has("y"):
+		return false
+	var previous := Vector2(float(last_point.get("x", 0.0)), float(last_point.get("y", 0.0)))
+	return previous.distance_to(point) > MAX_TRAIL_FRAME_JUMP
 
 func _is_normalized_point_in_bounds(point: Vector2) -> bool:
 	return point.x >= 0.0 and point.x <= 1.0 and point.y >= 0.0 and point.y <= 1.0
