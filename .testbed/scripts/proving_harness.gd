@@ -358,10 +358,9 @@ func _build_live_status_text() -> String:
 	var pose_count := int(provider.get_num_poses()) if provider != null else 0
 	var last_event_name := _latest_event_name()
 	var last_event_age := _last_seen_text(last_event_name) if last_event_name != "" else "never"
-	return "Live status  |  mode=%s  server=%s  camera=%s  tracking=%s  poses=%d  last_event=%s (%s)" % [
-		_mode_name(),
+	return "Live | srv=%s cam=%s track=%s poses=%d last=%s %s" % [
 		("ready" if _server_ready else "starting"),
-		("streaming" if camera_view and camera_view.is_streaming() else "offline"),
+		("on" if camera_view and camera_view.is_streaming() else "off"),
 		tracking_state,
 		pose_count,
 		(last_event_name if last_event_name != "" else "none"),

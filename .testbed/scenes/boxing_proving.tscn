@@ -27,27 +27,27 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_constants/margin_left = 16
-theme_override_constants/margin_top = 16
-theme_override_constants/margin_right = 16
-theme_override_constants/margin_bottom = 16
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 12
 
 [node name="VSplit" type="VBoxContainer" parent="Margin"]
 layout_mode = 2
-theme_override_constants/separation = 12
+theme_override_constants/separation = 8
 
 [node name="Header" type="VBoxContainer" parent="Margin/VSplit"]
 layout_mode = 2
-theme_override_constants/separation = 4
+theme_override_constants/separation = 2
 
 [node name="TitleLabel" type="Label" parent="Margin/VSplit/Header"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 26
+theme_override_font_sizes/font_size = 22
 text = "Boxing Detector Proving"
 
 [node name="StatusLabel" type="Label" parent="Margin/VSplit/Header"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 18
+theme_override_font_sizes/font_size = 15
 text = "Initializing..."
 
 [node name="LiveStatusLabel" type="RichTextLabel" parent="Margin/VSplit/Header"]
@@ -55,7 +55,7 @@ layout_mode = 2
 fit_content = true
 scroll_active = false
 bbcode_enabled = false
-text = "Live status | waiting for provider..."
+text = "Live | waiting for provider..."
 
 [node name="NotesLabel" type="Label" parent="Margin/VSplit/Header"]
 layout_mode = 2
@@ -79,7 +79,7 @@ size_flags_horizontal = 3
 size_flags_vertical = 3
 
 [node name="CameraDisplay" type="TextureRect" parent="Margin/VSplit/Content/LeftColumn/CameraPanel"]
-custom_minimum_size = Vector2(480, 270)
+custom_minimum_size = Vector2(426, 240)
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
@@ -108,7 +108,7 @@ script = ExtResource("3_trails")
 
 [node name="QuickStatsPanel" type="PanelContainer" parent="Margin/VSplit/Content/LeftColumn"]
 layout_mode = 2
-custom_minimum_size = Vector2(0, 200)
+custom_minimum_size = Vector2(0, 140)
 
 [node name="QuickStats" type="RichTextLabel" parent="Margin/VSplit/Content/LeftColumn/QuickStatsPanel"]
 layout_mode = 2
@@ -131,7 +131,7 @@ theme_override_constants/separation = 10
 
 [node name="SummaryPanel" type="PanelContainer" parent="Margin/VSplit/Content/RightPanelScroll/RightColumn"]
 layout_mode = 2
-custom_minimum_size = Vector2(0, 180)
+custom_minimum_size = Vector2(0, 100)
 size_flags_vertical = 3
 
 [node name="Summary" type="RichTextLabel" parent="Margin/VSplit/Content/RightPanelScroll/RightColumn/SummaryPanel"]
@@ -142,7 +142,7 @@ text = "Waiting for provider..."
 
 [node name="SignalPanel" type="PanelContainer" parent="Margin/VSplit/Content/RightPanelScroll/RightColumn"]
 layout_mode = 2
-custom_minimum_size = Vector2(0, 280)
+custom_minimum_size = Vector2(0, 150)
 size_flags_vertical = 3
 
 [node name="SignalStatus" type="RichTextLabel" parent="Margin/VSplit/Content/RightPanelScroll/RightColumn/SignalPanel"]
@@ -153,7 +153,7 @@ text = "Waiting for persistent Boxing signal coverage..."
 
 [node name="MetricsPanel" type="PanelContainer" parent="Margin/VSplit/Content/RightPanelScroll/RightColumn"]
 layout_mode = 2
-custom_minimum_size = Vector2(0, 240)
+custom_minimum_size = Vector2(0, 120)
 size_flags_vertical = 3
 
 [node name="Metrics" type="RichTextLabel" parent="Margin/VSplit/Content/RightPanelScroll/RightColumn/MetricsPanel"]
@@ -164,7 +164,7 @@ text = "Waiting for detector metrics..."
 
 [node name="EventsPanel" type="PanelContainer" parent="Margin/VSplit/Content/RightPanelScroll/RightColumn"]
 layout_mode = 2
-custom_minimum_size = Vector2(0, 260)
+custom_minimum_size = Vector2(0, 120)
 size_flags_vertical = 3
 
 [node name="Events" type="RichTextLabel" parent="Margin/VSplit/Content/RightPanelScroll/RightColumn/EventsPanel"]
