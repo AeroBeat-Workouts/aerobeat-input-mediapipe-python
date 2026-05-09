@@ -1204,10 +1204,10 @@ Likely implementation files for `oc-1qs`: `.testbed/scripts/proving_harness.gd` 
 
 ### Task 51: Research the file-backed preview texture-size mismatch
 
-**Bead ID:** `oc-b2xf`  
-**SubAgent:** `primary` (for `research` workflow role)  
-**Role:** `research`  
-**References:** `REF-04`, `REF-06`, `REF-10`  
+**Bead ID:** `oc-b2xf`
+**SubAgent:** `primary` (for `research` workflow role)
+**Role:** `research`
+**References:** `REF-04`, `REF-06`, `REF-10`
 **Prompt:** Investigate the file-backed preview error `camera_view.gd:502 @ _update_texture(): The new image dimensions must match the texture size.` Determine the smallest truthful fix so file-backed proving playback can render without texture-size spam, and explain whether the bug is likely separate from or entangled with the Cookie close-path crash.
 
 **Folders Created/Deleted/Modified:**
@@ -1226,10 +1226,10 @@ Likely implementation files for `oc-1qs`: `.testbed/scripts/proving_harness.gd` 
 
 ### Task 52: Implement the file-backed preview texture-size fix
 
-**Bead ID:** `oc-9khz`  
-**SubAgent:** `primary` (for `coder` workflow role)  
-**Role:** `coder`  
-**References:** `REF-04`, `REF-06`  
+**Bead ID:** `oc-9khz`
+**SubAgent:** `primary` (for `coder` workflow role)
+**Role:** `coder`
+**References:** `REF-04`, `REF-06`
 **Prompt:** Based on the approved research result, implement the smallest truthful fix for the file-backed preview texture-size mismatch in `camera_view.gd` (and any directly owning support code) so prerecorded video playback renders cleanly in the proving scenes without the current texture-dimension spam.
 
 **Folders Created/Deleted/Modified:**
@@ -1249,10 +1249,10 @@ Likely implementation files for `oc-1qs`: `.testbed/scripts/proving_harness.gd` 
 
 ### Task 53: QA the file-backed preview texture-size fix
 
-**Bead ID:** `oc-n9yk`  
-**SubAgent:** `primary` (for `qa` workflow role)  
-**Role:** `qa`  
-**References:** `REF-04`, `REF-06`  
+**Bead ID:** `oc-n9yk`
+**SubAgent:** `primary` (for `qa` workflow role)
+**Role:** `qa`
+**References:** `REF-04`, `REF-06`
 **Prompt:** Independently verify that the file-backed preview texture-size fix is wired correctly in the available terminal-safe validation scope, that prerecorded playback should now render without the old size-mismatch spam, and that Derrick has a clear operator path for rerunning the file-backed `PREVIEW_ONLY_DEBUG` comparison.
 
 **Folders Created/Deleted/Modified:**
@@ -1269,11 +1269,97 @@ Likely implementation files for `oc-1qs`: `.testbed/scripts/proving_harness.gd` 
 
 ### Task 54: Audit the rerun file-backed PREVIEW_ONLY_DEBUG comparison result
 
-**Bead ID:** `oc-o3i4`  
-**SubAgent:** `primary` (for `auditor` workflow role)  
-**Role:** `auditor`  
-**References:** `REF-01`, `REF-10`  
+**Bead ID:** `oc-o3i4`
+**SubAgent:** `primary` (for `auditor` workflow role)
+**Role:** `auditor`
+**References:** `REF-01`, `REF-10`
 **Prompt:** After the repaired file-backed `PREVIEW_ONLY_DEBUG` comparison reruns on Cookie, audit what it proves about the connected-preview close-path crash once the texture-size mismatch bug is removed. Decide whether the crash is now best explained as a generic connected-preview close bug or whether another narrower branch is still needed.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- forensic artifact dirs only for reading / notes
+
+**Files Created/Deleted/Modified:**
+- plan updates and audit notes only
+
+**Status:** ✅ Complete
+
+**Results:** Audited Derrick’s rerun report against the surviving system-scope Cookie artifact dir `/home/derrick/Documents/forensics/cookie-godot-stop-playback-preview-only-file-backed-rerun-20260508-234035` and updated the crash matrix accordingly. What this now proves after the texture-size fix: (1) the old texture-size mismatch/noise is no longer the gating issue for this rung, (2) a file-backed `PREVIEW_ONLY_DEBUG` run is still sufficient to reproduce the close-path desktop-session crash, so live camera / V4L teardown is no longer required, and (3) the file-backed playback path has a new separate preview-consumption bug where the proving clip remains selected but Godot only shows the first frame. The strongest artifact clue is the split between Godot and the sidecar: Godot logged `CameraView Stats: 386205014 bytes, 1 frames` at `23:42:11`, then repeated `0 frames` thereafter, while the file-backed sidecar log continued healthy processing through `Frame 1500` before receiving SIGTERM on close. That makes the new first-frame-only issue best understood as a separate bug in the Godot preview/render-consumption path rather than evidence that the file-backed source itself stopped producing frames. Ordering around the crash also survived cleanly in the system-scope harness: `stop.requested` was touched at `23:42:46.702`, the next poll at `23:42:47` showed Derrick’s session `782` already `closing`, `gnome-shell` and the Godot process were gone, and only the GDM Xorg greeter session remained. Recommendation recorded: treat the close-path crash as currently independent of both live camera/V4L and the old texture-size mismatch; track the new first-frame-only file-backed preview as a separate bug that weakens full behavioral parity on this rung but does not overturn the crash-matrix result that connected preview teardown alone can still take down Cookie’s GUI.
+
+---
+
+### Task 55: Research the file-backed first-frame-only preview bug
+
+**Bead ID:** `oc-hrod`
+**SubAgent:** `primary` (for `research` workflow role)
+**Role:** `research`
+**References:** `REF-04`, `REF-06`, `REF-10`
+**Prompt:** Investigate why file-backed proving playback shows only the first frame in Godot while the sidecar continues processing frames. Determine the smallest truthful next fix or instrumentation step in the Godot preview-consumer path so prerecorded preview advances normally.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- `.testbed/`
+- `src/` as needed for inspection
+
+**Files Created/Deleted/Modified:**
+- plan updates only unless a tiny proof step is required
+
+**Status:** ✅ Complete
+
+**Results:** Research completed from source/log inspection only; no GUI playback was launched. The strongest likely root cause is now in the Godot MJPEG consumer’s backlog/overflow behavior, not in the file-backed source itself. `python_mediapipe/camera_streamer.py` pushes MJPEG chunks every `1ms`, while `src/camera_view.gd` only polls every `5ms`, parses at most `2` frames per iteration, and hard-clears `_mjpeg_buffer` once it exceeds `MAX_BUFFER_SIZE = 131072`. On the file-backed proving clip, the sidecar is feeding full-resolution `1920x1080` frames (local fixture sampling shows ~90-106 KB JPEGs at the current stream quality), so the consumer can cross the 128 KB cap before it has a chance to isolate a complete next frame once the real clip replaces the startup placeholder. That matches the surviving artifact shape: Godot keeps receiving huge byte volume but decodes only the first frame, while the sidecar continues healthy frame processing. Smallest truthful next fix for `oc-hx7c`: keep this in the Godot preview-consumer path and stop treating buffer overflow as a full reset. In `src/camera_view.gd`, replace the current `if _mjpeg_buffer.size() > MAX_BUFFER_SIZE: _mjpeg_buffer.clear(); header_parsed = false` behavior with bounded stale-data dropping that preserves the newest boundary/tail (and ideally add one overflow log counter while touching that code). A modest buffer-cap increase to fit several 1080p JPEG frames is likely warranted too, but the key fix is preserving the latest parseable frame instead of repeatedly zeroing the stream state. Crash relationship: this still looks separate from the close-path crash. The crash already reproduces on connected-preview rungs without this exact file-backed first-frame symptom, so this bug is best treated as a file-backed preview-consumption defect that muddies parity on this rung rather than the newly discovered root cause of the desktop-session rollover.
+
+---
+
+### Task 56: Implement the first-frame-only preview fix or minimal instrumentation
+
+**Bead ID:** `oc-hx7c`
+**SubAgent:** `primary` (for `coder` workflow role)
+**Role:** `coder`
+**References:** `REF-04`, `REF-06`
+**Prompt:** Based on the approved research result, implement the smallest truthful fix for the file-backed first-frame-only preview bug in the proving path, or the smallest decisive instrumentation if a direct fix would still be speculative. Keep scope tight and avoid broad preview-pipeline redesign.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- `.testbed/`
+- `src/` as required
+
+**Files Created/Deleted/Modified:**
+- `src/camera_view.gd`
+- `.plans/2026-05-08-cookie-boxing-ui-missing-and-close-crash.md`
+
+**Status:** ✅ Complete
+
+**Results:** Implemented the approved minimal Godot-side fix in `src/camera_view.gd` only: raised the MJPEG buffer cap from `128KB` to `512KB`, added bounded overflow trimming to keep the newest boundary/tail instead of clearing the entire buffer, and logged an overflow counter with trim details so reruns can prove whether backlog is still occurring. The MJPEG marker/header byte patterns were hoisted into reusable top-level byte arrays while touching this path. Terminal-safe validation only: `godot --headless --path . --script src/camera_view.gd --check-only` now passes after the change. Still needs QA / Derrick rerun on the file-backed proving flow to confirm the preview advances beyond the first frame and to capture whether any new `[CameraView] MJPEG buffer overflow #...` logs still appear during playback.
+
+---
+
+### Task 57: QA the file-backed preview-advance fix
+
+**Bead ID:** `oc-6398`
+**SubAgent:** `primary` (for `qa` workflow role)
+**Role:** `qa`
+**References:** `REF-04`, `REF-06`
+**Prompt:** Independently verify that the file-backed proving preview should now advance beyond the first frame in the available validation scope, and that Derrick has a clear operator flow for rerunning the file-backed proving scene. Be explicit about what still needs Derrick’s direct Cookie truth pass.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+
+**Files Created/Deleted/Modified:**
+- plan updates / verification notes only unless a truthful docs correction is required
+
+**Status:** ⏳ Pending
+
+**Results:** Pending.
+
+---
+
+### Task 58: Audit the rerun file-backed preview-advance result and decide the next crash/debug branch
+
+**Bead ID:** `oc-zqlo`
+**SubAgent:** `primary` (for `auditor` workflow role)
+**Role:** `auditor`
+**References:** `REF-01`, `REF-10`
+**Prompt:** After the repaired file-backed proving preview reruns on Cookie, audit what it proves about the first-frame-only bug and whether the connected-preview close-path crash remains unchanged. Decide the strongest next branch for the crash investigation once playback behavior is cleaner.
 
 **Folders Created/Deleted/Modified:**
 - `.plans/`
