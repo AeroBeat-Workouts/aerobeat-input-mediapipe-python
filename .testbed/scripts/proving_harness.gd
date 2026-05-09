@@ -90,6 +90,7 @@ enum StartupMode {
 
 @export var harness_mode: HarnessMode = HarnessMode.BOXING
 @export var startup_mode: StartupMode = StartupMode.TRACKING
+@export_file("*.mp4", "*.mov", "*.avi", "*.mkv", "*.webm") var prerecorded_video_source := ""
 @export var scene_title := "Detector Proving Harness"
 @export_multiline var scene_notes := ""
 @export var overlay_visibility_threshold := 0.35
@@ -162,6 +163,8 @@ func _setup_auto_start() -> void:
 		push_error("[ProvingHarness] AutoStartManager node not found in scene")
 		_update_status("AutoStartManager missing", Color.RED)
 		return
+
+	auto_start_manager.camera_source_override = _get_scene_camera_source_override()
 
 	auto_start_manager.server_started.connect(_on_server_started)
 	auto_start_manager.server_failed.connect(_on_server_failed)
@@ -608,10 +611,11 @@ func _build_live_status_text() -> String:
 	var pose_count := int(provider.get_num_poses()) if provider != null else 0
 	var last_event_name := _latest_event_name()
 	var last_event_age := _last_seen_text(last_event_name) if last_event_name != "" else "never"
-	return "Live | mode=%s srv=%s cam=%s track=%s poses=%d last=%s %s" % [
+	return "Live | mode=%s srv=%s cam=%s src=%s track=%s poses=%d last=%s %s" % [
 		_get_startup_mode_label(),
 		_server_status_text(),
 		_camera_status_text("on", "off"),
+		_camera_source_compact_text(),
 		tracking_state,
 		pose_count,
 		(last_event_name if last_event_name != "" else "none"),
@@ -638,6 +642,7 @@ func _build_quick_stats_text() -> String:
 		"Startup: %s" % _get_startup_mode_label(),
 		"Server: %s" % _server_status_text(),
 		"Camera: %s" % _camera_status_text("streaming", "offline"),
+		"Source: %s" % _camera_source_summary_text(),
 		"Tracking: %s" % _tracking_status_text(state),
 		"Poses: %d" % pose_count,
 		"Visible landmarks: %d" % visible_landmarks,
@@ -678,6 +683,7 @@ func _build_summary_text() -> String:
 		"========",
 		"Harness: %s" % scene_title,
 		"Startup: %s" % _get_startup_mode_label(),
+		"Video source: %s" % _camera_source_summary_text(),
 		"Tracking state: %s" % _tracking_status_text(state),
 		"Baseline calibrated: %s" % str(bool(baseline.get("is_calibrated", false))),
 		"Baseline frames: %d" % int(baseline.get("sample_frames", 0)),
@@ -1037,12 +1043,13 @@ func _build_console_snapshot() -> String:
 	var metrics: Dictionary = state.get("metrics", {})
 	var measurements: Dictionary = metrics.get("measurements", {})
 	var gesture_states: Dictionary = state.get("gesture_states", {})
-	var base := "[ProvingHarness][%s] mode=%s status=%s server=%s camera=%s poses=%d" % [
+	var base := "[ProvingHarness][%s] mode=%s status=%s server=%s camera=%s source=%s poses=%d" % [
 		_mode_name(),
 		_get_startup_mode_label(),
 		_tracking_status_text(state),
 		_server_status_text(),
 		_camera_status_text("streaming", "offline"),
+		_camera_source_compact_text(),
 		(int(provider.get_num_poses()) if provider != null else 0),
 	]
 	if harness_mode == HarnessMode.BOXING:
@@ -1083,6 +1090,38 @@ func _emit_console_snapshot_if_changed(force: bool = false) -> void:
 		return
 	_last_console_snapshot = snapshot
 	print(snapshot)
+
+func _get_scene_camera_source_override() -> String:
+	return prerecorded_video_source.strip_edges()
+
+func _get_effective_camera_source() -> String:
+	if auto_start_manager != null and auto_start_manager.has_method("get_active_camera_source"):
+		return String(auto_start_manager.get_active_camera_source())
+	var explicit_override := _get_scene_camera_source_override()
+	if not explicit_override.is_empty():
+		return ProjectSettings.globalize_path(explicit_override) if not explicit_override.is_valid_int() else explicit_override
+	var env_override := OS.get_environment("AEROBEAT_MEDIAPIPE_CAMERA_SOURCE").strip_edges()
+	if not env_override.is_empty():
+		return ProjectSettings.globalize_path(env_override) if not env_override.is_valid_int() else env_override
+	return "0"
+
+func _camera_source_summary_text() -> String:
+	var source := _get_effective_camera_source()
+	if source == "0":
+		return "live camera (default)"
+	var scene_override := _get_scene_camera_source_override()
+	if not scene_override.is_empty():
+		return "scene override: %s" % scene_override
+	var env_override := OS.get_environment("AEROBEAT_MEDIAPIPE_CAMERA_SOURCE").strip_edges()
+	if not env_override.is_empty():
+		return "environment override: %s" % env_override
+	return source
+
+func _camera_source_compact_text() -> String:
+	var source := _get_effective_camera_source()
+	if source == "0":
+		return "live"
+	return source.get_file() if source.get_file() != "" else source
 
 func _mode_name() -> String:
 	return "Boxing" if harness_mode == HarnessMode.BOXING else "Flow"
@@ -1127,9 +1166,10 @@ func _tracking_status_text(state: Dictionary) -> String:
 	return String(state.get("tracking_state", &"lost"))
 
 func _update_status(text: String, color: Color) -> void:
-	status_label.text = text
+	var source_suffix := " | src=%s" % _camera_source_compact_text()
+	status_label.text = text + source_suffix
 	status_label.modulate = color
-	print("[ProvingHarness][%s] %s" % [_mode_name(), text])
+	print("[ProvingHarness][%s] %s%s" % [_mode_name(), text, source_suffix])
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:

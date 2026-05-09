@@ -1026,10 +1026,10 @@ Recommended ordered Cookie ladder: (1) add/run a Godot-only editor close path in
 
 ### Task 43: Research the PREVIEW_ONLY_DEBUG connect failure and warning-cleanup scope
 
-**Bead ID:** `oc-u4g`  
-**SubAgent:** `primary` (for `research` workflow role)  
-**Role:** `research`  
-**References:** `REF-04`, `REF-06`, `REF-10`  
+**Bead ID:** `oc-u4g`
+**SubAgent:** `primary` (for `research` workflow role)
+**Role:** `research`
+**References:** `REF-04`, `REF-06`, `REF-10`
 **Prompt:** Investigate why `PREVIEW_ONLY_DEBUG` hit `camera_view.gd:152 @ start_stream(): Failed to connect, status: 3` on Cookie, and identify the smallest truthful fix needed so the preview-only rung exercises a real successful preview path. Also inspect the constant/global-class reload warnings (`MediaPipeProvider`, `MediaPipeCameraView`, `MediaPipeConfig`) and identify the smallest hygiene cleanup that removes the noise without broad refactors.
 
 **Folders Created/Deleted/Modified:**
@@ -1048,10 +1048,10 @@ Recommended ordered Cookie ladder: (1) add/run a Godot-only editor close path in
 
 ### Task 44: Implement the PREVIEW_ONLY_DEBUG fix and warning cleanup
 
-**Bead ID:** `oc-p78`  
-**SubAgent:** `primary` (for `coder` workflow role)  
-**Role:** `coder`  
-**References:** `REF-04`, `REF-06`  
+**Bead ID:** `oc-p78`
+**SubAgent:** `primary` (for `coder` workflow role)
+**Role:** `coder`
+**References:** `REF-04`, `REF-06`
 **Prompt:** Based on the approved research result, implement the smallest truthful change set that (1) makes `PREVIEW_ONLY_DEBUG` exercise a successful preview connection instead of failing with `status: 3`, and (2) cleans up the constant/global-class reload warnings. Keep the comparison ladder intact and avoid broad refactors.
 
 **Folders Created/Deleted/Modified:**
@@ -1070,10 +1070,10 @@ Recommended ordered Cookie ladder: (1) add/run a Godot-only editor close path in
 
 ### Task 45: QA the repaired PREVIEW_ONLY_DEBUG rung and warning cleanup
 
-**Bead ID:** `oc-60d`  
-**SubAgent:** `primary` (for `qa` workflow role)  
-**Role:** `qa`  
-**References:** `REF-04`, `REF-06`  
+**Bead ID:** `oc-60d`
+**SubAgent:** `primary` (for `qa` workflow role)
+**Role:** `qa`
+**References:** `REF-04`, `REF-06`
 **Prompt:** Independently verify that `PREVIEW_ONLY_DEBUG` is now wired to a truthful successful preview path in source/runtime expectations, that the warning cleanup is real, and that Derrick has a clear operator path for rerunning the Cookie comparison. Be explicit about what still needs Derrick’s direct Cookie repro.
 
 **Folders Created/Deleted/Modified:**
@@ -1090,11 +1090,104 @@ Recommended ordered Cookie ladder: (1) add/run a Godot-only editor close path in
 
 ### Task 46: Audit the rerun PREVIEW_ONLY_DEBUG comparison result and decide the next rung
 
-**Bead ID:** `oc-68b`  
-**SubAgent:** `primary` (for `auditor` workflow role)  
-**Role:** `auditor`  
-**References:** `REF-01`, `REF-08`, `REF-09`, `REF-10`  
+**Bead ID:** `oc-68b`
+**SubAgent:** `primary` (for `auditor` workflow role)
+**Role:** `auditor`
+**References:** `REF-01`, `REF-08`, `REF-09`, `REF-10`
 **Prompt:** After the repaired `PREVIEW_ONLY_DEBUG` comparison reruns on Cookie, audit what it actually proves about preview teardown versus provider/detector teardown, and decide whether the next strongest rung is full `TRACKING` with file-backed input or a different narrower branch.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- forensic artifact dirs only for reading / notes
+
+**Files Created/Deleted/Modified:**
+- plan updates and audit notes only
+
+**Status:** ✅ Complete
+
+**Results:** Audited the repaired rerun against Derrick’s direct Cookie report as primary truth and the hardened system-scope forensics artifact as corroborating evidence. Actual result changed materially from the prior failed-connect preview rung: this time `PREVIEW_ONLY_DEBUG` reached a **real successful preview session** before close (`[CameraView] Connected`, `Stream started successfully`, proving-harness status `camera=streaming`, and `Stats: 96892924 bytes, 596 frames`), and Derrick reported that closing/stopping the rung **did crash Cookie / roll the desktop session**. Compared to prior rungs, that now proves `MediaPipeProvider.start()` / provider-detector teardown is **not required** for the session-reset family, while `GODOT_ONLY_DEBUG` still says bare editor/testbed close is not sufficient and the earlier failed-connect preview rerun says sidecar startup without an actually connected preview stream is not sufficient. The surviving artifact also gives a useful last-known-good ordering slice: close request logged at `22:41:06`, `CameraView` fully stopped its stream thread, then `AutoStartManager` logged `WM_CLOSE_REQUEST - stopping server`, immediately followed by `org.gnome.Shell.desktop: X connection to :1 broken (explicit kill or server shutdown)` and the final poll showing Derrick’s user session gone with only the GDM greeter left. Strongest next rung is therefore **not** full `TRACKING` with file-backed input yet; that would reintroduce provider activity after provider has already been demoted as unnecessary. The strongest next branch is a narrower `PREVIEW_ONLY_DEBUG` comparison with `AEROBEAT_MEDIAPIPE_CAMERA_SOURCE` pointed at a prerecorded boxing fixture (or other file-backed source) so the same connected-preview/no-provider rung can answer whether live camera / V4L teardown is required. If file-backed preview-only still crashes, the culprit stays in connected preview + sidecar/editor close without live hardware. If file-backed preview-only does not crash, live camera-device teardown becomes the strongest remaining suspect.
+
+---
+
+### Task 47: Research the smallest truthful video-source UX for proving scenes
+
+**Bead ID:** `oc-4pr`
+**SubAgent:** `primary` (for `research` workflow role)
+**Role:** `research`
+**References:** `REF-04`, `REF-06`
+**Prompt:** Design the smallest truthful UX for running Boxing/Flow proving scenes against prerecorded video files under `.testbed/assets/`. Compare two candidate approaches Derrick suggested: (a) autoscan the assets tree and populate a dropdown of available videos, and (b) expose a file-picker flow for selecting an arbitrary test video. Recommend the smallest good first version that works for both proving scenes and supports the current crash-isolation matrix.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- `.testbed/`
+- docs/notes only as needed
+
+**Files Created/Deleted/Modified:**
+- plan updates only unless a tiny proof step is required
+
+**Status:** ✅ Complete
+
+**Results:** Research completed and bead `oc-4pr` should close. Source-grounded recommendation: **first ship an Inspector-driven file-picker path, not an autoscanned in-scene dropdown**. In the current proving-harness structure, both `boxing_proving.tscn` and `flow_proving.tscn` auto-start the sidecar in `_ready()` through the shared `.testbed/scripts/proving_harness.gd` + child `AutoStartManager`, and the visible runtime UI is already space-constrained in the header/right-panel layout. A runtime dropdown would therefore require extra startup gating (`start`/`apply` flow or delayed auto-start), recursive asset scanning, scene UI changes in both proving scenes, and extra operator-state handling to avoid launching the live camera before the choice is made. By contrast, a root-node exported video-path property uses Godot’s existing Inspector file-picker flow, fits the repo’s current operator pattern (same as `startup_mode` selection), works for both Boxing and Flow through the shared harness with no new visible clutter, and can still be pointed at `.testbed/assets/...` clips for the crash-isolation matrix.
+
+Smallest truthful implementation hook set: add a shared exported property on `proving_harness.gd` for an optional prerecorded video path (for example `@export_file("*.mp4,*.mov,*.avi,*.mkv,*.webm") var prerecorded_video_source := ""`) plus a compact readout in the existing status/summary text showing whether the harness is using live camera vs a file. The selected path should resolve to an absolute path before sidecar launch and map onto the existing camera-source surface cleanly: preferred wiring is a new `camera_source_override` property on `src/autostart_manager.gd`, with `_get_camera_source_override()` preferring that explicit scene-provided path, then falling back to the existing `AEROBEAT_MEDIAPIPE_CAMERA_SOURCE` environment variable, then defaulting to `"0"` for live camera. That preserves the current shell/script path (`scripts/run_proving_fixture_capture.sh` already exports `AEROBEAT_MEDIAPIPE_CAMERA_SOURCE`) while giving the proving scenes a local non-shell control surface without mutating global editor environment state.
+
+Why not autoscan first: autoscan is attractive once we want a friendlier curated fixture browser, but in the actual current source it is **more** work than the file-picker path because there is no pre-launch selection UI or scene bootstrap gate yet. To do autoscan honestly we would need at least one of: (a) disable immediate auto-start until the dropdown value is chosen, (b) add restart/apply logic after selection, or (c) persist selection into the scene before run through a custom tool/editor surface. That is extra scope for the same immediate goal. Also, the assets are not just a single flat directory: there is `.testbed/assets/videos/` plus family-specific fixture clips under `.testbed/assets/fixtures/...`, so a truthful autoscan would need explicit inclusion rules and labeling logic rather than a trivial one-folder list.
+
+Likely implementation files for `oc-1qs`: `.testbed/scripts/proving_harness.gd` (shared exported property, display text, path handoff), `src/autostart_manager.gd` (preferred explicit override property + fallback order), and possibly `.testbed/scenes/boxing_proving.tscn` / `.testbed/scenes/flow_proving.tscn` only if Derrick wants default saved values or a tiny source label surfaced in-scene. Recommendation for `oc-1qs`: implement the shared file-picker property first, document the exact operator flow as `root node -> prerecorded_video_source -> choose .testbed/assets/... clip -> optional startup_mode -> run`, keep live-camera default untouched when the field is blank, and defer autoscan-dropdown until there is a proven need for a curated fixture browser or one-click saved presets.
+
+---
+
+### Task 48: Implement proving-scene video source selection UX
+
+**Bead ID:** `oc-1qs`
+**SubAgent:** `primary` (for `coder` workflow role)
+**Role:** `coder`
+**References:** `REF-04`, `REF-05`, `REF-06`
+**Prompt:** Implement the approved proving-scene video-source UX so Boxing and Flow can run against prerecorded videos from `.testbed/assets/`. Support the chosen first version cleanly in the proving harness, and wire it into the current preview/tracking comparison modes without breaking live-camera behavior.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- `.testbed/`
+- `src/`
+
+**Files Created/Deleted/Modified:**
+- `.plans/2026-05-08-cookie-boxing-ui-missing-and-close-crash.md`
+- `.testbed/scripts/proving_harness.gd`
+- `src/autostart_manager.gd`
+
+**Status:** ✅ Complete
+
+**Results:** Coder pass completed with the smallest approved Inspector-first UX. `.testbed/scripts/proving_harness.gd` now exports `prerecorded_video_source` as a shared file-picker property on the proving-harness root, hands that value to the child `AutoStartManager`, and surfaces the active source in the live header/status, quick stats, summary panel, and console snapshot so Derrick can tell whether a scene is using live camera default, a scene-selected file, or an environment override. `src/autostart_manager.gd` now exposes `camera_source_override` and resolves camera source in the approved order: explicit scene override first, then `AEROBEAT_MEDIAPIPE_CAMERA_SOURCE`, then live camera default `"0"`. No scene UI dropdown, autoscan flow, or startup redesign was added, so Boxing and Flow both pick up the new behavior through the shared harness with their existing roots unchanged. Terminal-safe validation passed: `godot --headless --path .testbed --check-only --script scripts/proving_harness.gd` succeeded; a headless scene-instantiation probe confirmed both `boxing_proving.tscn` and `flow_proving.tscn` still load and report `live camera (default)` with no scene value set; and a second headless override probe confirmed an explicit scene file path resolves ahead of an env override and is reported back by the harness as `scene override: res://assets/...`. Still pending for QA / Derrick use: real Inspector operator flow in Godot (`root node -> prerecorded_video_source -> choose .testbed/assets/... clip -> optional startup_mode -> run`) on both Boxing and Flow, plus the planned file-backed `PREVIEW_ONLY_DEBUG` crash-isolation comparison on Cookie to determine whether live camera / V4L teardown is still a required trigger.
+
+---
+
+### Task 49: QA video source selection UX and operator flow
+
+**Bead ID:** `oc-6tu`
+**SubAgent:** `primary` (for `qa` workflow role)
+**Role:** `qa`
+**References:** `REF-04`, `REF-05`, `REF-06`
+**Prompt:** Independently verify that the new proving-scene video source UX is understandable, works for both Boxing and Flow in the available validation scope, and gives Derrick a clear operator flow for choosing prerecorded videos instead of the live camera.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+
+**Files Created/Deleted/Modified:**
+- plan updates / verification notes only unless a truthful docs correction is required
+
+**Status:** ⏳ Pending
+
+**Results:** Pending.
+
+---
+
+### Task 50: Audit first file-backed proving comparison result
+
+**Bead ID:** `oc-zxrx`
+**SubAgent:** `primary` (for `auditor` workflow role)
+**Role:** `auditor`
+**References:** `REF-01`, `REF-10`
+**Prompt:** After the first file-backed proving comparison run lands, audit what it proves for the crash-isolation matrix and for the broader proving UX. Decide whether live camera / V4L remains a required trigger, and whether the new file-backed mode is strong enough to become a standard validation path.
 
 **Folders Created/Deleted/Modified:**
 - `.plans/`
@@ -1124,11 +1217,11 @@ Recommended ordered Cookie ladder: (1) add/run a Godot-only editor close path in
 - Crash-forensics branch is also active:
   - `oc-a8h` armed the first Cookie host-local harness and `oc-73r` audited the result
   - that first capture was useful only as a pre-crash slice; it did not survive long enough to capture the actual stop-playback desktop reset boundary
-  - close-path comparison ladder update: both `GODOT_ONLY_DEBUG` and `PREVIEW_ONLY_DEBUG` now have direct no-crash/no-session-rollover reports from Derrick on Cookie
-  - the `PREVIEW_ONLY_DEBUG` rung is still partially ambiguous because editor output also reported `camera_view.gd:152 @ start_stream(): Failed to connect, status: 3`, so successful preview-stream teardown has **not** been isolated yet
-  - next required improvement is a systemd-hardened detached capture mode that survives a GNOME/Xorg desktop-session reset better
-  - hardened harness branch is active: `oc-30v` research, `oc-8pl` implementation, `oc-dn7` QA
-  - recommended next repro before skipping ahead: make the preview-only rung connect truthfully, then rerun that rung so preview teardown vs provider teardown can be separated cleanly
+  - close-path comparison ladder update: `GODOT_ONLY_DEBUG` still has Derrick’s direct no-crash/no-session-rollover result on Cookie, but repaired `PREVIEW_ONLY_DEBUG` now has the opposite result: a direct crash / desktop-session-rollover report from Derrick after a **successful** connected preview run
+  - the successful-preview rerun removes the old connect-failure ambiguity: successful camera-preview teardown is now isolated as sufficient for the session-reset family, and `MediaPipeProvider.start()` is no longer required to trigger it
+  - next required comparison is narrower than full tracking: keep `PREVIEW_ONLY_DEBUG` and swap to file-backed camera input so live camera / V4L teardown can be separated from generic connected-preview teardown
+  - hardened harness branch already paid off here because the surviving system-scope artifact captured the close-order boundary and post-crash session state
+  - recommended next repro: rerun the same `PREVIEW_ONLY_DEBUG` rung with `AEROBEAT_MEDIAPIPE_CAMERA_SOURCE` set to a prerecorded boxing fixture before reintroducing provider/tracking behavior
 - Important new truth from this session: Pico's own Zorin GUI also crashed twice during risky local GUI-coupled work, and host journal evidence showed an actual session-reset family with `Connection to xwayland lost`, `Xwayland terminated, exiting since it was mandatory`, and `Xwayland exited unexpectedly`.
 - Therefore next session should avoid unsafe local live GUI proving on Pico's host and prioritize:
   1. systemd-hardened crash capture on Cookie / potentially Pico host too

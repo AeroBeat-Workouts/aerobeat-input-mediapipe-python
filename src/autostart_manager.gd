@@ -31,6 +31,7 @@ signal mediapipe_not_found
 @export var preprocess_size: int = 480
 @export var no_filter: bool = true
 @export var heartbeat_interval_ms: int = 500
+@export var camera_source_override: String = ""
 
 var python_path: String = ""
 var server_pid: int = -1
@@ -271,11 +272,23 @@ func _get_server_log_path() -> String:
 		return String(_launch_info.get("log_file", ""))
 	return _desktop_sidecar_launcher().get_state_dir().path_join("autostart-last.log")
 
+func _normalize_camera_source_value(raw_value: String) -> String:
+	var normalized_value := raw_value.strip_edges()
+	if normalized_value.is_empty():
+		return ""
+	return ProjectSettings.globalize_path(normalized_value) if not normalized_value.is_valid_int() else normalized_value
+
 func _get_camera_source_override() -> String:
-	var override_value := OS.get_environment("AEROBEAT_MEDIAPIPE_CAMERA_SOURCE").strip_edges()
-	if override_value.is_empty():
-		return "0"
-	return ProjectSettings.globalize_path(override_value) if not override_value.is_valid_int() else override_value
+	var explicit_override := _normalize_camera_source_value(camera_source_override)
+	if not explicit_override.is_empty():
+		return explicit_override
+	var env_override := _normalize_camera_source_value(OS.get_environment("AEROBEAT_MEDIAPIPE_CAMERA_SOURCE"))
+	if not env_override.is_empty():
+		return env_override
+	return "0"
+
+func get_active_camera_source() -> String:
+	return _get_camera_source_override()
 
 func _sidecar_show_window_requested() -> bool:
 	var raw_value := OS.get_environment("AEROBEAT_MEDIAPIPE_SHOW_WINDOW").strip_edges().to_lower()
