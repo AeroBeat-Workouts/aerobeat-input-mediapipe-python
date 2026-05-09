@@ -747,9 +747,9 @@ Follow-up research tightened that further: the screenshot is not the proving har
 **Files Created/Deleted/Modified:**
 - plan updates and forensic notes only unless tiny capture glue is required
 
-**Status:** ⏳ Pending
+**Status:** ⚠️ Partial
 
-**Results:** Pending.
+**Results:** Claimed bead `oc-a8h`, inspected Tasks 30-34 plus the Session Handoff, and verified the intended Cookie proving path remains `/home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-input-mediapipe-python/.testbed` with `run/main_scene="res://scenes/boxing_proving.tscn"`. On first verification, Cookie's copy of `/home/derrick/.openclaw/workspace/scripts/desktop-app-forensics.sh` was still a stale pre-hardening version (it lacked the new `systemd-run --user` / `controller.unit` path), so I backed it up to `/home/derrick/.openclaw/workspace/scripts/desktop-app-forensics.sh.bak-20260508-192732`, pushed the current hardened script to the same path, stopped the stale watch-only run at `/home/derrick/Documents/forensics/cookie-godot-stop-playback-20260508-192653`, and armed a fresh hardened capture at `/home/derrick/Documents/forensics/cookie-godot-stop-playback-20260508-192741`. Exact arm command used on Cookie: `/home/derrick/.openclaw/workspace/scripts/desktop-app-forensics.sh start --log-dir /home/derrick/Documents/forensics/cookie-godot-stop-playback-20260508-192741 --watch-pattern godot --watch-pattern Godot --watch-pattern python_mediapipe/main.py --watch-pattern gnome-shell --watch-pattern Xorg --poll-interval 2 --journal-since now --notes "Cookie real Godot editor stop-playback crash capture for aerobeat-input-mediapipe-python; armed from SSH in watch-only mode awaiting manual repro."` and status now reports `controller mode: systemd-user`, `controller_unit=desktop-app-forensics-1778282862-1439313.service`, `controller=active pid=1439357`. Durable artifacts already confirmed under that log dir: `meta/summary.txt`, `meta/environment.txt`, `logs/journal-system.log`, `logs/journal-user.log`, `logs/session-poll.log`, `logs/launcher.log`, `state/controller.pid`, `state/controller.unit`, and collector pid files. No truthful real stop-playback crash capture was obtained yet because there was no running Godot editor process when the harness was armed, and reproducing the actual stop-playback reset still requires Derrick to perform the real editor action on Cookie. Exact operator steps from here: (1) leave the harness running, (2) on Cookie launch/open the editor project at `/home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-input-mediapipe-python/.testbed` (launcher path available at `/home/derrick/.local/bin/godot`; active desktop session is X11 on `DISPLAY=:1`), (3) run the Boxing proving scene and trigger the known stop-playback action that resets the desktop, then (4) after the machine returns, collect/finalize with `/home/derrick/.openclaw/workspace/scripts/desktop-app-forensics.sh status --log-dir /home/derrick/Documents/forensics/cookie-godot-stop-playback-20260508-192741` and `/home/derrick/.openclaw/workspace/scripts/desktop-app-forensics.sh stop --log-dir /home/derrick/Documents/forensics/cookie-godot-stop-playback-20260508-192741`. Bead stays open/in-progress until a real crash-boundary capture exists.
 
 ---
 
@@ -767,9 +767,13 @@ Follow-up research tightened that further: the screenshot is not the proving har
 **Files Created/Deleted/Modified:**
 - plan updates and audit notes only
 
-**Status:** ⏳ Pending
+**Status:** ✅ Complete
 
-**Results:** Pending.
+**Results:** Auditor pass completed and bead `oc-73r` is ready to close. I inspected the hardened Cookie artifact at `/home/derrick/Documents/forensics/cookie-godot-stop-playback-20260508-192741` plus current live host journals on Cookie to separate what the artifact itself captured from what the machine later proved after return. The artifact definitively captured the real stop-playback entry path up to the crash boundary better than the earlier pre-hardening run: `logs/journal-user.log` / `godot.log` show the real proving scene launch, sidecar/server start, active camera streaming, `Window close request`, `Stopping harness resources`, camera stream shutdown, and `[AutoStartManager] WM_CLOSE_REQUEST - stopping server` at `2026-05-08T19:32:28-04:00`. The last `session-poll.log` block at `2026-05-08T19:32:27-04:00` still shows pre-reset session `765`, Xorg pid `1407572`, gnome-shell pid `1407817`, editor pid `1446232`, proving scene pid `1446497`, and python pid `1446611` alive immediately before the stop path. The sidecar log adds that it received `SIGTERM` during teardown and then hit `XIO: fatal IO error 34 on X server ":1.0"`, which is strong evidence that the X connection collapsed during/after stop-playback teardown.
+
+What the artifact does **not** contain is the actual rollover itself: there are no post-`19:32:28` poll snapshots, no captured `gnome-shell` / `Xorg` restart markers, no captured new session ID, and no final `finished_at=` marker in `meta/summary.txt`. The controller transient unit `desktop-app-forensics-1778282862-1439313.service` was itself terminated at `19:32:28` with exit status `143`, so the hardened capture still died before it could log the reset aftermath. However, live journal inspection after Cookie returned proves the reset did happen immediately after the artifact stopped: by `19:32:35` logind created new session `782`, by later inspection `loginctl show-user derrick` reported `Display=782`, and current Xorg / gnome-shell pids are `1447675` / `1447845` instead of the artifact’s `1407572` / `1407817`. Current live journal also shows the prior X11 stack being torn down and a fresh Xorg / GNOME login stack being brought up at `19:32:35-19:32:39`, with the old user manager (`systemd[1407504]`) only killing the lingering Godot app scope later at `19:33:58`.
+
+Truthful comparison versus the old pre-hardening artifact at `cookie-godot-stop-playback-20260508-180542`: hardened mode **did improve capture reach** because the old run died around `18:14:34` before any stop-playback request was recorded, while the hardened run reached the real stop action and captured teardown logs through `WM_CLOSE_REQUEST` plus the sidecar’s `SIGTERM`/XIO failure. But it did **not** achieve the intended survival goal; it still failed before the desktop-reset boundary and still shows the known QA finalization gap (`stop.requested` exists, but `finished_at=` and a trustworthy final snapshot are missing on the systemd-managed path). Strongest next step: move the controller one level higher than the user systemd manager / GUI session entirely—use a system-scope transient service (or equivalently privileged host-level capture anchor) that keeps polling `loginctl`, `pgrep`, and both system/user journals across the stop action and at least 60s after the reset—because this run proves `systemd-run --user` is better than plain `nohup` for pre-boundary evidence, but still not durable enough to survive Cookie’s actual X11 session rollover.
 
 ---
 
@@ -823,6 +827,79 @@ Follow-up research tightened that further: the screenshot is not the proving har
 **Role:** `qa`  
 **References:** `REF-01`, `REF-08`, `REF-09`, `REF-10`  
 **Prompt:** Independently verify whether the new hardened capture mode is actually more likely to survive a desktop-session reset and whether the operator workflow is clear enough for Derrick to use on Cookie.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+
+**Files Created/Deleted/Modified:**
+- plan updates / verification notes only unless a truthful docs correction is required
+
+**Status:** ✅ Complete
+
+**Results:** QA completed with mixed results and one material gap. Terminal-safe validation on Pico’s host confirmed the operator workflow is mostly clear and the systemd hardening is real in the narrow sense claimed by `oc-30v`: `help` now documents the preferred `systemd-run --user` path plus the nohup fallback; a start/status/stop lifecycle at `/tmp/desktop-app-forensics-qa-systemd` launched in `controller mode: systemd-user`; wrote `state/controller.unit`; reported `controller_unit=<transient>.service` plus `controller=active`; and `systemctl --user show` confirmed the controller lived in its own transient unit/cgroup (`.../app.slice/desktop-app-forensics-...service`) rather than only as a plain background shell process. That makes it truthfully more likely than the old ssh-shell-tied nohup launch to survive an invoking-shell death or a desktop-session reset that does not also tear down the user systemd manager. QA also forced the fallback path by masking the user-manager environment (`XDG_RUNTIME_DIR=/nonexistent DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent`): `start` visibly downgraded to `controller mode: nohup`, did not leave `state/controller.unit`, and `status` / `stop` remained backward-compatible.
+
+The important failure: the new systemd stop path did **not** preserve the coder-claimed finalization markers in this QA run. After `desktop-app-forensics.sh stop --log-dir /tmp/desktop-app-forensics-qa-systemd --grace-seconds 5`, `status` showed `controller=inactive`, but `meta/summary.txt` never gained `finished_at=` and the run did not prove a final cleanup snapshot the way the fallback/nohup run did. User-journal evidence for the transient unit showed `systemd[...]: Stopping ...`, `desktop-app-forensics.sh[PID]: Terminated`, and exit status `143`, which suggests the unit was stopped before the trap-driven cleanup fully flushed its final markers. By contrast, the explicit nohup fallback QA run at `/tmp/desktop-app-forensics-qa-fallback` did record `state/stop.requested` **and** `finished_at=` in `meta/summary.txt`. So the hardening claim is only partially certified: launch anchoring is better and fallback UX is acceptable, but the systemd-managed stop/finalization semantics still need tightening before we can say the hardened path fully preserves the intended forensic end markers under normal operator stop. Recommended next step: fix the transient-unit stop behavior so TERM-triggered cleanup reliably writes `finished_at` and the final snapshot before the unit fully exits, then rerun QA on Cookie/Pico.
+
+---
+
+### Task 35: Research a system-scope forensic capture mode above the user desktop stack
+
+**Bead ID:** `oc-cr9`  
+**SubAgent:** `primary` (for `research` workflow role)  
+**Role:** `research`  
+**References:** `REF-01`, `REF-08`, `REF-09`, `REF-10`  
+**Prompt:** Research the smallest truthful escalation from the current systemd-user hardened harness to a system-scope or equivalently host-level capture mode that can survive Cookie's actual X11/desktop session rollover. Derrick has explicitly granted sudo on Pico's terminal for this branch if needed. Focus on how to anchor the controller above the user manager while preserving the existing artifact layout and operator workflow as much as possible.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- shared `workspace/scripts/` and related docs/tests if needed
+
+**Files Created/Deleted/Modified:**
+- plan updates only unless a tiny proof step is required
+
+**Status:** ✅ Complete
+
+**Results:** Research completed and bead `oc-cr9` is ready to close. I inspected the current shared harness at `/home/derrick/.openclaw/workspace/scripts/desktop-app-forensics.sh`, the hardened/audit findings from Tasks 31 and 34, and did one tiny host-safe proof that a system-scope transient unit can be anchored in PID 1 while still running the payload as the target desktop user (`sudo systemd-run --unit oc-forensics-proof-... --uid derrick ...` reported `User=derrick`, `ActiveState=active`, and a `/system.slice/...service` cgroup). Recommended design: add a new explicit system-scope controller mode that keeps the existing `_run`, `meta/`, `logs/`, `state/`, watch patterns, and subcommands, but launches the controller via `sudo systemd-run` in the **system manager** instead of `systemd-run --user`, preferably with `--uid derrick`, `WorkingDirectory=<cwd>`, `KillMode=process`, and a generous `TimeoutStopSec` so the controller can flush `stop.requested`, a final snapshot, and `finished_at=` before systemd finishes stopping it. This is the narrowest truthful escalation because the only thing that materially failed on Cookie was the lifetime anchor: the controller transient unit tied to the **user** manager died at the same crash boundary, while the collector/artifact model itself was already good enough pre-boundary.
+
+The key design choice is **not** a long-lived root wrapper unless later QA proves it is required. A root wrapper supervising separate user collectors would add another orchestration layer, split ownership/permissions, and complicate cleanup/status without evidence that Cookie needs that complexity. A system-scope transient service whose main payload still runs as `derrick` preserves file ownership and most of the current script logic, yet moves the service’s lifecycle above the desktop session and above the user systemd manager. For journal capture in this mode, the smallest safe path is: keep the existing system journal collector, and replace the current `journalctl --user ...` follower with a root-capable or UID-filtered equivalent only when running in system-scope mode (for example `journalctl --since ... -f -o short-iso _UID=<target_uid>` from a privileged helper or from the system unit when allowed), because `journalctl --user` is scoped to the current user manager and is exactly the part most likely to become unreliable across rollover.
+
+Operator caveats: Cookie would invoke this from SSH with `sudo` (for example a new `start --controller-mode system` or auto-selected fallback when explicitly requested); the script should record a new marker such as `state/controller.mode=systemd-system` plus `state/controller.unit`, and `status` / `stop` should prefer plain `systemctl` (system scope) over `systemctl --user` when that marker is present. Unit naming can keep the current `desktop-app-forensics-<epoch>-<pid>.service` convention to preserve operator recognition. Cleanup should remove or tolerate stale `controller.pid` / `controller.unit` the same way the current code does. Because the payload still runs as `derrick`, log dirs under `/home/derrick/Documents/forensics/...` stay writable without a root-owned artifact mess. If launch-cmd support matters in this mode, it should also execute as `derrick` inside the same system service rather than as root. Clear recommendation for `oc-0rb`: implement a **system-manager transient-service mode running as the target user**, not a root wrapper daemon; add explicit mode markers plus system-scope `status` / `stop`; adjust journal collection for the loss of `--user`; and carry forward the existing finalization fixups (`KillMode=process`, longer stop timeout, trap-driven summary flush) so QA can truthfully test survival across Cookie’s real X11 reset boundary.
+
+---
+
+### Task 36: Implement a system-scope forensic capture mode
+
+**Bead ID:** `oc-0rb`  
+**SubAgent:** `primary` (for `coder` workflow role)  
+**Role:** `coder`  
+**References:** `REF-01`, `REF-08`, `REF-09`, `REF-10`  
+**Prompt:** After the research pass identifies the correct root/system-scope escalation, implement the smallest truthful hardening to `workspace/scripts/desktop-app-forensics.sh` so the controller can survive Cookie's actual desktop/session rollover better than the current `systemd-run --user` mode. Preserve backward compatibility and existing artifact conventions where possible, and use sudo only to the minimum extent required.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- shared `workspace/scripts/`
+- shared docs/tests if needed
+
+**Files Created/Deleted/Modified:**
+- owning shared script/docs/test files as required
+
+**Status:** ✅ Complete
+
+**Results:** Coder pass completed and bead `oc-0rb` is ready to close. The shared `workspace/scripts/desktop-app-forensics.sh` now has an explicit system-scope controller mode that preserves the existing `_run` harness, artifact layout, watch-pattern workflow, and `start/status/stop` surface while moving the controller anchor above the user desktop stack when requested. `start` now accepts `--controller-mode auto|user|system|nohup` plus `--controller-user`, launches system mode via `sudo systemd-run` against PID 1 with `--uid <target-user>`, and records explicit markers in `state/controller.mode`, `state/controller.unit`, and `state/controller.user`. The transient-unit launch path now also sets `KillMode=process` and `TimeoutStopSec=30s` for both user and system systemd modes. `status` / `stop` branch by the recorded controller mode so older pid-only/nohup runs still work, user-mode runs still use `systemctl --user`, and system-mode runs use plain `systemctl` via `sudo`.
+
+Journal capture was hardened in the narrowest truthful way for system mode: the harness keeps the existing `logs/journal-system.log` collector and replaces the fragile `journalctl --user` assumption with a system-journal `_UID=<target uid>` follower for `logs/journal-user.log`, so useful per-user journal capture can continue even if the user manager rolls over. Finalization was also tightened by adding an `EXIT` trap on `_run` in addition to `TERM`/`INT`, so the controller now reliably writes `state/stop.requested`, a final polling snapshot, and `finished_at=` during the validated system-mode stop path.
+
+Terminal-safe validation completed on Pico’s host only. `bash -n /home/derrick/.openclaw/workspace/scripts/desktop-app-forensics.sh` passed. `help` output was checked and now documents the new system mode. A no-GUI lifecycle run at `/tmp/desktop-app-forensics-system-138213` successfully started with `controller mode: systemd-system`, wrote `state/controller.mode=systemd-system`, `state/controller.unit=desktop-app-forensics-1778285971-138221.service`, and `state/controller.user=derrick`, reported `controller=active` plus collector pids in `status`, then `stop` returned `Harness stopped cleanly` and a follow-up `status` showed `controller=inactive`. The artifact also truthfully recorded `finished_at=` in `meta/summary.txt`, confirming the stop/finalization path worked in this validated system-scope run. Important caveat kept explicit: this is a terminal-safe anchor/lifecycle validation, not yet a real Cookie stop-playback rollover proof.
+
+---
+
+### Task 37: QA the system-scope forensic capture mode
+
+**Bead ID:** `oc-cny`  
+**SubAgent:** `primary` (for `qa` workflow role)  
+**Role:** `qa`  
+**References:** `REF-01`, `REF-08`, `REF-09`, `REF-10`  
+**Prompt:** Independently verify whether the new system-scope capture mode is actually anchored above the user desktop stack, whether the operator workflow remains usable on Cookie, and what final limits still remain. Be explicit about what is proven by terminal-safe validation versus what still needs a real Cookie stop-playback repro.
 
 **Folders Created/Deleted/Modified:**
 - `.plans/`
