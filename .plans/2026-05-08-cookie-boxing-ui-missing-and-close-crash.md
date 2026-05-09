@@ -1374,6 +1374,94 @@ Likely implementation files for `oc-1qs`: `.testbed/scripts/proving_harness.gd` 
 
 ---
 
+### Task 59: Research the MJPEG producer/consumer throughput mismatch for file-backed preview
+
+**Bead ID:** `oc-l1l5`  
+**SubAgent:** `primary` (for `research` workflow role)  
+**Role:** `research`  
+**References:** `REF-04`, `REF-06`, `REF-10`  
+**Prompt:** Investigate why file-backed proving preview still stalls on the first frame even after the MJPEG overflow-trimming fix. Determine whether the smallest truthful next fix is producer pacing, consumer parse budget, a lower preview frame rate for prerecorded sources, JPEG quality/size reduction, or another narrow throughput control. Treat this as a product-quality feature branch for reliable video-to-MediaPipe proving, not just crash forensics.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- `.testbed/`
+- `src/`
+- `python_mediapipe/` as needed for inspection
+
+**Files Created/Deleted/Modified:**
+- plan updates only unless a tiny proof step is required
+
+**Status:** ✅ Complete
+
+**Results:** Research completed from source/log inspection only; no GUI playback was launched. The most likely bottleneck is now producer-side MJPEG oversupply, not the file-backed source itself and not a simple Godot texture bug. `python_mediapipe/camera_streamer.py` currently sends a multipart JPEG frame every `1ms` regardless of whether a new camera/video frame exists, while `python_mediapipe/main.py` only refreshes `frame_buffer` when the capture loop advances. For prerecorded proving clips, local fixture sampling of Derrick’s 1920x1080 boxing file shows ~`102 KB` average JPEGs at the current `stream_quality=50` (`97-106 KB` across the first 120 frames). Combined with the surviving rerun stat shape (`CameraView Stats: 386205014 bytes, 1 frames` over a 5s window), that points to the stream thread re-sending the same large JPEG hundreds of times per second and burying the Godot consumer in duplicate work before preview can advance. The current consumer still has limits (`OS.delay_msec(5)`, parse budget `2` frames per loop, texture refresh `33ms`), but those are secondary leverage compared with the avoidable producer flood.
+
+Smallest truthful next fix for `oc-w1u6`: pace the MJPEG producer, not the GDScript parser. In `python_mediapipe/camera_streamer.py`, stop writing frames on a blind `1ms` loop; instead send only when a newly encoded frame arrives, and cap that stream to the preview cadence Godot can actually display (roughly the existing `33ms` / ~30 FPS budget, or a nearby explicit preview cap). That is the narrowest fix because it removes duplicate 1080p JPEG traffic at the source, helps both Boxing and Flow prerecorded proving, and should also reduce needless live-preview CPU/bandwidth without changing the tracking/data path. Why this beats the alternatives right now: (1) increasing consumer parse budget in `src/camera_view.gd` would spend more CPU decoding frames the UI still cannot display and still leave the producer free to outrun it, (2) lowering JPEG quality/size helps but does not fix the core duplicate-frame flood, and even quality `20` still samples around `67 KB` per 1080p frame, and (3) a prerecorded-only frame-rate special case is a reasonable follow-up if needed, but the more truthful first control is a shared producer pacing rule in the streamer itself because the current `1ms` resend policy is wasteful for any source. Likely implementation files: `python_mediapipe/camera_streamer.py` first; if a configurable preview cap is desired, a small companion surface in `python_mediapipe/args.py`, `python_mediapipe/main.py`, and `src/autostart_manager.gd` may be warranted. Recommendation for `oc-w1u6`: implement producer-side send-on-new-frame pacing with a preview-rate cap before touching consumer budget or broader MJPEG redesign.
+
+---
+
+### Task 60: Implement the smallest reliable file-backed preview-advance fix
+
+**Bead ID:** `oc-w1u6`  
+**SubAgent:** `primary` (for `coder` workflow role)  
+**Role:** `coder`  
+**References:** `REF-04`, `REF-06`  
+**Prompt:** Based on the approved research result, implement the smallest truthful fix that makes prerecorded proving preview advance reliably beyond the first frame. Prefer the narrowest change that improves real product behavior for video-backed Boxing/Flow proving without broad pipeline redesign.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- `python_mediapipe/`
+
+**Files Created/Deleted/Modified:**
+- `.plans/2026-05-08-cookie-boxing-ui-missing-and-close-crash.md`
+- `python_mediapipe/camera_streamer.py`
+
+**Status:** ✅ Complete
+
+**Results:** Implemented the narrow producer-side pacing fix in `python_mediapipe/camera_streamer.py` without broadening into consumer-budget rewrites. The MJPEG HTTP loop no longer re-sends the same JPEG every `1ms`; each client now waits on a frame-ready condition and only sends when a newly encoded frame arrives. The streamer also now caps preview publication to `30 FPS` (`~33ms`) before publishing a new JPEG, which keeps file-backed and live preview traffic aligned with real display cadence instead of flooding Godot with duplicate multipart frames. Terminal-safe validation only: `python3 -m py_compile python_mediapipe/camera_streamer.py` passed, and a runtime smoke script using `python_mediapipe/assets/runtimes/linux-x64/venv/bin/python3` verified the publish sequence advances on the first frame, does not advance on an immediate duplicate send, then advances again after a `40ms` wait. Manual test steps for Derrick: `1)` open the proving flow that previously stuck on frame 1, `2)` run the MediaPipe Python path with the prerecorded boxing/flow clip you were using for the repro, `3)` confirm the camera preview now visibly advances instead of freezing on the first frame, `4)` leave it running for several seconds and confirm preview motion stays smooth-ish at normal UI cadence rather than bursty/frozen, `5)` if desired, compare the old `CameraView Stats: ... bytes, 1 frames` symptom against the new behavior/logs to confirm the duplicate-frame flood is gone. Landed in the coder commit for this task (`Fix MJPEG preview producer pacing`).
+
+---
+
+### Task 61: QA reliable file-backed preview advancement
+
+**Bead ID:** `oc-tm15`  
+**SubAgent:** `primary` (for `qa` workflow role)  
+**Role:** `qa`  
+**References:** `REF-04`, `REF-06`  
+**Prompt:** Independently verify that file-backed proving preview should now advance reliably in the available validation scope, and that Derrick has a clear operator flow for using prerecorded clips in Boxing/Flow proving as a normal feature.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+
+**Files Created/Deleted/Modified:**
+- plan updates / verification notes only unless a truthful docs correction is required
+
+**Status:** ⏳ Pending
+
+**Results:** Pending.
+
+---
+
+### Task 62: Audit rerun file-backed proving playback as a feature check
+
+**Bead ID:** `oc-lbje`  
+**SubAgent:** `primary` (for `auditor` workflow role)  
+**Role:** `auditor`  
+**References:** `REF-01`, `REF-10`  
+**Prompt:** After the repaired file-backed proving playback reruns on Cookie, audit whether prerecorded video now behaves like a usable proving feature and summarize any remaining defects separately from the wider close-path crash investigation.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- forensic/log dirs only for reading / notes
+
+**Files Created/Deleted/Modified:**
+- plan updates and audit notes only
+
+**Status:** ⏳ Pending
+
+**Results:** Pending.
+
+---
+
 ## Session Handoff / Current Stopping Point
 
 - Derrick confirmed the Boxing proving UI is now visible on both Pico's terminal and Cookie, but the hand-trail branch remains unresolved and should no longer be advanced by theory-only fixes.
