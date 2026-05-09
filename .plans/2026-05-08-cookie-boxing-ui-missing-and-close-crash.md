@@ -997,9 +997,9 @@ Recommended ordered Cookie ladder: (1) add/run a Godot-only editor close path in
 **Files Created/Deleted/Modified:**
 - plan updates / verification notes only unless a truthful docs correction is required
 
-**Status:** ⏳ Pending
+**Status:** ✅ Complete
 
-**Results:** Pending.
+**Results:** Source-only QA pass completed against `REF-04` and `REF-06`; no Godot runtime, GUI control, or playback was used. The new proving-harness comparison control is real but only moderately discoverable: `.testbed/scripts/proving_harness.gd` exports `startup_mode` as an enum (`TRACKING`, `PREVIEW_ONLY_DEBUG`, `GODOT_ONLY_DEBUG`), and both proving scenes bind that script on the root `Control` node while leaving `startup_mode` unset in the `.tscn`, so the scene still defaults to `TRACKING` unless Derrick changes the root-node Inspector property and saves the scene. Truthful Cookie operator path today: open the `.testbed` project in Godot, open `res://scenes/boxing_proving.tscn` (the current `run/main_scene`), select the root node `BoxingProving`, find the exported `startup_mode` property in the Inspector, set it to `GODOT_ONLY_DEBUG`, save the scene, then run the project/scene on Cookie. Source wiring supports that path cleanly: `_enter_tree()` removes the child `AutoStartManager` when `startup_mode == GODOT_ONLY_DEBUG`, and `_ready()` then marks the harness as `Godot-only debug mode active` without starting sidecar/camera/provider. Operator-path verdict: truthful and usable once you know where to click, but not self-documenting yet because there is no dedicated docs note, launcher preset, or scene-level persisted debug variant advertising the setting. Smallest follow-up to make this operator-friendly: add a short repo-local note (README or plan-adjacent operator note) that explicitly says `BoxingProving root node -> Inspector -> startup_mode -> GODOT_ONLY_DEBUG`, or add a dedicated saved debug scene/preset if Derrick wants one-click switching later. Ready-for-run verdict: yes, Cookie can be armed for the first `GODOT_ONLY_DEBUG` comparison run now, but only with that explicit root-node Inspector step; if Derrick skips it, the scene will still run the default `TRACKING` path.
 
 ---
 
