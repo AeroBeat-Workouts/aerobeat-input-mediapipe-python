@@ -1647,9 +1647,11 @@ Validation run locally from this repo: `godot --headless --path .testbed --impor
 **Files Created/Deleted/Modified:**
 - plan updates / verification notes only unless a truthful docs correction is required
 
-**Status:** ⏳ Pending
+**Status:** ✅ Complete
 
-**Results:** Pending.
+**Results:** QA completed against commit `c247339` in terminal-safe scope only; no live Chip GUI/editor rerun was performed. What is now **proven by source + headless validation**: (1) `PREVIEW_ONLY_DEBUG` still exits `_on_server_started()` before `_start_provider()`, so the intended rung remains provider-disabled by construction; (2) the harness now self-audits that contract continuously via `_audit_preview_only_surface()` in `_process()`, surfaces `Preview audit: provider=disabled (expected)` across live/summary/quick-stats/console text, logs `preview_only_provider_disabled` on entry, and marks the rung `INVALID` with `preview_only_invalid` if pose updates, tracking signals, or a live `MediaPipeProvider` node leak into preview-only; (3) preview-only cleanup now actively clears landmarks/trails instead of passively leaving stale overlay state around; and (4) `src/camera_view.gd` now routes both start-time orphan cleanup and normal `stop_stream()` teardown through `_realize_stream_thread(...)`, which unconditionally calls `wait_to_finish()` whenever a thread object exists instead of relying on `is_alive()`. Independent validation evidence: `~/.local/bin/godot --headless --path .testbed --import` passed, and `~/.local/bin/godot --headless --path .testbed --script addons/gut/gut_cmdln.gd -gtest=res://tests/unit/test_proving_harness_trails.gd -gexit` passed `9/9`; the new QA tests explicitly proved default preview-only audit text plus invalidation/overlay-clear behavior for both pose activity and provider-node drift.
+
+What is **not yet proven** without Derrick’s direct Chip truth pass: that the real Chip editor/runtime rerun stays visually provider-free for the whole session, that no `mediapipe_server.gd:59 Buffer full, dropping packets!` family reappears under the actual file-backed repro, and that the old `camera_view.gd ... Thread object is being destroyed without its completion having been realized` warning is truly gone in a live close on Chip rather than only fixed in source. So the current QA verdict is: the rung is now clean/self-auditing enough to justify the next Chip A/B rerun, and the specific thread-cleanup warning confound is removed at source, but only Derrick’s real Chip run can certify runtime cleanliness and whether the host still diverges from Cookie.
 
 ---
 
