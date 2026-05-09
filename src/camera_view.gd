@@ -492,7 +492,10 @@ func _update_texture() -> void:
 	var frame_texture := _frame_texture
 	_frame_mutex.unlock()
 	if frame and frame.get_width() > 0:
-		if frame_texture == null:
+		var needs_recreate := frame_texture == null
+		if not needs_recreate:
+			needs_recreate = frame_texture.get_width() != frame.get_width() or frame_texture.get_height() != frame.get_height()
+		if needs_recreate:
 			frame_texture = ImageTexture.create_from_image(frame)
 			_frame_mutex.lock()
 			_frame_texture = frame_texture

@@ -1196,6 +1196,92 @@ Likely implementation files for `oc-1qs`: `.testbed/scripts/proving_harness.gd` 
 **Files Created/Deleted/Modified:**
 - plan updates and audit notes only
 
+**Status:** ✅ Complete
+
+**Results:** Audited against Derrick’s direct Cookie report as primary truth, with remote shell inspection of the surviving forensics dir (`/home/derrick/Documents/forensics/cookie-godot-stop-playback-preview-only-file-backed-20260508-231127`) used only as corroboration. Actual result: `PREVIEW_ONLY_DEBUG` still crashed / rolled Cookie’s Zorin desktop session even when Derrick deliberately selected a prerecorded boxing clip (`res://assets/fixtures/boxing/punch_left/boxing__punch_left__positive__guard_start_end__take_01.mp4`) instead of using live camera input. That is the first strong comparison proving that **live hardware camera / V4L teardown is not required** for this crash family; `MediaPipeProvider.start()` was already demoted by the earlier connected-preview/no-provider crash, and now live-camera teardown is demoted too. The surviving artifact gives only limited ordering help: it shows the controller started at `23:11:27`, repeated `camera_view.gd:502 @_update_texture(): The new image dimensions must match the texture size.` errors during playback at `23:15:01-23:15:02`, then the final poll shows Derrick’s normal user session gone and only the greeter/Xorg stack surviving. Important confound: unlike the earlier repaired live-preview rung, this artifact slice does **not** preserve a clean close-path ordering line such as `WM_CLOSE_REQUEST` / `stopping server`, and it does not independently prove the selected file path inside the surviving logs, so Derrick’s direct report remains the source of truth for the file-backed selection and the fact of the crash. Classification of the new texture-size mismatch bug: treat it as a **separate newly surfaced bug that is also a plausible causal/confounding factor for this file-backed rung**. It is not enough evidence to restore live camera / V4L as a required trigger, because the crash happened under file-backed playback; but it does prevent a clean claim that the crash is caused by generic connected-preview teardown alone. Best current recommendation: split the matrix into two facts — (1) file-backed `PREVIEW_ONLY_DEBUG` proves the crash can happen without live hardware camera input, and (2) the new texture-resize/render bug must be isolated next before making stronger claims about the exact crash mechanism or promoting file-backed preview to a standard proving path.
+
+---
+
+### Task 51: Research the file-backed preview texture-size mismatch
+
+**Bead ID:** `oc-b2xf`  
+**SubAgent:** `primary` (for `research` workflow role)  
+**Role:** `research`  
+**References:** `REF-04`, `REF-06`, `REF-10`  
+**Prompt:** Investigate the file-backed preview error `camera_view.gd:502 @ _update_texture(): The new image dimensions must match the texture size.` Determine the smallest truthful fix so file-backed proving playback can render without texture-size spam, and explain whether the bug is likely separate from or entangled with the Cookie close-path crash.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- `.testbed/`
+- `src/` as needed for inspection
+
+**Files Created/Deleted/Modified:**
+- plan updates only unless a tiny proof step is required
+
+**Status:** ✅ Complete
+
+**Results:** Source inspection points to a straightforward size-lifecycle bug rather than a mysterious codec problem. In `python_mediapipe/main.py`, the MJPEG streamer is started before capture begins, and `python_mediapipe/camera_streamer.py` serves a synthetic 640x480 placeholder whenever no real frame is buffered yet. In `src/camera_view.gd`, `_ready()` also seeds a 640x480 texture and `_update_texture()` only does two cases: create-once if `_frame_texture == null`, otherwise blindly `frame_texture.update(frame)` (line 502). For file-backed preview, Derrick’s proving clip is 1920x1080, so the first real JPEG can legitimately differ from the initial 640x480 texture. Once that happens, Godot rejects every subsequent `update()` with `The new image dimensions must match the texture size.`, which matches the observed spam pattern exactly. Smallest truthful fix: make `_update_texture()` recreate the `ImageTexture` whenever the incoming frame dimensions differ from the existing texture dimensions, then assign `self.texture` to the recreated texture. That change in `src/camera_view.gd` should be sufficient to make file-backed playback dimension-stable even if startup begins on a placeholder or any future source changes resolution. Optional cleanup later: make `camera_streamer.py` avoid or source-size the placeholder, but that is not required for the minimal rendering fix. Crash relationship: this looks like a separate rendering bug that becomes newly visible on the file-backed rung, and it is a plausible confound/crash contributor because it causes sustained runtime error spam during the same playback session; however, terminal-only evidence is not strong enough to claim it is the root cause of Cookie’s close-path crash. Best reading is: separate bug, likely not the original underlying close-path issue, but worth fixing before using file-backed preview to reason further about crash causality.
+
+---
+
+### Task 52: Implement the file-backed preview texture-size fix
+
+**Bead ID:** `oc-9khz`  
+**SubAgent:** `primary` (for `coder` workflow role)  
+**Role:** `coder`  
+**References:** `REF-04`, `REF-06`  
+**Prompt:** Based on the approved research result, implement the smallest truthful fix for the file-backed preview texture-size mismatch in `camera_view.gd` (and any directly owning support code) so prerecorded video playback renders cleanly in the proving scenes without the current texture-dimension spam.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- `.testbed/`
+- `src/` as required
+
+**Files Created/Deleted/Modified:**
+- `.plans/2026-05-08-cookie-boxing-ui-missing-and-close-crash.md`
+- `src/camera_view.gd`
+
+**Status:** ✅ Complete
+
+**Results:** Implemented the approved minimal fix in `src/camera_view.gd`: `_update_texture()` now recreates the `ImageTexture` whenever the incoming frame dimensions differ from the currently bound texture, and still uses `update()` only for same-size frames. Scope stayed tight to the owning source repo; no placeholder/streamer behavior was widened. Terminal-safe validation only: reviewed the targeted diff and confirmed the change matches the approved oc-b2xf research path without touching consumer mirror copies under assembly repos. QA still needs to rerun the file-backed proving flow / `PREVIEW_ONLY_DEBUG` comparison in the normal verification environment and confirm the prior `The new image dimensions must match the texture size.` spam is gone during prerecorded playback.
+
+---
+
+### Task 53: QA the file-backed preview texture-size fix
+
+**Bead ID:** `oc-n9yk`  
+**SubAgent:** `primary` (for `qa` workflow role)  
+**Role:** `qa`  
+**References:** `REF-04`, `REF-06`  
+**Prompt:** Independently verify that the file-backed preview texture-size fix is wired correctly in the available terminal-safe validation scope, that prerecorded playback should now render without the old size-mismatch spam, and that Derrick has a clear operator path for rerunning the file-backed `PREVIEW_ONLY_DEBUG` comparison.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+
+**Files Created/Deleted/Modified:**
+- plan updates / verification notes only unless a truthful docs correction is required
+
+**Status:** ⏳ Pending
+
+**Results:** Pending.
+
+---
+
+### Task 54: Audit the rerun file-backed PREVIEW_ONLY_DEBUG comparison result
+
+**Bead ID:** `oc-o3i4`  
+**SubAgent:** `primary` (for `auditor` workflow role)  
+**Role:** `auditor`  
+**References:** `REF-01`, `REF-10`  
+**Prompt:** After the repaired file-backed `PREVIEW_ONLY_DEBUG` comparison reruns on Cookie, audit what it proves about the connected-preview close-path crash once the texture-size mismatch bug is removed. Decide whether the crash is now best explained as a generic connected-preview close bug or whether another narrower branch is still needed.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- forensic artifact dirs only for reading / notes
+
+**Files Created/Deleted/Modified:**
+- plan updates and audit notes only
+
 **Status:** ⏳ Pending
 
 **Results:** Pending.
