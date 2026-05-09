@@ -1,9 +1,9 @@
 extends Control
 ## Shared proving harness for live Boxing / Flow detector tuning.
 
-const MediaPipeProvider = preload("res://addons/aerobeat-input-mediapipe-python/src/providers/mediapipe_provider.gd")
-const MediaPipeCameraView = preload("res://addons/aerobeat-input-mediapipe-python/src/camera_view.gd")
-const MediaPipeConfig = preload("res://addons/aerobeat-input-mediapipe-python/src/config/mediapipe_config.gd")
+const MediaPipeProviderScript = preload("res://addons/aerobeat-input-mediapipe-python/src/providers/mediapipe_provider.gd")
+const MediaPipeCameraViewScript = preload("res://addons/aerobeat-input-mediapipe-python/src/camera_view.gd")
+const MediaPipeConfigScript = preload("res://addons/aerobeat-input-mediapipe-python/src/config/mediapipe_config.gd")
 
 const LEFT_WRIST_ID := 15
 const RIGHT_WRIST_ID := 16
@@ -237,7 +237,7 @@ func _start_provider() -> void:
 	if provider != null:
 		return
 
-	provider = MediaPipeProvider.new()
+	provider = MediaPipeProviderScript.new()
 	provider.name = "MediaPipeProvider"
 	provider.config = _build_runtime_config()
 	add_child(provider)
@@ -256,7 +256,7 @@ func _start_provider() -> void:
 		_update_status("Provider failed to start", Color.RED)
 
 func _build_runtime_config() -> MediaPipeConfig:
-	var config := MediaPipeConfig.new()
+	var config := MediaPipeConfigScript.new()
 	config.min_visibility = overlay_visibility_threshold
 	config.track_left_foot = true
 	config.track_right_foot = true
@@ -572,7 +572,7 @@ func _on_tracking_restored() -> void:
 	_record_event("tracking_restored", {})
 
 func _start_camera_feed() -> void:
-	camera_view = MediaPipeCameraView.new()
+	camera_view = MediaPipeCameraViewScript.new()
 	camera_view.name = "CameraView"
 	camera_view.stream_url = "http://127.0.0.1:4243/camera"
 	camera_view.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL

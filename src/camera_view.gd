@@ -18,6 +18,10 @@ signal stream_stopped()
 # Buffer limits for latency control
 const MAX_BUFFER_SIZE := 131072  # 128KB max - larger frames will cause drops
 const MAX_BUFFERED_FRAMES := 2   # Keep at most 2 frames buffered
+const CONNECT_RETRY_TIMEOUT_MS := 6000
+const CONNECT_ATTEMPT_TIMEOUT_MS := 750
+const CONNECT_RETRY_DELAY_MS := 150
+const CONNECT_RETRY_ERROR_CODE := 3
 
 var _tcp: StreamPeerTCP
 var _is_streaming: bool = false
@@ -115,43 +119,7 @@ func start_stream() -> bool:
 	
 	print("[CameraView] Connecting to ", host, ":", port, path)
 	
-	# Use raw TCP instead of HTTPClient
-	_tcp = StreamPeerTCP.new()
-	var err := _tcp.connect_to_host(host, port)
-	print("[CameraView] connect_to_host returned: ", err)
-	
-	if err != OK:
-		push_error("Failed to start connection: " + str(err))
-		_tcp = null
-		_is_starting = false
-		return false
-	
-	# Wait for connection with timeout
-	var timeout := 0.0
-	var status := _tcp.get_status()
-	print("[CameraView] Initial TCP status: ", status)
-	
-	while status == StreamPeerTCP.STATUS_CONNECTING:
-		_tcp.poll()
-		status = _tcp.get_status()
-		timeout += get_process_delta_time()
-		
-		if timeout > 10.0:
-			print("[CameraView] Connection timeout! Status: ", status)
-			push_error("Connection timeout after 10s")
-			_tcp.disconnect_from_host()
-			_tcp = null
-			_is_starting = false
-			return false
-		
-		await get_tree().process_frame
-	
-	print("[CameraView] Final TCP status: ", status)
-	
-	if _tcp.get_status() != StreamPeerTCP.STATUS_CONNECTED:
-		push_error("Failed to connect, status: " + str(_tcp.get_status()))
-		_tcp.disconnect_from_host()
-		_tcp = null
+	if not await _connect_with_retry(host, port):
 		_is_starting = false
 		return false
 	
@@ -189,6 +157,63 @@ func start_stream() -> bool:
 	print("[CameraView] Stream started successfully")
 	return true
 
+func _connect_with_retry(host: String, port: int) -> bool:
+	var deadline_ms := Time.get_ticks_msec() + CONNECT_RETRY_TIMEOUT_MS
+	var last_err := OK
+	var last_status := StreamPeerTCP.STATUS_NONE
+	var attempt := 0
+	
+	while Time.get_ticks_msec() < deadline_ms:
+		attempt += 1
+		last_err = await _attempt_tcp_connect(host, port, attempt)
+		if last_err == OK and _tcp and _tcp.get_status() == StreamPeerTCP.STATUS_CONNECTED:
+			return true
+		
+		last_status = _tcp.get_status() if _tcp else StreamPeerTCP.STATUS_NONE
+		var retryable_error := last_err == CONNECT_RETRY_ERROR_CODE
+		var retryable_status := last_status == StreamPeerTCP.STATUS_ERROR or last_status == StreamPeerTCP.STATUS_CONNECTING
+		if Time.get_ticks_msec() >= deadline_ms or not (retryable_error or retryable_status):
+			break
+		
+		print("[CameraView] Retryable connect failure (err=", last_err, ", status=", last_status, "), retrying...")
+		await get_tree().create_timer(float(CONNECT_RETRY_DELAY_MS) / 1000.0).timeout
+	
+	_cleanup_tcp_peer()
+	if last_err != OK:
+		push_error("Failed to start connection: " + str(last_err))
+	else:
+		push_error("Failed to connect, status: " + str(last_status))
+	return false
+
+func _attempt_tcp_connect(host: String, port: int, attempt: int) -> int:
+	_cleanup_tcp_peer()
+	_tcp = StreamPeerTCP.new()
+	var err := _tcp.connect_to_host(host, port)
+	print("[CameraView] Connect attempt ", attempt, " returned: ", err)
+	if err != OK:
+		return err
+	
+	var status := _tcp.get_status()
+	print("[CameraView] Connect attempt ", attempt, " initial TCP status: ", status)
+	var attempt_deadline_ms := Time.get_ticks_msec() + CONNECT_ATTEMPT_TIMEOUT_MS
+	while _tcp and status == StreamPeerTCP.STATUS_CONNECTING and Time.get_ticks_msec() < attempt_deadline_ms:
+		_tcp.poll()
+		status = _tcp.get_status()
+		if status != StreamPeerTCP.STATUS_CONNECTING:
+			break
+		await get_tree().process_frame
+	
+	if _tcp:
+		_tcp.poll()
+		status = _tcp.get_status()
+		print("[CameraView] Connect attempt ", attempt, " final TCP status: ", status)
+	return OK
+
+func _cleanup_tcp_peer() -> void:
+	if _tcp:
+		_tcp.disconnect_from_host()
+		_tcp = null
+
 func stop_stream() -> void:
 	print("[CameraView] Stopping stream...")
 	
@@ -204,9 +229,7 @@ func stop_stream() -> void:
 			_stream_thread.wait_to_finish()
 		_stream_thread = null
 	
-	if _tcp:
-		_tcp.disconnect_from_host()
-		_tcp = null
+	_cleanup_tcp_peer()
 	
 	visible = false
 	stream_stopped.emit()

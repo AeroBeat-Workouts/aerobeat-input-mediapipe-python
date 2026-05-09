@@ -1018,6 +1018,91 @@ Recommended ordered Cookie ladder: (1) add/run a Godot-only editor close path in
 **Files Created/Deleted/Modified:**
 - plan updates and audit notes only
 
+**Status:** ✅ Complete
+
+**Results:** Updated audit against Derrick’s direct Cookie report as the primary truth: after switching `boxing_proving.tscn` root `startup_mode` first to `GODOT_ONLY_DEBUG` and then to `PREVIEW_ONLY_DEBUG`, running the scene, and closing it, Cookie did **not** crash and the desktop session did **not** roll over in either rung. The new `PREVIEW_ONLY_DEBUG` result proves something narrower and important: the previously observed session-reset family is **not** reproduced by the proving-scene close path when sidecar startup and camera preview are allowed to run but `MediaPipeProvider.start()` is still skipped. That demotes the bare editor/testbed close path **and** the preview-only-without-provider path as sufficient triggers by themselves. What remains ambiguous because of the reported `camera_view.gd:152 @ start_stream(): Failed to connect, status: 3` error is whether the preview rung actually exercised the same live camera-preview/teardown path strongly enough to stand in for a fully connected preview session. Because the preview failed to connect, this rung does **not** cleanly distinguish between: (a) teardown that only becomes dangerous once a real preview stream is established, (b) teardown in `MediaPipeProvider` / detector startup-stop, or (c) a bug that requires both a successful stream connection and provider activity together. The three `GDScript::reload` constant-name warnings are low-severity/editor-noise for this crash audit: relevant to code hygiene, but they do not materially change the branch decision. The stream-connect failure is the high-relevance warning because it weakens the comparison’s isolation power even though the no-crash observation itself is still true. Best next move: **do not skip ahead yet**. Fix or at least warn-clean/understand the preview-only rung enough to get a truthful successful preview connection, then rerun `PREVIEW_ONLY_DEBUG` before advancing to a later rung. Right now the cleanest decision is that no-crash-under-failed-preview is useful but incomplete; the next highest-signal step is to make the preview-only comparison actually connect so the team can tell whether successful preview teardown alone is safe, or whether the remaining suspect narrows further to `MediaPipeProvider` / detector startup-stop.
+
+---
+
+### Task 43: Research the PREVIEW_ONLY_DEBUG connect failure and warning-cleanup scope
+
+**Bead ID:** `oc-u4g`  
+**SubAgent:** `primary` (for `research` workflow role)  
+**Role:** `research`  
+**References:** `REF-04`, `REF-06`, `REF-10`  
+**Prompt:** Investigate why `PREVIEW_ONLY_DEBUG` hit `camera_view.gd:152 @ start_stream(): Failed to connect, status: 3` on Cookie, and identify the smallest truthful fix needed so the preview-only rung exercises a real successful preview path. Also inspect the constant/global-class reload warnings (`MediaPipeProvider`, `MediaPipeCameraView`, `MediaPipeConfig`) and identify the smallest hygiene cleanup that removes the noise without broad refactors.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- `.testbed/`
+- owning source files as needed for inspection
+
+**Files Created/Deleted/Modified:**
+- plan updates only unless a tiny proof step is required
+
+**Status:** ✅ Complete
+
+**Results:** Research completed from source/log inspection only; no GUI playback was launched. The preview connect failure is most likely a startup-readiness race, not a wrong URL/path and not a provider-only issue. In both `.testbed/scripts/proving_harness.gd` and `.testbed/scripts/test_scene.gd`, `_on_server_started()` treats `AutoStartManager.server_started` like a ready-to-connect signal, then attempts `camera_view.start_stream()` almost immediately (`1.5s` in proving harness after the signal; `2.0s` in test_scene). But `src/autostart_manager.gd` emits `server_started` as soon as the detached Python process is spawned and heartbeat starts, before its own later stabilization wait finishes. The captured logs line up with that race exactly: Godot attempts TCP connect to `127.0.0.1:4243` and `camera_view.gd` reports `Failed to connect, status: 3` while the harness still shows `server=starting`; only afterward do later lines show the sidecar/provider reaching their running state. The Python side also initializes the Pose Landmarker before enabling MJPEG streaming in `python_mediapipe/main.py`, so the HTTP preview endpoint can legitimately lag process spawn by multiple seconds. Smallest truthful implementation direction for `oc-p78`: do not paper over this with a bigger fixed sleep. Add a bounded readiness retry around the actual MJPEG connect path so preview mode only reports success after a real connection is established. The narrowest high-value place is `src/camera_view.gd:start_stream()`: when `connect_to_host()` / `get_status()` lands in error state `3`, recreate the TCP peer and retry for a short bounded window before failing. That is one shared source file and truthfully upgrades both the proving harness and `test_scene.gd` to wait for the real HTTP stream instead of assuming the sidecar process spawn means the stream is live. If Derrick wants even stricter signal semantics later, a follow-up could also move `AutoStartManager.server_started` later or add a dedicated stream-ready signal, but that is larger than needed for the current rung. Warning-cleanup research: the `GDScript::reload` noise is caused by `.testbed/scripts/proving_harness.gd` locally preloading scripts into constants with the exact same names as the registered global classes (`MediaPipeProvider`, `MediaPipeCameraView`, `MediaPipeConfig`). The smallest hygiene cleanup is to stop shadowing those class names there — either rename the three local constants to non-class names such as `MediaPipeProviderScript` / `MediaPipeCameraViewScript` / `MediaPipeConfigScript`, or remove those preloads entirely and instantiate the global classes directly. For the scoped Cookie repro noise, only `proving_harness.gd` needs this cleanup; no broad repo-wide rename is required. Likely implementation files for `oc-p78`: `src/camera_view.gd` for the truthful preview-connect retry, plus `.testbed/scripts/proving_harness.gd` for the warning cleanup. Optional parity-only follow-up if desired later: mirror the same explicit success/failure handling style in `.testbed/scripts/test_scene.gd`, but that is not required for the proving-harness comparison rung once `camera_view.gd` is made retry-capable.
+
+---
+
+### Task 44: Implement the PREVIEW_ONLY_DEBUG fix and warning cleanup
+
+**Bead ID:** `oc-p78`  
+**SubAgent:** `primary` (for `coder` workflow role)  
+**Role:** `coder`  
+**References:** `REF-04`, `REF-06`  
+**Prompt:** Based on the approved research result, implement the smallest truthful change set that (1) makes `PREVIEW_ONLY_DEBUG` exercise a successful preview connection instead of failing with `status: 3`, and (2) cleans up the constant/global-class reload warnings. Keep the comparison ladder intact and avoid broad refactors.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- `.testbed/`
+- owning source files as required
+
+**Files Created/Deleted/Modified:**
+- only the minimum files required by the approved fix
+
+**Status:** ✅ Complete
+
+**Results:** Implemented the smallest shared-source fix in `src/camera_view.gd` plus the narrow proving-harness warning cleanup in `.testbed/scripts/proving_harness.gd`. `start_stream()` no longer assumes the first TCP attempt is definitive: it now runs a bounded retry/readiness loop (6s overall window, short per-attempt connect wait, peer recreated between attempts) and specifically retries the observed `status: 3` / connect-error-`3` failure path before surfacing a final error. That keeps the preview-only rung truthful without adding a guessed harness sleep and automatically benefits both the proving harness and `test_scene.gd`, since both rely on the shared camera view. The proving harness cleanup only renamed the three colliding preload constants to `*Script` aliases and updated the local `.new()` callsites, removing the class-name shadowing that caused the `GDScript::reload` warning noise. Terminal-safe validation completed: `~/.local/bin/godot --headless --path .testbed --check-only --script scripts/proving_harness.gd` exited `0`, and a dedicated headless retry probe with a delayed local TCP listener reproduced repeated `status: 3` attempts and then succeeded once the listener became available, proving the new retry path can turn the previous failed-preview timing window into a successful preview connection. Remaining QA / Derrick rerun: execute the repaired `PREVIEW_ONLY_DEBUG` rung on Cookie in the real editor/runtime path to confirm the preview now connects truthfully there and to re-check whether close/stop remains no-crash under a genuinely connected preview session.
+
+---
+
+### Task 45: QA the repaired PREVIEW_ONLY_DEBUG rung and warning cleanup
+
+**Bead ID:** `oc-60d`  
+**SubAgent:** `primary` (for `qa` workflow role)  
+**Role:** `qa`  
+**References:** `REF-04`, `REF-06`  
+**Prompt:** Independently verify that `PREVIEW_ONLY_DEBUG` is now wired to a truthful successful preview path in source/runtime expectations, that the warning cleanup is real, and that Derrick has a clear operator path for rerunning the Cookie comparison. Be explicit about what still needs Derrick’s direct Cookie repro.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+
+**Files Created/Deleted/Modified:**
+- plan updates / verification notes only unless a truthful docs correction is required
+
+**Status:** ⏳ Pending
+
+**Results:** Pending.
+
+---
+
+### Task 46: Audit the rerun PREVIEW_ONLY_DEBUG comparison result and decide the next rung
+
+**Bead ID:** `oc-68b`  
+**SubAgent:** `primary` (for `auditor` workflow role)  
+**Role:** `auditor`  
+**References:** `REF-01`, `REF-08`, `REF-09`, `REF-10`  
+**Prompt:** After the repaired `PREVIEW_ONLY_DEBUG` comparison reruns on Cookie, audit what it actually proves about preview teardown versus provider/detector teardown, and decide whether the next strongest rung is full `TRACKING` with file-backed input or a different narrower branch.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- forensic artifact dirs only for reading / notes
+
+**Files Created/Deleted/Modified:**
+- plan updates and audit notes only
+
 **Status:** ⏳ Pending
 
 **Results:** Pending.
@@ -1039,8 +1124,11 @@ Recommended ordered Cookie ladder: (1) add/run a Godot-only editor close path in
 - Crash-forensics branch is also active:
   - `oc-a8h` armed the first Cookie host-local harness and `oc-73r` audited the result
   - that first capture was useful only as a pre-crash slice; it did not survive long enough to capture the actual stop-playback desktop reset boundary
+  - close-path comparison ladder update: both `GODOT_ONLY_DEBUG` and `PREVIEW_ONLY_DEBUG` now have direct no-crash/no-session-rollover reports from Derrick on Cookie
+  - the `PREVIEW_ONLY_DEBUG` rung is still partially ambiguous because editor output also reported `camera_view.gd:152 @ start_stream(): Failed to connect, status: 3`, so successful preview-stream teardown has **not** been isolated yet
   - next required improvement is a systemd-hardened detached capture mode that survives a GNOME/Xorg desktop-session reset better
   - hardened harness branch is active: `oc-30v` research, `oc-8pl` implementation, `oc-dn7` QA
+  - recommended next repro before skipping ahead: make the preview-only rung connect truthfully, then rerun that rung so preview teardown vs provider teardown can be separated cleanly
 - Important new truth from this session: Pico's own Zorin GUI also crashed twice during risky local GUI-coupled work, and host journal evidence showed an actual session-reset family with `Connection to xwayland lost`, `Xwayland terminated, exiting since it was mandatory`, and `Xwayland exited unexpectedly`.
 - Therefore next session should avoid unsafe local live GUI proving on Pico's host and prioritize:
   1. systemd-hardened crash capture on Cookie / potentially Pico host too
