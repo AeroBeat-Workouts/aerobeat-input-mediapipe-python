@@ -49,6 +49,10 @@ Follow-up research tightened that further: the screenshot is not the proving har
 | `REF-15` | Derrick constraint: AeroBeat uses a 16:9 aspect ratio, so proving/test scenes should compose correctly for that target too | current session |
 | `REF-16` | Derrick screenshot showing overlay registration and mirror mismatch in the now-correct Boxing proving scene: landmarks/skeleton do not align to the mirrored webcam view, and left/right handedness appears visually reversed | `/home/derrick/.openclaw/workspace/.temp/nerve-uploads/2026/05/08/image-4607f58a.png` |
 | `REF-17` | Derrick screenshot showing the hand-trail raycast bug persists even while fists remain in frame; out-of-frame clearing helps, but in-bounds giant diagonal slashes still occur | `/home/derrick/.openclaw/workspace/.temp/nerve-uploads/2026/05/08/image-35404133.png` |
+| `REF-18` | 2026-05-09 handoff: connected preview stops crashing when normal sidecar stop-on-close is skipped; shutdown path is now the prime suspect cluster | `/home/derrick/.openclaw/workspace/memory/2026-05-09.md` |
+| `REF-19` | Today’s execution constraint: use `ssh chip` as the crash sandbox, verify the remote repo/deps first, and let Derrick recover the GUI locally after each crash if needed | current session |
+| `REF-20` | Active close-path isolation toggle in proving harness / AutoStartManager | `/home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-input-mediapipe-python/.testbed/scripts/proving_harness.gd` + `/home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-input-mediapipe-python/src/autostart_manager.gd` |
+| `REF-21` | Chip console warning snapshot showing packet-backlog and stream-thread cleanup warnings during the dirty second-half rerun | `/home/derrick/.openclaw/workspace/.temp/nerve-uploads/2026/05/09/image-0bb3a3de.png` |
 
 ---
 
@@ -1511,45 +1515,217 @@ Smallest truthful next fix for `oc-w1u6`: pace the MJPEG producer, not the GDScr
 
 ---
 
-## Session Handoff / Current Stopping Point
+### Task 65: Research Chip crash-sandbox test flow and current shutdown-path target
 
-- Derrick confirmed the Boxing proving UI is now visible on both Pico's terminal and Cookie, but the hand-trail branch remains unresolved and should no longer be advanced by theory-only fixes.
-- New explicit rule from this session: subagent claims are not enough on GUI-sensitive branches without deterministic artifacts or exact-path visual proof.
-- Two new recorded boxing videos now exist as candidate fixtures and should become the first deterministic proving-validation inputs:
-  - `.testbed/assets/fixtures/boxing/punch_left/boxing__punch_left__positive__guard_start_end__take_01.mp4`
-  - `.testbed/assets/fixtures/boxing/punch_right/boxing__punch_right__positive__guard_start_end__take_01.mp4`
-  - matching candidate fixture YAMLs were created and partially filled from Derrick's metadata
-- Deterministic validation branch is active:
-  - `oc-9wd` research completed: existing videos + durable logs + screenshotable rendered output is the right primitive
-  - `oc-b10` implementation is/was in flight at stop time
-  - `oc-amo` QA remains pending behind that implementation
-- Crash-forensics branch is also active:
-  - `oc-a8h` armed the first Cookie host-local harness and `oc-73r` audited the result
-  - that first capture was useful only as a pre-crash slice; it did not survive long enough to capture the actual stop-playback desktop reset boundary
-  - close-path comparison ladder update: `GODOT_ONLY_DEBUG` still has Derrick’s direct no-crash/no-session-rollover result on Cookie, but repaired `PREVIEW_ONLY_DEBUG` now has the opposite result: a direct crash / desktop-session-rollover report from Derrick after a **successful** connected preview run
-  - the successful-preview rerun removes the old connect-failure ambiguity: successful camera-preview teardown is now isolated as sufficient for the session-reset family, and `MediaPipeProvider.start()` is no longer required to trigger it
-  - next required comparison is narrower than full tracking: keep `PREVIEW_ONLY_DEBUG` and swap to file-backed camera input so live camera / V4L teardown can be separated from generic connected-preview teardown
-  - hardened harness branch already paid off here because the surviving system-scope artifact captured the close-order boundary and post-crash session state
-  - recommended next repro: rerun the same `PREVIEW_ONLY_DEBUG` rung with `AEROBEAT_MEDIAPIPE_CAMERA_SOURCE` set to a prerecorded boxing fixture before reintroducing provider/tracking behavior
-- Important new truth from this session: Pico's own Zorin GUI also crashed twice during risky local GUI-coupled work, and host journal evidence showed an actual session-reset family with `Connection to xwayland lost`, `Xwayland terminated, exiting since it was mandatory`, and `Xwayland exited unexpectedly`.
-- Therefore next session should avoid unsafe local live GUI proving on Pico's host and prioritize:
-  1. systemd-hardened crash capture on Cookie / potentially Pico host too
-  2. deterministic video-driven proving validation using the new prerecorded boxing fixtures
-  3. only then return to trail/overlay behavior using artifact-backed evidence rather than webcam-only live retests
+**Bead ID:** `oc-3j3t`
+**SubAgent:** `primary` (for `research` workflow role)
+**Role:** `research`
+**References:** `REF-18`, `REF-19`, `REF-20`
+**Prompt:** Re-enter the crash branch from the 2026-05-09 handoff, but adapt it to today’s execution model on Chip. Confirm the sharpest current hypothesis, the minimum environment checks needed on the remote host before any repro, and the safest highest-signal comparison order now that Derrick can locally recover Chip’s GUI after each crash.
 
-## Final Results
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- forensic/log notes only as needed
 
-**Status:** ⏳ Pending
+**Files Created/Deleted/Modified:**
+- plan updates only unless a tiny truth-revealing note is required
 
-**What We Built:** Pending.
+**Status:** ✅ Complete
 
-**Reference Check:** Pending.
+**Results:** Research completed and bead `oc-3j3t` should close. The sharpest current shutdown-path hypothesis is no longer just “sidecar involvement”; it is the **normal AutoStartManager close-time stop sequence itself**, especially the synchronous Linux teardown cluster that only runs when sidecar stop-on-close is enabled: `DesktopSidecarLauncher.terminate_sync()` (TERM then KILL against the whole process group) followed immediately by repo-level cleanup kills (`pkill -9 -f python_mediapipe/main.py`, and in the async path also `pkill -9 -f main.py` plus `fuser -k -9 /dev/video0`). That cluster is reached from `WM_CLOSE_REQUEST` / `EXIT_TREE` / `PREDELETE`, while the proving harness otherwise keeps the same connected-preview playback surface. The decisive evidence remains the 2026-05-09 handoff truth: connected preview stayed the same, but when `skip_sidecar_stop_on_close_debug=true` bypassed that normal close-time stop path, Cookie stopped crashing. So the prime suspect family is the **specific shutdown behavior inside AutoStartManager / launcher cleanup**, not preview existence, not MediaPipeProvider startup, and not live camera hardware as a requirement.
 
-**Commits:**
-- Pending
+Minimum pre-repro Chip checks should stay narrow and mechanical before risking any GUI reset: (1) confirm the remote repo is on or ahead of commit `e719624` and still contains the close-path toggle plus the file-backed proving fixes (`git rev-parse --short HEAD`, `git merge-base --is-ancestor e719624 HEAD`); (2) confirm the active `.testbed` addon copy matches the owning source for `src/autostart_manager.gd` so Chip will actually run the shutdown-isolation code path under test; (3) confirm the prepared sidecar runtime exists on Chip by running the resolved runtime Python and importing `mediapipe`, plus verify the required model asset file exists; and (4) confirm Chip really has a live GUI/X11 session available for a human repro (`loginctl show-user derrick`, active `DISPLAY`, and no stale leftover `python_mediapipe/main.py` before launch). Those checks are enough to avoid wasting a crash pass on stale code, missing deps, or a dead desktop session.
 
-**Lessons Learned:** Pending.
+Safest highest-signal comparison order on Chip is now an **A/B on one variable only** using the cleanest already-proven repro surface: Boxing proving scene, `startup_mode=PREVIEW_ONLY_DEBUG`, prerecorded/file-backed source selected, and the close done normally via the window manager. First run the file-backed preview rung with `skip_sidecar_stop_on_close_debug=true` as the non-crashing hypothesis baseline; if Chip still crashes there, the hypothesis weakens immediately or Chip introduces a new confound. Then, with everything else unchanged, flip only `skip_sidecar_stop_on_close_debug=false` and rerun the exact same file-backed `PREVIEW_ONLY_DEBUG` close. That is the highest-signal first comparison because it preserves the connected-preview repro surface while toggling only the suspected shutdown path. Only after that A/B should today’s branch widen into finer shutdown sequencing (for example deferred stop vs immediate stop inside `AutoStartManager`) if Chip reproduces the same no-crash/crash split as Cookie.
 
 ---
 
-*Completed on Pending*
+### Task 66: Prepare Chip aerobeat-input-mediapipe-python workspace and dependencies for crash testing
+
+**Bead ID:** `oc-dlcg`
+**SubAgent:** `primary` (for `coder` workflow role)
+**Role:** `coder`
+**References:** `REF-18`, `REF-19`, `REF-20`
+**Prompt:** Using `ssh chip`, verify that Chip’s `aerobeat-input-mediapipe-python` checkout is up to date enough for the current crash branch, ensure the local testbed/addon copy and Python-side dependencies are present, and leave the remote workspace ready for repeated crash repros without unsafe guesswork.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- remote Chip repo/runtime paths as required
+
+**Files Created/Deleted/Modified:**
+- remote repo/runtime files only as required by truthful prep
+
+**Status:** ✅ Complete
+
+**Results:** Chip remote prep completed directly over `ssh chip`. The owning repo is on commit `e719624` (`Add close-path isolation toggle for preview crash repro`), so the latest shutdown-path isolation work from last night is present. The proving testbed still points `run/main_scene` at `res://scenes/boxing_proving.tscn`, the prerecorded boxing fixtures and pose models are present, the testbed addon mirror matches the owning `src/autostart_manager.gd` and `src/camera_view.gd`, and the embedded Python runtime successfully imports `cv2`, `mediapipe`, and `numpy`. Chip also has a working Godot launcher at `~/.local/bin/godot` (`4.6.2`). One important ops gap showed up: Chip’s shared `desktop-app-forensics.sh` was still the stale nohup-only version, so it was refreshed from the current workspace copy before crash work continued. Another useful harness truth surfaced during prep: on Chip, system-scope capture must be started as `derrick` and allowed to escalate internally; wrapping the entire start command in `sudo` made the log dir root-owned and caused the controller to die on permission errors. The corrected system-scope harness is now armed successfully at `/home/derrick/Documents/forensics/chip-godot-stop-playback-20260509-141721` with active unit `desktop-app-forensics-1778350641-546248.service`. Minor caveat kept explicit: a headless `--check-only` compile path still reports existing `MediaPipeProvider`-adjacent parse issues, so GUI/editor truth on Chip should remain the primary launch surface for today’s repros rather than over-trusting headless parse-only checks.
+
+---
+
+### Task 67: Run Chip crash-path comparison tests and capture results
+
+**Bead ID:** `oc-i58l`
+**SubAgent:** `primary` (for `qa` workflow role)
+**Role:** `qa`
+**References:** `REF-18`, `REF-19`, `REF-20`
+**Prompt:** Once Chip is prepared, run the next highest-signal shutdown-path comparisons from the active crash matrix on Chip, keeping the repro surface safe for Pico’s local machine. Record exactly which rung was tested, whether preview connected, whether close crashed the GUI, and what logs/artifacts survive after Derrick restores the desktop session.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- remote Chip repo/runtime paths and forensic artifact dirs as needed
+
+**Files Created/Deleted/Modified:**
+- plan updates and repro notes only unless tiny capture glue is required
+
+**Status:** ⏳ Pending
+
+**Results:** Partial progress on Chip: Derrick ran the Boxing proving scene with the `punch_left` prerecorded boxing fixture, `startup_mode = PREVIEW_ONLY_DEBUG`, and `skip_sidecar_stop_on_close_debug = true`, observed the MediaPipe skeleton overlay during video playback, and then closed the scene normally **without** triggering a Zorin GUI crash. That is a high-signal first-half A/B confirmation on Chip: connected preview + active overlay/video playback still appears safe when the normal sidecar stop-on-close path is bypassed. Derrick then reran the exact same host/rung with only `skip_sidecar_stop_on_close_debug` flipped back to `false`. Important confound on this second-half run: the prerecorded video was not visually rendering, the skeleton initially tracked, then later stopped updating before close, with console-error spam reported during the run. Derrick’s console snapshot explains the likely wedge: `mediapipe_server.gd:59 @ _process(): Buffer full, dropping packets!` plus `camera_view.gd:247 @ stop_stream(): A Thread object is being destroyed without its completion having been realized. Please call wait_to_finish() on it to ensure correct cleanup.` When Derrick closed playback, **Chip still did not crash**. So Chip currently does **not** reproduce the clean Cookie-style shutdown crash on this exact comparison ladder. That weakens the simple host-agnostic "normal sidecar stop-on-close always crashes" theory and promotes a narrower branch: Chip likely hit a local packet-backlog / stream-thread cleanup defect that degraded the run before close, so the next comparison should distinguish host-specific crash differences from this newly surfaced buffer/thread confound.
+
+---
+
+### Task 68: Audit Chip crash-test results and recommend next shutdown isolation step
+
+**Bead ID:** `oc-v2uv`
+**SubAgent:** `primary` (for `auditor` workflow role)
+**Role:** `auditor`
+**References:** `REF-18`, `REF-19`, `REF-20`
+**Prompt:** Audit the first Chip-hosted crash-test results against the current close-path-shutdown hypothesis. Decide what the run actually proves, whether the Chip environment introduces any new confounds, and what the next smallest shutdown-path isolation step should be.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- forensic/log dirs only for reading / notes
+
+**Files Created/Deleted/Modified:**
+- plan updates and audit notes only
+
+**Status:** ✅ Complete
+
+**Results:** Auditor pass completed from plan evidence plus source inspection only. The first-half Chip run still supports the earlier Cookie truth cut: file-backed connected preview with `skip_sidecar_stop_on_close_debug=true` closed cleanly, so bypassing the normal AutoStartManager stop path remains a meaningful non-crash baseline. But the second-half Chip run does **not** truthfully falsify the Cookie shutdown hypothesis yet, because Chip appears to have fallen off the intended clean `PREVIEW_ONLY_DEBUG` repro surface before close. The strongest source-grounded clue is the reported `mediapipe_server.gd:59 @ _process(): Buffer full, dropping packets!` warning: in the current proving harness, a real `PREVIEW_ONLY_DEBUG` run returns from `_on_server_started()` **before** `_start_provider()`, so `MediaPipeProvider` / `MediaPipeServer` should never be alive there at all. If that warning is real on the active runtime, then the second Chip pass was not actually the same provider-disabled rung anymore, or the runtime drifted onto a path where provider/server activity re-entered. That alone is enough to demote the second-half no-crash result as a shutdown-comparison proof.
+
+The other reported warning is also source-actionable and likely contributes to the dirty close surface: `camera_view.gd:247 @ stop_stream(): A Thread object is being destroyed without its completion having been realized...`. Current `src/camera_view.gd` says it should always wait, but it still only calls `wait_to_finish()` when `_stream_thread.is_alive()`. In Godot, a finished thread object still needs `wait_to_finish()` before destruction, so this is a real cleanup bug in the current source and a plausible reason Chip’s close path is not matching Cookie’s earlier cleaner crash presentations.
+
+Probable mechanism ranking for Chip now: (1) the second run was not a pure `PREVIEW_ONLY_DEBUG`/provider-disabled repro anymore, likely because the active scene/runtime settings drifted; (2) once provider/server was active, Chip hit a separate packet-backlog state before close, which changed playback into a degraded/shutdown-different condition; (3) the current `CameraView` thread-join bug further muddies teardown by leaving a stream-thread cleanup warning at close. The narrowest next Chip-only branch is therefore **not** deeper AutoStartManager kill sequencing yet. First restore a clean file-backed `PREVIEW_ONLY_DEBUG` surface on Chip by tightening only the repro-surface integrity points: (a) in `.testbed/scripts/proving_harness.gd`, make `PREVIEW_ONLY_DEBUG` self-auditing by loudly surfacing `provider=disabled`, clearing/hiding landmark-trail overlays, and warning if a provider/server ever becomes active; (b) in `src/camera_view.gd`, always realize the stream thread with `wait_to_finish()` whenever `_stream_thread` exists during stop/teardown, not only when `is_alive()` is true; and (c) before the next Chip rerun, verify the active scene/addon hashes and root-node `startup_mode` so the rung is truly provider-free. After that, rerun the exact same Chip A/B (`skip_sidecar_stop_on_close_debug=true` then `false`) on the file-backed preview rung and reject the run as invalid if any provider/server buffer warning or overlay/provider activity appears. Only if that cleaned repro still diverges from Cookie should the branch widen back into finer AutoStartManager shutdown sequencing.
+
+---
+
+### Task 69: Implement clean Chip PREVIEW_ONLY_DEBUG surface and camera thread teardown
+
+**Bead ID:** `oc-sw7t`
+**SubAgent:** `primary` (for `coder` workflow role)
+**Role:** `coder`
+**References:** `REF-18`, `REF-20`, `REF-21`
+**Prompt:** Implement the smallest truthful fix set that restores a clean Chip-only `PREVIEW_ONLY_DEBUG` file-backed repro surface before more crash comparisons. Scope should stay tight: make `PREVIEW_ONLY_DEBUG` self-auditing enough that provider activity/overlay drift becomes obvious or invalid, and fix the `camera_view.gd` stream-thread teardown so the thread object is always properly realized before destruction.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- `.testbed/`
+- `src/`
+
+**Files Created/Deleted/Modified:**
+- `.testbed/scripts/proving_harness.gd`
+- `.testbed/tests/unit/test_proving_harness_trails.gd`
+- `src/camera_view.gd`
+
+**Status:** ✅ Complete
+
+**Results:** Landed the smallest repo-owned cleanup needed to make Chip's `PREVIEW_ONLY_DEBUG` rung self-auditing again before more crash comparisons. In `.testbed/scripts/proving_harness.gd`, preview-only mode now explicitly records and surfaces that the provider is expected to stay disabled, includes preview audit state in the live/debug/console surfaces, clears landmark + trail overlays continuously on that rung, and marks the rung `INVALID` with a logged `preview_only_invalid` event if provider/pose/tracking activity leaks back in. That makes REF-18/REF-20 drift visible instead of silently presenting a misleading skeleton overlay. In `src/camera_view.gd`, stream teardown now realizes any existing thread object via `wait_to_finish()` through a single helper on both startup cleanup and `stop_stream()`, so the finished-thread destruction warning called out in REF-21 no longer relies on `is_alive()` being true at destruction time. Added targeted GUT coverage in `.testbed/tests/unit/test_proving_harness_trails.gd` for the new preview-only audit/invalidation behavior.
+
+Validation run locally from this repo: `godot --headless --path .testbed --import` ✅ and `godot --headless --path .testbed --script addons/gut/gut_cmdln.gd -gtest=res://tests/unit/test_proving_harness_trails.gd -gexit` ✅ (9/9 passed).
+
+---
+
+### Task 70: QA clean Chip PREVIEW_ONLY_DEBUG surface before rerun
+
+**Bead ID:** `oc-zex2`
+**SubAgent:** `primary` (for `qa` workflow role)
+**Role:** `qa`
+**References:** `REF-18`, `REF-20`, `REF-21`
+**Prompt:** Independently verify in the available terminal-safe scope that the cleaned `PREVIEW_ONLY_DEBUG` rung is actually provider-free/self-auditing enough for Chip reruns and that the camera stream thread cleanup is fixed tightly enough to remove the current shutdown warning confound.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+
+**Files Created/Deleted/Modified:**
+- plan updates / verification notes only unless a truthful docs correction is required
+
+**Status:** ⏳ Pending
+
+**Results:** Pending.
+
+---
+
+### Task 71: Audit cleaned Chip rerun and decide next crash branch
+
+**Bead ID:** `oc-6gfl`
+**SubAgent:** `primary` (for `auditor` workflow role)
+**Role:** `auditor`
+**References:** `REF-18`, `REF-20`, `REF-21`
+**Prompt:** After the cleaned Chip rerun lands, audit whether the repro surface was finally clean enough to trust and decide whether the shutdown-path crash family reappears on Chip or whether a host-specific difference still dominates.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- forensic/log dirs only for reading / notes
+
+**Files Created/Deleted/Modified:**
+- plan updates and audit notes only
+
+**Status:** ⏳ Pending
+
+**Results:** Pending.
+
+---
+
+## Session Handoff / Current Stopping Point
+
+- Tonight’s biggest product win: prerecorded proving playback is now a real feature path instead of a frozen stub.
+  - Boxing/Flow proving scenes can now select prerecorded clips through the shared Inspector file-picker `prerecorded_video_source`.
+  - File-backed preview now advances visibly and loops correctly after the producer-pacing / file-FPS fix in `python_mediapipe/main.py`.
+- Important crash-forensics breakthrough: the final one-shot close-path isolation toggle (`skip_sidecar_stop_on_close_debug`) prevented the Cookie GUI/session crash when enabled.
+  - Same connected preview during playback.
+  - Different close-time teardown behavior.
+  - Derrick’s direct result: **with sidecar stop on close skipped, Cookie did not crash**.
+  - That is now the sharpest truth cut in the whole branch and strongly implicates the AutoStartManager / sidecar shutdown path on close as the prime suspect cluster.
+- Current crash matrix after tonight:
+  - `GODOT_ONLY_DEBUG` → no crash
+  - connected `PREVIEW_ONLY_DEBUG` → crash
+  - connected `PREVIEW_ONLY_DEBUG` + file-backed source → crash
+  - connected preview + `skip_sidecar_stop_on_close_debug=true` → **no crash**
+- What this now rules out strongly:
+  - bare Godot/editor close as sufficient
+  - `MediaPipeProvider.start()` as required
+  - live camera / V4L teardown as required
+  - texture-size mismatch as the primary cause
+- What remains product-side but separate from the crash:
+  - file-backed preview is now usable and loops, but should still be treated as newly landed feature work that may want polish/docs later
+- Important local-host rule carried forward:
+  - avoid risky live GUI proving on Pico’s own machine; the session-reset/Xwayland family was reproduced locally earlier in the night and local GUI work should stay minimized unless explicitly needed
+- Exact next-session starting point:
+  1. begin from the close-time sidecar shutdown path, not from broad crash theories
+  2. compare narrower shutdown behaviors inside `AutoStartManager` / proving close path (immediate stop vs deferred stop vs heartbeat-only stop and any specific kill/cleanup calls)
+  3. keep using file-backed proving as the cleaner repro surface while pursuing that shutdown-sequence isolation
+
+## Final Results
+
+**Status:** ⚠️ Partial
+
+**What We Built:**
+- A working file-backed prerecorded proving path for Boxing/Flow scenes, including Inspector-based clip selection and visibly advancing/looping preview playback.
+- A system-scope forensics harness strong enough to survive the rollover boundary.
+- A one-shot close-path isolation toggle that produced the night’s decisive non-crash result.
+
+**Reference Check:**
+- `REF-04` / `REF-06`: satisfied for the file-backed proving feature work and proving-harness/source-owned changes.
+- `REF-10`: satisfied for the crash-forensics comparisons and active-plan traceability.
+
+**Commits:**
+- `47698a0` - `Fix file-backed preview playback pacing`
+- `e719624` - `Add close-path isolation toggle for preview crash repro`
+- plus earlier same-session support commits already recorded above for video-source selection, preview readiness, warning cleanup, and crash-harness hardening.
+
+**Lessons Learned:**
+- Treat prerecorded proving playback as a first-class product feature, not just a debugging convenience.
+- The strongest crash-isolation progress came from changing one teardown variable while keeping playback constant.
+- For GUI-sensitive branches, Derrick’s direct observation remains the ground truth; subagent/source/headless work should be used to sharpen the next human repro, not replace it.
+
+---
+
+*Completed on 2026-05-09*

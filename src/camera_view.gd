@@ -103,10 +103,8 @@ func start_stream() -> bool:
 
 	# Clean up any orphaned thread from a previous failed attempt
 	if _stream_thread:
-		if _stream_thread.is_alive():
-			_thread_running = false
-			_stream_thread.wait_to_finish()
-		_stream_thread = null
+		_thread_running = false
+		_realize_stream_thread("start cleanup")
 
 	print("[CameraView] Starting stream from: ", stream_url)
 
@@ -239,12 +237,9 @@ func stop_stream() -> void:
 	_is_streaming = false
 	_is_starting = false
 
-	# Always wait for thread if it exists - don't check flags
+	# Always realize thread completion if an object exists, even if the worker already stopped
 	if _stream_thread:
-		print("[CameraView] Waiting for stream thread to finish...")
-		if _stream_thread.is_alive():
-			_stream_thread.wait_to_finish()
-		_stream_thread = null
+		_realize_stream_thread("stop_stream")
 
 	_cleanup_tcp_peer()
 
@@ -254,6 +249,13 @@ func stop_stream() -> void:
 
 func is_streaming() -> bool:
 	return _is_streaming
+
+func _realize_stream_thread(context: String) -> void:
+	if _stream_thread == null:
+		return
+	print("[CameraView] Realizing stream thread completion (", context, ")...")
+	_stream_thread.wait_to_finish()
+	_stream_thread = null
 
 func _update_flip_material() -> void:
 	"""Update the material to apply horizontal flip if enabled."""

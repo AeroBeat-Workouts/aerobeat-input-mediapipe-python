@@ -129,6 +129,8 @@ var _event_counts: Dictionary = {}
 var _last_event_payloads: Dictionary = {}
 var _last_event_timestamps_ms: Dictionary = {}
 var _last_console_snapshot := ""
+var _preview_only_invalid_reason := ""
+var _preview_only_invalid_logged := false
 
 func _enter_tree() -> void:
 	if startup_mode != StartupMode.GODOT_ONLY_DEBUG:
@@ -185,6 +187,9 @@ func _setup_auto_start() -> void:
 func _process(_delta: float) -> void:
 	_frame_count += 1
 
+	if _is_preview_only_mode():
+		_audit_preview_only_surface()
+
 	if _frame_count % 60 == 0 and auto_start_manager and auto_start_manager.server_pid > 0:
 		if not auto_start_manager.is_server_running():
 			_update_status("Python server died", Color.RED)
@@ -223,11 +228,11 @@ func _on_server_started(pid: int) -> void:
 
 	if startup_mode == StartupMode.PREVIEW_ONLY_DEBUG:
 		_server_ready = true
-		_update_status("Preview-only debug mode active", Color.GREEN)
-		if landmark_drawer:
-			landmark_drawer.clear_landmarks()
-		if trail_drawer:
-			trail_drawer.clear_trails()
+		_preview_only_invalid_reason = ""
+		_preview_only_invalid_logged = false
+		_clear_preview_only_overlay_state()
+		_record_event("preview_only_provider_disabled", {"mode": _mode_name(), "source": _camera_source_compact_text()})
+		_update_status("Preview-only debug mode active (provider disabled)", Color.GREEN)
 		return
 
 	_start_provider()
@@ -307,6 +312,10 @@ func _connect_flow_signal(signal_name: String) -> void:
 	)
 
 func _on_pose_updated(landmarks: Array) -> void:
+	if _is_preview_only_mode():
+		_invalidate_preview_only_surface("pose/provider activity reached preview-only rung")
+		return
+
 	_latest_landmarks = landmarks.duplicate(true)
 	_latest_state = provider.get_detector_state() if provider != null else {}
 
@@ -565,6 +574,10 @@ func _find_landmark(landmarks: Array, landmark_id: int) -> Dictionary:
 	return {}
 
 func _on_tracking_lost() -> void:
+	if _is_preview_only_mode():
+		_invalidate_preview_only_surface("tracking_lost signal reached preview-only rung")
+		return
+
 	_update_status("Tracking lost", Color.ORANGE)
 	_record_event("tracking_lost", {})
 	_left_trail.clear()
@@ -575,6 +588,10 @@ func _on_tracking_lost() -> void:
 		trail_drawer.clear_trails()
 
 func _on_tracking_restored() -> void:
+	if _is_preview_only_mode():
+		_invalidate_preview_only_surface("tracking_restored signal reached preview-only rung")
+		return
+
 	_update_status("Tracking restored", Color.GREEN)
 	_record_event("tracking_restored", {})
 
@@ -602,12 +619,18 @@ func _start_camera_feed() -> void:
 		_record_event("camera_stream_failed", {})
 
 func _refresh_debug_panels() -> void:
-	live_status_label.text = _build_live_status_text()
-	quick_stats_label.text = _build_quick_stats_text()
-	summary_label.text = _build_summary_text()
-	signal_status_label.text = _build_signal_text()
-	metrics_label.text = _build_metrics_text()
-	events_label.text = _build_events_text()
+	if live_status_label:
+		live_status_label.text = _build_live_status_text()
+	if quick_stats_label:
+		quick_stats_label.text = _build_quick_stats_text()
+	if summary_label:
+		summary_label.text = _build_summary_text()
+	if signal_status_label:
+		signal_status_label.text = _build_signal_text()
+	if metrics_label:
+		metrics_label.text = _build_metrics_text()
+	if events_label:
+		events_label.text = _build_events_text()
 
 func _build_live_status_text() -> String:
 	var state: Dictionary = _latest_state
@@ -615,13 +638,14 @@ func _build_live_status_text() -> String:
 	var pose_count := int(provider.get_num_poses()) if provider != null else 0
 	var last_event_name := _latest_event_name()
 	var last_event_age := _last_seen_text(last_event_name) if last_event_name != "" else "never"
-	return "Live | mode=%s srv=%s cam=%s src=%s track=%s poses=%d last=%s %s" % [
+	return "Live | mode=%s srv=%s cam=%s src=%s track=%s poses=%d audit=%s last=%s %s" % [
 		_get_startup_mode_label(),
 		_server_status_text(),
 		_camera_status_text("on", "off"),
 		_camera_source_compact_text(),
 		tracking_state,
 		pose_count,
+		_preview_only_audit_text(),
 		(last_event_name if last_event_name != "" else "none"),
 		last_event_age,
 	]
@@ -649,6 +673,7 @@ func _build_quick_stats_text() -> String:
 		"Source: %s" % _camera_source_summary_text(),
 		"Tracking: %s" % _tracking_status_text(state),
 		"Poses: %d" % pose_count,
+		"Preview audit: %s" % _preview_only_audit_text(),
 		"Visible landmarks: %d" % visible_landmarks,
 		"Head confidence: %s" % _fmt_float(confidences.get("head", 0.0)),
 		"L hand confidence: %s" % _fmt_float(confidences.get("left_hand", 0.0)),
@@ -689,6 +714,7 @@ func _build_summary_text() -> String:
 		"Startup: %s" % _get_startup_mode_label(),
 		"Video source: %s" % _camera_source_summary_text(),
 		"Tracking state: %s" % _tracking_status_text(state),
+		"Preview audit: %s" % _preview_only_audit_text(),
 		"Baseline calibrated: %s" % str(bool(baseline.get("is_calibrated", false))),
 		"Baseline frames: %d" % int(baseline.get("sample_frames", 0)),
 		"Shoulder width: %s" % _fmt_float(measurements.get("shoulder_width", 0.0)),
@@ -991,7 +1017,7 @@ func _reset_event_tracking() -> void:
 	_event_counts = {}
 	_last_event_payloads = {}
 	_last_event_timestamps_ms = {}
-	for event_name: String in BOXING_EVENT_ORDER + FLOW_EVENT_ORDER + ["provider_started", "tracking_lost", "tracking_restored", "camera_stream_failed", "server_failed"]:
+	for event_name: String in BOXING_EVENT_ORDER + FLOW_EVENT_ORDER + ["provider_started", "tracking_lost", "tracking_restored", "camera_stream_failed", "server_failed", "preview_only_provider_disabled", "preview_only_invalid"]:
 		_event_counts[event_name] = 0
 
 func _format_attack_signal_row(event_name: String, ready_map: Dictionary, guard_suppressed: bool) -> String:
@@ -1047,7 +1073,7 @@ func _build_console_snapshot() -> String:
 	var metrics: Dictionary = state.get("metrics", {})
 	var measurements: Dictionary = metrics.get("measurements", {})
 	var gesture_states: Dictionary = state.get("gesture_states", {})
-	var base := "[ProvingHarness][%s] mode=%s status=%s server=%s camera=%s source=%s poses=%d" % [
+	var base := "[ProvingHarness][%s] mode=%s status=%s server=%s camera=%s source=%s poses=%d preview=%s" % [
 		_mode_name(),
 		_get_startup_mode_label(),
 		_tracking_status_text(state),
@@ -1055,6 +1081,7 @@ func _build_console_snapshot() -> String:
 		_camera_status_text("streaming", "offline"),
 		_camera_source_compact_text(),
 		(int(provider.get_num_poses()) if provider != null else 0),
+		_preview_only_audit_text(),
 	]
 	if harness_mode == HarnessMode.BOXING:
 		if trail_debug_logging:
@@ -1165,14 +1192,15 @@ func _camera_status_text(active_label: String, inactive_label: String) -> String
 func _tracking_status_text(state: Dictionary) -> String:
 	if startup_mode == StartupMode.GODOT_ONLY_DEBUG:
 		return "disabled"
-	if startup_mode == StartupMode.PREVIEW_ONLY_DEBUG and provider == null:
-		return "preview_only"
+	if startup_mode == StartupMode.PREVIEW_ONLY_DEBUG:
+		return "invalid" if not _preview_only_invalid_reason.is_empty() else "preview_only"
 	return String(state.get("tracking_state", &"lost"))
 
 func _update_status(text: String, color: Color) -> void:
 	var source_suffix := " | src=%s" % _camera_source_compact_text()
-	status_label.text = text + source_suffix
-	status_label.modulate = color
+	if status_label:
+		status_label.text = text + source_suffix
+		status_label.modulate = color
 	print("[ProvingHarness][%s] %s%s" % [_mode_name(), text, source_suffix])
 
 func _notification(what: int) -> void:
@@ -1183,6 +1211,45 @@ func _notification(what: int) -> void:
 	elif what == NOTIFICATION_EXIT_TREE or what == NOTIFICATION_PREDELETE:
 		print("[ProvingHarness][%s] Scene teardown notification=%d" % [_mode_name(), what])
 		_stop_everything()
+
+func _is_preview_only_mode() -> bool:
+	return startup_mode == StartupMode.PREVIEW_ONLY_DEBUG
+
+func _preview_only_audit_text() -> String:
+	if not _is_preview_only_mode():
+		return "n/a"
+	if not _preview_only_invalid_reason.is_empty():
+		return "INVALID: %s" % _preview_only_invalid_reason
+	return "provider=disabled (expected)"
+
+func _audit_preview_only_surface() -> void:
+	if not _is_preview_only_mode():
+		return
+	_clear_preview_only_overlay_state()
+	if provider != null or get_node_or_null("MediaPipeProvider") != null:
+		_invalidate_preview_only_surface("provider node active in preview-only rung")
+
+func _invalidate_preview_only_surface(reason: String) -> void:
+	if not _is_preview_only_mode():
+		return
+	var normalized_reason := reason.strip_edges()
+	if normalized_reason.is_empty():
+		normalized_reason = "provider activity detected"
+	_preview_only_invalid_reason = normalized_reason
+	_clear_preview_only_overlay_state()
+	if not _preview_only_invalid_logged:
+		_preview_only_invalid_logged = true
+		_record_event("preview_only_invalid", {"reason": normalized_reason})
+	_update_status("INVALID preview-only debug: %s" % normalized_reason, Color.RED)
+
+func _clear_preview_only_overlay_state() -> void:
+	_latest_landmarks = []
+	_left_trail.clear()
+	_right_trail.clear()
+	if landmark_drawer:
+		landmark_drawer.clear_landmarks()
+	if trail_drawer:
+		trail_drawer.clear_trails()
 
 func _stop_everything() -> void:
 	print("[ProvingHarness][%s] Stopping harness resources" % _mode_name())

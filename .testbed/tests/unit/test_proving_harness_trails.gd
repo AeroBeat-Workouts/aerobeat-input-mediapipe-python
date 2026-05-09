@@ -7,6 +7,10 @@ var harness: ProvingHarness = null
 func before_each() -> void:
 	harness = ProvingHarness.new()
 	harness.overlay_visibility_threshold = 0.35
+	harness._reset_last_flow_events()
+	harness._reset_event_tracking()
+	harness._left_trail_debug = harness._make_trail_debug_state("left")
+	harness._right_trail_debug = harness._make_trail_debug_state("right")
 
 func _debug_state(side: String = "test") -> Dictionary:
 	return harness._make_trail_debug_state(side)
@@ -84,3 +88,30 @@ func test_out_of_bounds_point_still_clears_trail() -> void:
 	assert_eq(trail.size(), 0)
 	assert_eq(int(debug_state.get("out_of_bounds_clears", 0)), 1)
 	assert_eq(String(debug_state.get("last_action", "")), "clear_oob")
+
+func test_preview_only_audit_defaults_to_provider_disabled() -> void:
+	harness.startup_mode = harness.StartupMode.PREVIEW_ONLY_DEBUG
+	assert_eq(harness._preview_only_audit_text(), "provider=disabled (expected)")
+	assert_true(harness._build_live_status_text().contains("audit=provider=disabled (expected)"))
+
+func test_preview_only_pose_activity_invalidates_surface_and_clears_overlay_state() -> void:
+	harness.startup_mode = harness.StartupMode.PREVIEW_ONLY_DEBUG
+	harness._latest_landmarks = [{"id": 15, "x": 0.25, "y": 0.40, "v": 0.99}]
+	harness._left_trail = [{"x": 0.25, "y": 0.40, "v": 0.99, "timestamp_ms": 1000}]
+	harness._right_trail = [{"x": 0.75, "y": 0.40, "v": 0.99, "timestamp_ms": 1000}]
+	harness._on_pose_updated([{"id": 16, "x": 0.75, "y": 0.40, "v": 0.99}])
+	assert_eq(harness._preview_only_invalid_reason, "pose/provider activity reached preview-only rung")
+	assert_eq(harness._event_count("preview_only_invalid"), 1)
+	assert_eq(harness._latest_landmarks.size(), 0)
+	assert_eq(harness._left_trail.size(), 0)
+	assert_eq(harness._right_trail.size(), 0)
+	assert_true(harness._preview_only_audit_text().contains("INVALID:"))
+
+func test_preview_only_provider_node_drift_invalidates_surface() -> void:
+	harness.startup_mode = harness.StartupMode.PREVIEW_ONLY_DEBUG
+	var drift_node := Node.new()
+	drift_node.name = "MediaPipeProvider"
+	harness.add_child(drift_node)
+	harness._audit_preview_only_surface()
+	assert_eq(harness._preview_only_invalid_reason, "provider node active in preview-only rung")
+	assert_eq(harness._event_count("preview_only_invalid"), 1)
