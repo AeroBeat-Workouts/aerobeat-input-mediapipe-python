@@ -1175,9 +1175,9 @@ Likely implementation files for `oc-1qs`: `.testbed/scripts/proving_harness.gd` 
 **Files Created/Deleted/Modified:**
 - plan updates / verification notes only unless a truthful docs correction is required
 
-**Status:** ⏳ Pending
+**Status:** ✅ Complete
 
-**Results:** Pending.
+**Results:** QA completed with terminal-safe source/headless validation only; no visible Godot editor or local GUI playback was launched. The new Inspector-first UX is real in both proving scenes and is understandable once the operator is on the root node: headless scene probes confirmed both `boxing_proving.tscn` and `flow_proving.tscn` still instantiate, both roots (`BoxingProving`, `FlowProving`) expose the exported `prerecorded_video_source` property from the shared `proving_harness.gd`, and both default to empty scene override / `startup_mode=TRACKING`. Source + headless runtime checks also confirmed the intended precedence contract in `src/autostart_manager.gd`: with no overrides the active camera source resolves to live default `"0"`; with `AEROBEAT_MEDIAPIPE_CAMERA_SOURCE` set it resolves to the env-selected file; and when the scene sets `prerecorded_video_source`, that scene value wins over the env override and is surfaced back by the harness summary as `scene override: res://...`. Operator flow is therefore clear enough to arm Derrick without adding a new in-scene dropdown: open `.testbed`, open either `res://scenes/boxing_proving.tscn` or `res://scenes/flow_proving.tscn`, select the root proving node, set Inspector `prerecorded_video_source` to the desired clip (for example under `.testbed/assets/...`), optionally set `startup_mode=PREVIEW_ONLY_DEBUG` for the crash-isolation rung, save, then run. Important scope limit: this QA pass proves the shared wiring, discoverability location, and Boxing/Flow parity at source/headless level, but it does not prove the literal Inspector feel in a human-driven editor session, does not prove successful playback of a chosen file on Cookie, and does not yet prove the file-backed `PREVIEW_ONLY_DEBUG` close-path result. Net QA decision: yes, the feature is ready to arm Cookie for the file-backed comparison rung, but only with the explicit operator caveat that the control lives on the proving-scene root node in the Inspector and remains default-live unless Derrick deliberately sets and saves it.
 
 ---
 
