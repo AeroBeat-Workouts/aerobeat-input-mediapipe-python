@@ -82,7 +82,14 @@ enum HarnessMode {
 	FLOW,
 }
 
+enum StartupMode {
+	TRACKING,
+	PREVIEW_ONLY_DEBUG,
+	GODOT_ONLY_DEBUG,
+}
+
 @export var harness_mode: HarnessMode = HarnessMode.BOXING
+@export var startup_mode: StartupMode = StartupMode.TRACKING
 @export var scene_title := "Detector Proving Harness"
 @export_multiline var scene_notes := ""
 @export var overlay_visibility_threshold := 0.35
@@ -121,6 +128,14 @@ var _last_event_payloads: Dictionary = {}
 var _last_event_timestamps_ms: Dictionary = {}
 var _last_console_snapshot := ""
 
+func _enter_tree() -> void:
+	if startup_mode != StartupMode.GODOT_ONLY_DEBUG:
+		return
+	var auto_start_node := get_node_or_null("AutoStartManager")
+	if auto_start_node != null:
+		remove_child(auto_start_node)
+		auto_start_node.queue_free()
+
 func _ready() -> void:
 	title_label.text = scene_title
 	notes_label.text = scene_notes
@@ -134,7 +149,11 @@ func _ready() -> void:
 	_reset_last_flow_events()
 	_reset_event_tracking()
 	_update_status("Initializing...", Color.WHITE)
-	_setup_auto_start()
+	if startup_mode == StartupMode.GODOT_ONLY_DEBUG:
+		_server_ready = true
+		_update_status("Godot-only debug mode active", Color.GREEN)
+	else:
+		_setup_auto_start()
 	_refresh_debug_panels()
 
 func _setup_auto_start() -> void:
@@ -194,6 +213,16 @@ func _on_server_started(pid: int) -> void:
 	_update_status("Python server started (PID %d)" % pid, Color.GREEN)
 	await get_tree().create_timer(1.5).timeout
 	await _start_camera_feed()
+
+	if startup_mode == StartupMode.PREVIEW_ONLY_DEBUG:
+		_server_ready = true
+		_update_status("Preview-only debug mode active", Color.GREEN)
+		if landmark_drawer:
+			landmark_drawer.clear_landmarks()
+		if trail_drawer:
+			trail_drawer.clear_trails()
+		return
+
 	_start_provider()
 
 func _on_server_failed(error: String) -> void:
@@ -575,13 +604,14 @@ func _refresh_debug_panels() -> void:
 
 func _build_live_status_text() -> String:
 	var state: Dictionary = _latest_state
-	var tracking_state := String(state.get("tracking_state", &"lost"))
+	var tracking_state := _tracking_status_text(state)
 	var pose_count := int(provider.get_num_poses()) if provider != null else 0
 	var last_event_name := _latest_event_name()
 	var last_event_age := _last_seen_text(last_event_name) if last_event_name != "" else "never"
-	return "Live | srv=%s cam=%s track=%s poses=%d last=%s %s" % [
-		("ready" if _server_ready else "starting"),
-		("on" if camera_view and camera_view.is_streaming() else "off"),
+	return "Live | mode=%s srv=%s cam=%s track=%s poses=%d last=%s %s" % [
+		_get_startup_mode_label(),
+		_server_status_text(),
+		_camera_status_text("on", "off"),
 		tracking_state,
 		pose_count,
 		(last_event_name if last_event_name != "" else "none"),
@@ -605,9 +635,10 @@ func _build_quick_stats_text() -> String:
 		"Quick stats",
 		"==========",
 		"Mode: %s" % _mode_name(),
-		"Server: %s" % ("ready" if _server_ready else "starting"),
-		"Camera: %s" % ("streaming" if camera_view and camera_view.is_streaming() else "offline"),
-		"Tracking: %s" % String(state.get("tracking_state", &"lost")),
+		"Startup: %s" % _get_startup_mode_label(),
+		"Server: %s" % _server_status_text(),
+		"Camera: %s" % _camera_status_text("streaming", "offline"),
+		"Tracking: %s" % _tracking_status_text(state),
 		"Poses: %d" % pose_count,
 		"Visible landmarks: %d" % visible_landmarks,
 		"Head confidence: %s" % _fmt_float(confidences.get("head", 0.0)),
@@ -646,7 +677,8 @@ func _build_summary_text() -> String:
 		"Overview",
 		"========",
 		"Harness: %s" % scene_title,
-		"Tracking state: %s" % String(state.get("tracking_state", &"lost")),
+		"Startup: %s" % _get_startup_mode_label(),
+		"Tracking state: %s" % _tracking_status_text(state),
 		"Baseline calibrated: %s" % str(bool(baseline.get("is_calibrated", false))),
 		"Baseline frames: %d" % int(baseline.get("sample_frames", 0)),
 		"Shoulder width: %s" % _fmt_float(measurements.get("shoulder_width", 0.0)),
@@ -1005,11 +1037,12 @@ func _build_console_snapshot() -> String:
 	var metrics: Dictionary = state.get("metrics", {})
 	var measurements: Dictionary = metrics.get("measurements", {})
 	var gesture_states: Dictionary = state.get("gesture_states", {})
-	var base := "[ProvingHarness][%s] status=%s server=%s camera=%s poses=%d" % [
+	var base := "[ProvingHarness][%s] mode=%s status=%s server=%s camera=%s poses=%d" % [
 		_mode_name(),
-		String(state.get("tracking_state", &"lost")),
-		("ready" if _server_ready else "starting"),
-		("streaming" if camera_view and camera_view.is_streaming() else "offline"),
+		_get_startup_mode_label(),
+		_tracking_status_text(state),
+		_server_status_text(),
+		_camera_status_text("streaming", "offline"),
 		(int(provider.get_num_poses()) if provider != null else 0),
 	]
 	if harness_mode == HarnessMode.BOXING:
@@ -1066,6 +1099,32 @@ func _fmt_vec3(value: Variant) -> String:
 	if value is Vector3:
 		return "(%.3f, %.3f, %.3f)" % [value.x, value.y, value.z]
 	return "(0.000, 0.000, 0.000)"
+
+func _get_startup_mode_label() -> String:
+	match startup_mode:
+		StartupMode.PREVIEW_ONLY_DEBUG:
+			return "Preview-only debug"
+		StartupMode.GODOT_ONLY_DEBUG:
+			return "Godot-only debug"
+		_:
+			return "Tracking"
+
+func _server_status_text() -> String:
+	if startup_mode == StartupMode.GODOT_ONLY_DEBUG:
+		return "disabled"
+	return "ready" if _server_ready else "starting"
+
+func _camera_status_text(active_label: String, inactive_label: String) -> String:
+	if startup_mode == StartupMode.GODOT_ONLY_DEBUG:
+		return "disabled"
+	return active_label if camera_view and camera_view.is_streaming() else inactive_label
+
+func _tracking_status_text(state: Dictionary) -> String:
+	if startup_mode == StartupMode.GODOT_ONLY_DEBUG:
+		return "disabled"
+	if startup_mode == StartupMode.PREVIEW_ONLY_DEBUG and provider == null:
+		return "preview_only"
+	return String(state.get("tracking_state", &"lost"))
 
 func _update_status(text: String, color: Color) -> void:
 	status_label.text = text
