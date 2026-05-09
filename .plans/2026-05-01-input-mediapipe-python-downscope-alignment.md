@@ -1,7 +1,7 @@
 # aerobeat-input-mediapipe-python
 
 **Date:** 2026-05-01  
-**Status:** Ready for QA Recheck  
+**Status:** Audit Passed / Complete  
 **Agent:** Chip 🐱‍💻
 
 ---
@@ -88,7 +88,7 @@ The target truth stayed narrow: **camera-only official gameplay input**, **Boxin
 
 ## Final Results
 
-**Status:** ⚠️ Ready for QA Recheck
+**Status:** ✅ Complete
 
 **What We Built:**
 A truthful, repo-localized current-path pass for `aerobeat-input-mediapipe-python` that now also survives the previously failing QA rerun: docs and metadata still describe the repo as the official current AeroBeat v1 PC camera input path; the repo-local `.testbed` resolves local assets instead of stale machine-specific paths; the authoritative GUT suite is green again; and the runtime-prep helper/documentation now describes and performs a repeatable fresh Linux rerun instead of silently treating a scaffold-only runtime as ready.
@@ -205,6 +205,82 @@ The repo-local testbed path and Python sidecar path are materially improved and 
   - 29 tests, 29 passing, 0 failing
 - Implementation commit: `6ccda5d` (`Fix QA rerun gaps for MediaPipe runtime and GUT suite`)
 - Plan/history update commit follows immediately after this rerun record
+
+## QA Recheck (2026-05-01, independent rerun after QA-fix pass)
+
+**QA status:** ✅ Pass
+
+**What QA independently re-verified:**
+- Downscoped truth alignment in `README.md`, `plugin.cfg`, and `.testbed/addons.jsonc` against the locked AeroBeat docs: **PC community first**, **camera-only official gameplay input**, and **Boxing + Flow** as the retained v1 gameplay features.
+- Repo-local GodotEnv restore from `.testbed/addons.jsonc`, including truthful addon mounting for this repo and sibling `aerobeat-input-core`.
+- Runtime contract/help text in `python_mediapipe/prepare_runtime.py` and `src/runtime/desktop_sidecar_runtime.gd`, specifically the canonical fresh-rerun flow using `--install-requirements --validate`.
+- Python validation surfaces: `py_compile`, `python_mediapipe/test_filter.py`, and `python_mediapipe/test_runner.py` against `.testbed/assets/videos/boxing.mp4`.
+- Godot headless smoke for the repo-local `.testbed/`.
+- The authoritative repo-local GUT suite under `.testbed/tests/`.
+
+**QA rerun results:**
+- ✅ `cd .testbed && godotenv addons install`
+  - restored `aerobeat-input-mediapipe-python`, `aerobeat-input-core`, and `gut` successfully
+- ✅ Addon paths resolve locally and truthfully:
+  - `.testbed/addons/aerobeat-input-mediapipe-python -> /home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-input-mediapipe-python`
+  - `.testbed/addons/aerobeat-input-core -> /home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-input-core`
+- ✅ Fresh runtime failure path is now truthful and repeatable:
+  - `rm -rf python_mediapipe/assets/runtimes/linux-x64 && python3 python_mediapipe/prepare_runtime.py --platform linux-x64 --mode dev --validate`
+  - exits non-zero and reports `Runtime python executable is missing .../venv/bin/python`
+- ✅ Fresh runtime repair/success path is now truthful and repeatable:
+  - `python3 python_mediapipe/prepare_runtime.py --platform linux-x64 --mode dev --install-requirements --validate`
+  - recreates the runtime venv, installs `python_mediapipe/requirements.txt`, and exits successfully
+- ✅ `python3 -m py_compile python_mediapipe/*.py`
+- ✅ `python_mediapipe/assets/runtimes/linux-x64/venv/bin/python python_mediapipe/test_filter.py`
+- ✅ `python_mediapipe/assets/runtimes/linux-x64/venv/bin/python python_mediapipe/test_runner.py --video .testbed/assets/videos/boxing.mp4 --output .testbed/test_report.qa-recheck.json`
+  - produced `frames_processed=941/941`
+  - `achieved_fps≈59.3`
+  - `avg_latency_ms≈15.91`
+  - `detection_rate≈0.744`
+- ✅ `~/.local/bin/godot --headless --path .testbed --quit-after 2`
+  - runtime resolved, dependencies/model asset reported ready, and the testbed booted successfully
+  - still emits the pre-existing `ObjectDB instances leaked at exit` teardown warning
+- ✅ `~/.local/bin/godot --headless --path .testbed --script addons/gut/gut_cmdln.gd -gdir=res://tests -ginclude_subdirs -gexit`
+  - 29 tests, 29 passing, 0 failing
+  - process teardown still prints intermittent Linux process-group warning noise inside `test_mediapipe_process.gd`, but the suite remains green
+
+**Remaining QA caveats (non-blocking for this bead):**
+1. Headless `.testbed` smoke still prints `ObjectDB instances leaked at exit` during teardown.
+2. `test_mediapipe_process.gd` exercises can still emit intermittent Linux process-group teardown warnings even though the authoritative suite passes.
+
+## Auditor Final Check (2026-05-01, independent truth-check)
+
+**Audit status:** ✅ Pass
+
+**What the audit independently re-verified:**
+- Locked docs truth still matches the repo story: official v1 gameplay is **camera only**, retained gameplay features are **Boxing + Flow**, and release sequencing is **PC community first**.
+- Repo truth surfaces are aligned: `README.md`, `plugin.cfg`, `.testbed/addons.jsonc`, `python_mediapipe/prepare_runtime.py`, and `src/runtime/desktop_sidecar_runtime.gd` all present the repaired current-path contract consistently.
+- Fresh runtime behavior is now honest and repeatable:
+  - `rm -rf python_mediapipe/assets/runtimes/linux-x64 && python3 python_mediapipe/prepare_runtime.py --platform linux-x64 --mode dev --validate`
+  - correctly exits non-zero with `Runtime python executable is missing .../venv/bin/python`
+  - `python3 python_mediapipe/prepare_runtime.py --platform linux-x64 --mode dev --install-requirements --validate`
+  - recreates the runtime venv, installs requirements, and validates successfully
+- Python-side validation reran successfully:
+  - `python3 -m py_compile python_mediapipe/*.py`
+  - `python_mediapipe/assets/runtimes/linux-x64/venv/bin/python python_mediapipe/test_filter.py`
+  - `python_mediapipe/assets/runtimes/linux-x64/venv/bin/python python_mediapipe/test_runner.py --video .testbed/assets/videos/boxing.mp4 --output .testbed/test_report.audit.json`
+  - audit rerun produced `frames_processed=941/941`, `Avg FPS≈50.8`, `Avg Latency≈18.49ms`, `Detection Rate≈0.744`
+- Godot-side validation reran successfully:
+  - `~/.local/bin/godot --headless --path .testbed --quit-after 2`
+  - `~/.local/bin/godot --headless --path .testbed --script addons/gut/gut_cmdln.gd -gdir=res://tests -ginclude_subdirs -gexit`
+  - authoritative GUT suite passed at `29/29`
+- Repo cleanliness is acceptable for closure:
+  - `git status --short` shows only this repo-local plan file modified for the QA/audit history update
+  - generated runtime/test artifacts remain ignored; no stray `.uid` or source-file dirt was introduced by the audit rerun
+
+**Audit judgment on remaining warnings:**
+1. `ObjectDB instances leaked at exit` appears only during headless teardown after successful boot and does not correspond to a failing validation surface in this bead.
+2. The intermittent Linux process-group teardown warning in `test_mediapipe_process.gd` occurs alongside a green authoritative suite (`29/29`) and did not block process start/stop assertions from passing.
+
+These warnings are real and worth future cleanup, but they are **not blocking** for this bead because the requested truth fixes were about current-path honesty, authoritative test health, repeatable runtime prep, and repo-local validation integrity — all of which now pass.
+
+**Closure action:**
+- Closed bead `aerobeat-input-mediapipe-python-2x0` with an audit-passed reason citing the truthful runtime contract, green authoritative suite, aligned repo surfaces, and non-blocking warning status.
 
 ---
 
