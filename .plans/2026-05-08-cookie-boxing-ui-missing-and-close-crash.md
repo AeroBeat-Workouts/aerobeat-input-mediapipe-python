@@ -1462,6 +1462,31 @@ Smallest truthful next fix for `oc-w1u6`: pace the MJPEG producer, not the GDScr
 
 ---
 
+### Task 63: Implement preview cadence/uniqueness instrumentation and the smallest fix for file-backed playback
+
+**Bead ID:** `oc-cnid`  
+**SubAgent:** `primary` (for `coder` workflow role)  
+**Role:** `coder`  
+**References:** `REF-04`, `REF-06`, `REF-10`  
+**Prompt:** Instrument the Godot preview-consumer/display path enough to determine whether file-backed preview is actually advancing unique frames at too-low cadence versus staying visually pinned to the first presented frame, then implement the smallest truthful fix that makes prerecorded proving preview visibly advance like a usable feature. Keep scope tight and skip the separate QA/audit loop because Derrick will manually verify on Cookie.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- `.testbed/`
+- `src/`
+- `python_mediapipe/` as required
+
+**Files Created/Deleted/Modified:**
+- `.plans/2026-05-08-cookie-boxing-ui-missing-and-close-crash.md`
+- `python_mediapipe/main.py`
+- `src/camera_view.gd`
+
+**Status:** ✅ Complete
+
+**Results:** Implemented the smallest truthful file-backed preview fix plus direct cadence instrumentation. The root cause turned out to be stronger than “too subtle”: the threaded file-source path in `python_mediapipe/main.py` was racing prerecorded clips to EOF, which let the MJPEG preview expose only a few unique frames before pinning on a stale frame while bytes/frames counters kept looking healthy. The fix keeps scope tight: file-backed threaded capture is now paced to the clip’s native FPS, rewinds cleanly at EOF so proving preview remains usable instead of dying on a terminal frame, and logs file-preview advancement as captured/unique/repeat/loop/frame-position stats. To make subtle prerecorded motion read as obviously advancing for human QA without lying to the tracker, the MJPEG preview path now adds a small file-only playback HUD (loop/frame/time/progress bar) to the streamed preview copy while leaving the raw frame untouched for MediaPipe inference. On the Godot consumer side, `src/camera_view.gd` now logs preview cadence/uniqueness from decoded MJPEG frames so Cookie logs can distinguish “advancing unique frames” from “same JPEG repeated.” Terminal-safe validation matched the diagnosis and the fix: before the change, a headless sidecar probe against the left-punch fixture produced only 4 unique `/snapshot` hashes across 12 samples before freezing; after the change, the same probe produced 12/12 unique hashes, producer logs showed steady `unique==captured` advancement at clip FPS, and a headless Godot `CameraView` probe showed decoded preview cadence advancing uniquely on the consumer side. Manual Cookie steps for Derrick: open `.testbed`, open `res://scenes/boxing_proving.tscn`, select root `BoxingProving`, set `startup_mode = PREVIEW_ONLY_DEBUG`, set `prerecorded_video_source` to either boxing fixture under `res://assets/fixtures/boxing/...`, save, run, and confirm the preview now visibly advances with the file HUD/progress instead of appearing frozen; then repeat the intended stop/close comparison on Cookie and inspect logs for `[FrameCapture] File preview advance` plus `[CameraView] Preview cadence` if needed.
+
+---
+
 ## Session Handoff / Current Stopping Point
 
 - Derrick confirmed the Boxing proving UI is now visible on both Pico's terminal and Cookie, but the hand-trail branch remains unresolved and should no longer be advanced by theory-only fixes.

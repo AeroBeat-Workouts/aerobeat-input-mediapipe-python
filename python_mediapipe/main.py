@@ -9,6 +9,7 @@ import json
 import time
 import struct
 import threading
+import zlib
 from collections import deque
 from args import parse_args
 from one_euro_filter import LandmarkFilterBank, get_preset_params
@@ -163,17 +164,44 @@ def draw_landmarks_on_frame(frame, landmarks, connections=True, pose_id=0):
 
 # Threaded frame capture
 class FrameCapture:
-    """Threaded frame capture to always get the latest frame"""
+    """Threaded frame capture to always get the latest frame."""
+
+    FILE_PREVIEW_BANNER = "FILE PREVIEW"
+
     def __init__(self, camera_id, width, height, fps):
+        self.camera_id = camera_id
         self.cap = cv2.VideoCapture(camera_id)
         if not self.cap.isOpened():
             raise RuntimeError(f"Could not open camera {camera_id}")
 
-        # Set camera properties
-        self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
-        self.cap.set(cv2.CAP_PROP_FPS, fps)
+        self._is_file_source = isinstance(camera_id, str) and os.path.isfile(camera_id)
+        self._requested_fps = max(float(fps), 1.0)
+        self._source_fps = 0.0
+        self._frame_interval_sec = 0.0
+        self._next_frame_due = None
+        self._loop_count = 0
+        self._captured_frame_count = 0
+        self._unique_frame_count = 0
+        self._last_signature = None
+        self._repeat_signature_run = 0
+        self._source_total_frames = 0
+
+        if self._is_file_source:
+            detected_fps = float(self.cap.get(cv2.CAP_PROP_FPS) or 0.0)
+            self._source_fps = detected_fps if detected_fps > 0.1 else self._requested_fps
+            self._frame_interval_sec = 1.0 / self._source_fps if self._source_fps > 0 else 0.0
+            self._next_frame_due = time.monotonic()
+            self._source_total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+            print(
+                f"[FrameCapture] File source detected: {camera_id} | "
+                f"source_fps={self._source_fps:.3f} | total_frames={self._source_total_frames}"
+            )
+        else:
+            # Set live camera properties
+            self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+            self.cap.set(cv2.CAP_PROP_FPS, fps)
 
         self.frame = None
         self.lock = threading.Lock()
@@ -191,15 +219,104 @@ class FrameCapture:
         if not self._ready:
             raise RuntimeError("Camera failed to capture first frame within timeout")
 
+    def is_file_source(self):
+        return self._is_file_source
+
+    def decorate_preview_frame(self, frame):
+        if not self._is_file_source or frame is None:
+            return frame
+
+        preview = frame.copy()
+        frame_number = max(int(self.cap.get(cv2.CAP_PROP_POS_FRAMES) or 0), 0)
+        pos_msec = float(self.cap.get(cv2.CAP_PROP_POS_MSEC) or 0.0)
+        total = self._source_total_frames
+        progress = 0.0
+        if total > 0:
+            progress = max(0.0, min(frame_number / float(total), 1.0))
+
+        cv2.rectangle(preview, (12, 12), (560, 94), (0, 0, 0), -1)
+        cv2.rectangle(preview, (12, 12), (560, 94), (0, 200, 255), 2)
+        cv2.putText(
+            preview,
+            self.FILE_PREVIEW_BANNER,
+            (24, 40),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.8,
+            (0, 200, 255),
+            2,
+        )
+        cv2.putText(
+            preview,
+            f"loop {self._loop_count} | frame {frame_number}/{total if total > 0 else '?'} | t={pos_msec / 1000.0:.2f}s",
+            (24, 68),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.65,
+            (255, 255, 255),
+            2,
+        )
+        bar_left, bar_top, bar_width, bar_height = 24, 76, 520, 10
+        cv2.rectangle(preview, (bar_left, bar_top), (bar_left + bar_width, bar_top + bar_height), (70, 70, 70), -1)
+        cv2.rectangle(preview, (bar_left, bar_top), (bar_left + max(1, int(bar_width * progress)), bar_top + bar_height), (0, 200, 255), -1)
+        return preview
+
     def _capture_loop(self):
-        """Continuously capture frames in background thread"""
+        """Continuously capture frames in background thread."""
         while self._running:
+            if self._is_file_source and self._frame_interval_sec > 0 and self._next_frame_due is not None:
+                now = time.monotonic()
+                if now < self._next_frame_due:
+                    time.sleep(min(self._next_frame_due - now, 0.01))
+                    continue
+
             ret, frame = self.cap.read()
-            if ret:
-                with self.lock:
-                    self.frame = frame
-                    if not self._ready:
-                        self._ready = True
+            if not ret:
+                if self._is_file_source and self._rewind_file_source():
+                    continue
+                time.sleep(0.01)
+                continue
+
+            self._captured_frame_count += 1
+            if self._is_file_source:
+                self._record_file_frame_stats(frame)
+                if self._frame_interval_sec > 0:
+                    if self._next_frame_due is None:
+                        self._next_frame_due = time.monotonic() + self._frame_interval_sec
+                    else:
+                        self._next_frame_due += self._frame_interval_sec
+                        if time.monotonic() - self._next_frame_due > self._frame_interval_sec * 4.0:
+                            self._next_frame_due = time.monotonic() + self._frame_interval_sec
+
+            with self.lock:
+                self.frame = frame
+                if not self._ready:
+                    self._ready = True
+
+    def _rewind_file_source(self):
+        self._loop_count += 1
+        self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+        self._next_frame_due = time.monotonic()
+        print(f"[FrameCapture] File source reached EOF; rewinding to frame 0 (loop={self._loop_count})")
+        return True
+
+    def _record_file_frame_stats(self, frame):
+        sample = cv2.resize(frame, (16, 16), interpolation=cv2.INTER_AREA)
+        signature = zlib.crc32(sample.tobytes())
+        if signature != self._last_signature:
+            self._unique_frame_count += 1
+            self._repeat_signature_run = 0
+            self._last_signature = signature
+        else:
+            self._repeat_signature_run += 1
+
+        if self._captured_frame_count <= 5 or self._captured_frame_count % 30 == 0:
+            pos_frames = int(self.cap.get(cv2.CAP_PROP_POS_FRAMES) or 0)
+            pos_msec = float(self.cap.get(cv2.CAP_PROP_POS_MSEC) or 0.0)
+            print(
+                f"[FrameCapture] File preview advance: captured={self._captured_frame_count} "
+                f"unique={self._unique_frame_count} repeat_run={self._repeat_signature_run} "
+                f"loop={self._loop_count} pos_frame={pos_frames} pos_sec={pos_msec / 1000.0:.2f} "
+                f"sig={signature:08x}"
+            )
 
     def get_frame(self):
         """Get the latest frame"""
@@ -671,9 +788,11 @@ def main():
             print("Warning: Failed to capture frame")
             continue
 
-        # Update MJPEG streamer with raw frame (before any processing)
+        # Update MJPEG streamer with a truthful preview frame before processing.
+        # File-backed sources get a small playback HUD so subtle motion still reads as advancing.
         if mjpeg_streamer and mjpeg_streamer.is_running():
-            mjpeg_streamer.update_frame(frame)
+            preview_frame = frame_capture.decorate_preview_frame(frame) if frame_capture else frame
+            mjpeg_streamer.update_frame(preview_frame)
 
         capture_time = (time.time() - frame_start) * 1000  # ms
 

@@ -41,6 +41,10 @@ var _update_timer: float = 0.0
 var _mjpeg_buffer: PackedByteArray
 var _is_starting: bool = false  # Guard against concurrent start_stream calls
 var _mjpeg_overflow_count: int = 0
+var _decoded_frame_count: int = 0
+var _unique_frame_count: int = 0
+var _repeat_signature_run: int = 0
+var _last_frame_signature: int = 0
 
 # Overlay drawing
 var _overlay_landmarks: Array = []
@@ -133,6 +137,10 @@ func start_stream() -> bool:
 
 	print("[CameraView] Connected, sending HTTP request...")
 	_mjpeg_overflow_count = 0
+	_decoded_frame_count = 0
+	_unique_frame_count = 0
+	_repeat_signature_run = 0
+	_last_frame_signature = 0
 
 	# Send HTTP request manually
 	var request := "GET " + path + " HTTP/1.1\r\n"
@@ -453,6 +461,24 @@ func _trim_mjpeg_buffer_on_overflow(header_parsed: bool) -> bool:
 		" bytes (keep_from=", keep_from, ", preserved_boundary=", preserved_boundary, ")")
 	return header_state_after_trim
 
+func _record_preview_signature(jpeg_data: PackedByteArray) -> void:
+	var sample_size := mini(64, jpeg_data.size())
+	var signature := hash([jpeg_data.size(), jpeg_data.slice(0, sample_size)])
+	_decoded_frame_count += 1
+	if _decoded_frame_count == 1 or signature != _last_frame_signature:
+		_unique_frame_count += 1
+		_repeat_signature_run = 0
+		_last_frame_signature = signature
+	else:
+		_repeat_signature_run += 1
+
+	if _decoded_frame_count <= 5 or _decoded_frame_count % 60 == 0 or _repeat_signature_run == 30:
+		print("[CameraView] Preview cadence: decoded=", _decoded_frame_count,
+			" unique=", _unique_frame_count,
+			" repeat_run=", _repeat_signature_run,
+			" jpeg_bytes=", jpeg_data.size(),
+			" sig=", signature)
+
 func _parse_mjpeg_frame() -> bool:
 	# Search for boundary as raw bytes, not UTF-8
 	var boundary_pos := _find_byte_pattern(_mjpeg_buffer, MJPEG_BOUNDARY_BYTES)
@@ -516,6 +542,7 @@ func _parse_mjpeg_frame() -> bool:
 		var img := Image.new()
 		var err := img.load_jpg_from_buffer(jpeg_data)
 		if err == OK:
+			_record_preview_signature(jpeg_data)
 			if img.get_format() != Image.FORMAT_RGBA8:
 				img.convert(Image.FORMAT_RGBA8)
 			_frame_mutex.lock()
