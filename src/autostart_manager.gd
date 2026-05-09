@@ -32,6 +32,7 @@ signal mediapipe_not_found
 @export var no_filter: bool = true
 @export var heartbeat_interval_ms: int = 500
 @export var camera_source_override: String = ""
+@export var skip_sidecar_stop_on_close_debug: bool = false
 
 var python_path: String = ""
 var server_pid: int = -1
@@ -413,7 +414,10 @@ func _emit_progress(percentage: int, message: String) -> void:
 
 func _exit_tree() -> void:
 	if _has_active_server_state():
-		_stop_sync()
+		if _should_skip_close_path_stop("EXIT_TREE"):
+			print("[AutoStartManager] EXIT_TREE - leaving sidecar running for close-path isolation; heartbeat timeout should stop it after Godot exits")
+		else:
+			_stop_sync()
 	progress_timer.stop()
 
 func _notification(what: int) -> void:
@@ -421,14 +425,29 @@ func _notification(what: int) -> void:
 		return
 	match what:
 		NOTIFICATION_PREDELETE:
-			print("[AutoStartManager] PREDELETE - emergency cleanup")
-			_stop_sync()
+			if _should_skip_close_path_stop("PREDELETE"):
+				print("[AutoStartManager] PREDELETE - leaving sidecar running for close-path isolation")
+			else:
+				print("[AutoStartManager] PREDELETE - emergency cleanup")
+				_stop_sync()
 		NOTIFICATION_EXIT_TREE:
-			print("[AutoStartManager] EXIT_TREE - stopping server")
-			_stop_sync()
+			if _should_skip_close_path_stop("EXIT_TREE"):
+				print("[AutoStartManager] EXIT_TREE - leaving sidecar running for close-path isolation")
+			else:
+				print("[AutoStartManager] EXIT_TREE - stopping server")
+				_stop_sync()
 		NOTIFICATION_WM_CLOSE_REQUEST:
-			print("[AutoStartManager] WM_CLOSE_REQUEST - stopping server")
-			_stop_sync()
+			if _should_skip_close_path_stop("WM_CLOSE_REQUEST"):
+				print("[AutoStartManager] WM_CLOSE_REQUEST - leaving sidecar running for close-path isolation")
+			else:
+				print("[AutoStartManager] WM_CLOSE_REQUEST - stopping server")
+				_stop_sync()
+
+func _should_skip_close_path_stop(reason: String) -> bool:
+	if not skip_sidecar_stop_on_close_debug:
+		return false
+	print("[AutoStartManager] Close-path isolation active (%s): skipping normal sidecar stop; sidecar should self-exit after heartbeat timeout (~3s)" % reason)
+	return true
 
 func _stop_sync() -> void:
 	if _is_stopping or not _has_active_server_state():

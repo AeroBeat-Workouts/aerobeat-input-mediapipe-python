@@ -97,6 +97,7 @@ enum StartupMode {
 @export var show_landmarks := true
 @export var show_trails := true
 @export var trail_debug_logging := true
+@export var skip_sidecar_stop_on_close_debug := false
 
 @onready var status_label: Label = $Margin/VSplit/Header/StatusLabel
 @onready var live_status_label: RichTextLabel = $Margin/VSplit/Header/LiveStatusLabel
@@ -165,6 +166,9 @@ func _setup_auto_start() -> void:
 		return
 
 	auto_start_manager.camera_source_override = _get_scene_camera_source_override()
+	auto_start_manager.skip_sidecar_stop_on_close_debug = skip_sidecar_stop_on_close_debug
+	if skip_sidecar_stop_on_close_debug:
+		print("[ProvingHarness][%s] Close-path isolation enabled: AutoStartManager will skip normal sidecar stop on close/scene teardown; heartbeat timeout should stop it after exit" % _mode_name())
 
 	auto_start_manager.server_started.connect(_on_server_started)
 	auto_start_manager.server_failed.connect(_on_server_failed)
@@ -1182,6 +1186,8 @@ func _notification(what: int) -> void:
 
 func _stop_everything() -> void:
 	print("[ProvingHarness][%s] Stopping harness resources" % _mode_name())
+	if skip_sidecar_stop_on_close_debug:
+		print("[ProvingHarness][%s] Close-path isolation is enabled; expected behavior is that the sidecar remains up briefly and then exits on heartbeat timeout after Godot closes" % _mode_name())
 	if camera_view and camera_view.is_streaming():
 		camera_view.stop_stream()
 	if camera_view and is_instance_valid(camera_view):

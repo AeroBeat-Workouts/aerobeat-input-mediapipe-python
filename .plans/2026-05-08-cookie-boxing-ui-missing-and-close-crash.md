@@ -1487,6 +1487,30 @@ Smallest truthful next fix for `oc-w1u6`: pace the MJPEG producer, not the GDScr
 
 ---
 
+### Task 64: Implement one-shot close-path isolation toggle for the connected-preview crash
+
+**Bead ID:** `oc-c7dm`
+**SubAgent:** `primary` (for `coder` workflow role)
+**Role:** `coder`
+**References:** `REF-04`, `REF-06`, `REF-10`
+**Prompt:** Implement the smallest truthful debug/isolation toggle for one last Cookie repro tonight that helps answer whether the connected-preview crash is tied specifically to the AutoStartManager/sidecar shutdown path on close. Prefer a narrowly scoped proving-harness/autostart switch that preserves connected preview during playback but changes close-time shutdown behavior in a clearly observable way, with exact operator steps and cleanup notes for Derrick.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- `.testbed/`
+- `src/`
+
+**Files Created/Deleted/Modified:**
+- `.plans/2026-05-08-cookie-boxing-ui-missing-and-close-crash.md`
+- `.testbed/scripts/proving_harness.gd`
+- `src/autostart_manager.gd`
+
+**Status:** ✅ Complete
+
+**Results:** Implemented the smallest truthful close-path isolation switch as a proving-harness-facing export: `skip_sidecar_stop_on_close_debug`. When Derrick enables it on the proving scene root, the harness forwards that flag into `AutoStartManager`, and `AutoStartManager` now skips its normal `_stop_sync()` shutdown path for `WM_CLOSE`, `EXIT_TREE`, and `PREDELETE`. Connected preview behavior during playback stays unchanged; the only intentional difference is close-time teardown. Logs now say explicitly that close-path isolation is active and that the sidecar is being left alive on purpose so it can die on its own heartbeat timeout (~3s) after Godot exits. This makes the repro question crisp: if Cookie still resets while the normal stop path is bypassed, the crash is probably not specific to AutoStartManager's sidecar stop/kill sequence; if the reset disappears, that shutdown path remains the prime suspect. Terminal-safe validation stayed static-only per tonight's constraint: a headless Godot parse-only pass preloaded both modified scripts without errors, and `git diff` review confirmed the toggle is narrowly scoped to close-path behavior. Exact manual repro steps for Derrick: (1) open `.testbed` on Cookie and load `res://scenes/boxing_proving.tscn`; (2) on the root `BoxingProving`, set `startup_mode = PREVIEW_ONLY_DEBUG`; (3) set `skip_sidecar_stop_on_close_debug = true`; (4) keep `prerecorded_video_source` pointed at the boxing fixture if you want the file-backed repro rung, or leave the current source override you are comparing against; (5) run the scene, wait until connected preview is visibly working, then close the game window normally via the titlebar/X so the close path is exercised; (6) watch whether Cookie still crashes/resets; (7) if you need log proof, look for `[ProvingHarness] Close-path isolation enabled` plus `[AutoStartManager] Close-path isolation active` / `leaving sidecar running for close-path isolation`. Cleanup notes: this toggle is intentionally one-shot and debug-only; after the repro, set `skip_sidecar_stop_on_close_debug` back to `false` before any normal work, because with it enabled the sidecar is expected to linger briefly after close until heartbeat timeout handles shutdown instead of the usual immediate stop path.
+
+---
+
 ## Session Handoff / Current Stopping Point
 
 - Derrick confirmed the Boxing proving UI is now visible on both Pico's terminal and Cookie, but the hand-trail branch remains unresolved and should no longer be advanced by theory-only fixes.
