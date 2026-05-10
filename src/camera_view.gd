@@ -7,6 +7,7 @@ signal stream_stopped()
 
 @export var stream_url: String = "http://127.0.0.1:4243/camera"
 @export var update_interval_ms: float = 33.0
+@export var debug_logging: bool = false
 @export var show_overlay: bool = true
 @export var overlay_color: Color = Color(0, 1, 0, 0.8)
 @export var overlay_radius: float = 4.0
@@ -51,6 +52,11 @@ var _overlay_landmarks: Array = []
 var _overlay_mutex: Mutex
 var _overlay_canvas: Control
 
+func _debug_log(parts: Array) -> void:
+	if not debug_logging:
+		return
+	print("[CameraView]", " ".join(parts))
+
 func _ready() -> void:
 	_current_frame = Image.create(640, 480, false, Image.FORMAT_RGBA8)
 	_frame_texture = ImageTexture.create_from_image(_current_frame)
@@ -74,7 +80,6 @@ func _ready() -> void:
 	_overlay_canvas.draw.connect(_on_overlay_draw)
 
 func _exit_tree() -> void:
-	print("[CameraView] _exit_tree called, stopping stream...")
 	# Stop the stream properly to ensure thread cleanup
 	stop_stream()
 
@@ -96,7 +101,7 @@ func start_stream() -> bool:
 
 	# Prevent concurrent calls
 	if _is_starting:
-		print("[CameraView] start_stream already in progress, skipping...")
+		_debug_log(["start_stream already in progress, skipping..."])
 		return false
 
 	_is_starting = true
@@ -106,7 +111,7 @@ func start_stream() -> bool:
 		_thread_running = false
 		_realize_stream_thread("start cleanup")
 
-	print("[CameraView] Starting stream from: ", stream_url)
+	_debug_log(["Starting stream from:", stream_url])
 
 	# Parse URL
 	var host := "127.0.0.1"
@@ -127,13 +132,13 @@ func start_stream() -> bool:
 			port = host.substr(port_sep + 1).to_int()
 			host = host.substr(0, port_sep)
 
-	print("[CameraView] Connecting to ", host, ":", port, path)
+	_debug_log(["Connecting to", "%s:%d%s" % [host, port, path]])
 
 	if not await _connect_with_retry(host, port):
 		_is_starting = false
 		return false
 
-	print("[CameraView] Connected, sending HTTP request...")
+	_debug_log(["Connected, sending HTTP request..."])
 	_mjpeg_overflow_count = 0
 	_decoded_frame_count = 0
 	_unique_frame_count = 0
@@ -149,7 +154,7 @@ func start_stream() -> bool:
 
 	_tcp.put_data(request.to_utf8_buffer())
 
-	print("[CameraView] Request sent, starting stream thread...")
+	_debug_log(["Request sent, starting stream thread..."])
 
 	# Start thread BEFORE setting flags to avoid race conditions
 	_stream_thread = Thread.new()
@@ -169,7 +174,7 @@ func start_stream() -> bool:
 
 	visible = true
 	stream_started.emit()
-	print("[CameraView] Stream started successfully")
+	_debug_log(["Stream started successfully"])
 	return true
 
 func _connect_with_retry(host: String, port: int) -> bool:
@@ -190,7 +195,7 @@ func _connect_with_retry(host: String, port: int) -> bool:
 		if Time.get_ticks_msec() >= deadline_ms or not (retryable_error or retryable_status):
 			break
 
-		print("[CameraView] Retryable connect failure (err=", last_err, ", status=", last_status, "), retrying...")
+		_debug_log(["Retryable connect failure (err=%s, status=%s), retrying..." % [str(last_err), str(last_status)]])
 		await get_tree().create_timer(float(CONNECT_RETRY_DELAY_MS) / 1000.0).timeout
 
 	_cleanup_tcp_peer()
@@ -204,12 +209,12 @@ func _attempt_tcp_connect(host: String, port: int, attempt: int) -> int:
 	_cleanup_tcp_peer()
 	_tcp = StreamPeerTCP.new()
 	var err := _tcp.connect_to_host(host, port)
-	print("[CameraView] Connect attempt ", attempt, " returned: ", err)
+	_debug_log(["Connect attempt %d returned: %s" % [attempt, str(err)]])
 	if err != OK:
 		return err
 
 	var status := _tcp.get_status()
-	print("[CameraView] Connect attempt ", attempt, " initial TCP status: ", status)
+	_debug_log(["Connect attempt %d initial TCP status: %s" % [attempt, str(status)]])
 	var attempt_deadline_ms := Time.get_ticks_msec() + CONNECT_ATTEMPT_TIMEOUT_MS
 	while _tcp and status == StreamPeerTCP.STATUS_CONNECTING and Time.get_ticks_msec() < attempt_deadline_ms:
 		_tcp.poll()
@@ -221,7 +226,7 @@ func _attempt_tcp_connect(host: String, port: int, attempt: int) -> int:
 	if _tcp:
 		_tcp.poll()
 		status = _tcp.get_status()
-		print("[CameraView] Connect attempt ", attempt, " final TCP status: ", status)
+		_debug_log(["Connect attempt %d final TCP status: %s" % [attempt, str(status)]])
 	return OK
 
 func _cleanup_tcp_peer() -> void:
@@ -230,8 +235,6 @@ func _cleanup_tcp_peer() -> void:
 		_tcp = null
 
 func stop_stream() -> void:
-	print("[CameraView] Stopping stream...")
-
 	# Always signal thread to stop and reset all flags
 	_thread_running = false
 	_is_streaming = false
@@ -245,7 +248,7 @@ func stop_stream() -> void:
 
 	visible = false
 	stream_stopped.emit()
-	print("[CameraView] Stream stopped")
+	_debug_log(["Stream stopped"])
 
 func is_streaming() -> bool:
 	return _is_streaming
@@ -253,7 +256,7 @@ func is_streaming() -> bool:
 func _realize_stream_thread(context: String) -> void:
 	if _stream_thread == null:
 		return
-	print("[CameraView] Realizing stream thread completion (", context, ")...")
+	_debug_log(["Realizing stream thread completion (%s)..." % context])
 	_stream_thread.wait_to_finish()
 	_stream_thread = null
 
@@ -360,7 +363,7 @@ func _get_displayed_image_offset(displayed_size: Vector2) -> Vector2:
 	return (size - displayed_size) / 2.0
 
 func _stream_loop() -> void:
-	print("[CameraView] Stream thread started")
+	_debug_log(["Stream thread started"])
 	var bytes_received := 0
 	var frames_decoded := 0
 	var last_log := Time.get_ticks_msec()
@@ -370,7 +373,7 @@ func _stream_loop() -> void:
 		_tcp.poll()
 
 		if _tcp.get_status() != StreamPeerTCP.STATUS_CONNECTED:
-			print("[CameraView] Connection lost")
+			_debug_log(["Connection lost"])
 			break
 
 		# Read available data
@@ -402,14 +405,14 @@ func _stream_loop() -> void:
 		# Log stats every 5 seconds
 		var now := Time.get_ticks_msec()
 		if now - last_log > 5000:
-			print("[CameraView] Stats: ", bytes_received, " bytes, ", frames_decoded, " frames")
+			_debug_log(["Stats: %d bytes, %d frames" % [bytes_received, frames_decoded]])
 			bytes_received = 0
 			frames_decoded = 0
 			last_log = now
 
 		OS.delay_msec(5)
 
-	print("[CameraView] Stream thread ended")
+	_debug_log(["Stream thread ended"])
 
 func _find_byte_pattern(buffer: PackedByteArray, pattern: PackedByteArray) -> int:
 	"""Find byte pattern in buffer. Returns -1 if not found."""
@@ -458,9 +461,15 @@ func _trim_mjpeg_buffer_on_overflow(header_parsed: bool) -> bool:
 	_mjpeg_buffer = _mjpeg_buffer.slice(keep_from)
 	var preserved_boundary: bool = _find_byte_pattern(_mjpeg_buffer, MJPEG_BOUNDARY_BYTES) != -1
 	var header_state_after_trim: bool = header_parsed and preserved_boundary
-	print("[CameraView] MJPEG buffer overflow #", _mjpeg_overflow_count,
-		" trimmed ", original_size, " -> ", _mjpeg_buffer.size(),
-		" bytes (keep_from=", keep_from, ", preserved_boundary=", preserved_boundary, ")")
+	_debug_log([
+		"MJPEG buffer overflow #%d trimmed %d -> %d bytes (keep_from=%d, preserved_boundary=%s)" % [
+			_mjpeg_overflow_count,
+			original_size,
+			_mjpeg_buffer.size(),
+			keep_from,
+			str(preserved_boundary),
+		]
+	])
 	return header_state_after_trim
 
 func _record_preview_signature(jpeg_data: PackedByteArray) -> void:
@@ -475,11 +484,15 @@ func _record_preview_signature(jpeg_data: PackedByteArray) -> void:
 		_repeat_signature_run += 1
 
 	if _decoded_frame_count <= 5 or _decoded_frame_count % 60 == 0 or _repeat_signature_run == 30:
-		print("[CameraView] Preview cadence: decoded=", _decoded_frame_count,
-			" unique=", _unique_frame_count,
-			" repeat_run=", _repeat_signature_run,
-			" jpeg_bytes=", jpeg_data.size(),
-			" sig=", signature)
+		_debug_log([
+			"Preview cadence: decoded=%d unique=%d repeat_run=%d jpeg_bytes=%d sig=%d" % [
+				_decoded_frame_count,
+				_unique_frame_count,
+				_repeat_signature_run,
+				jpeg_data.size(),
+				signature,
+			]
+		])
 
 func _parse_mjpeg_frame() -> bool:
 	# Search for boundary as raw bytes, not UTF-8
@@ -553,7 +566,7 @@ func _parse_mjpeg_frame() -> bool:
 			_mjpeg_buffer = _mjpeg_buffer.slice(next_boundary)
 			return true
 		else:
-			print("[CameraView] JPEG decode error: ", err, " (size: ", jpeg_data.size(), ")")
+			push_warning("[CameraView] JPEG decode error: %s (size: %d)" % [str(err), jpeg_data.size()])
 
 	_mjpeg_buffer = _mjpeg_buffer.slice(next_boundary)
 	return false

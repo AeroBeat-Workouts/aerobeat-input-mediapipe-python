@@ -40,6 +40,12 @@ env/
 !python_mediapipe/assets/runtimes/
 python_mediapipe/assets/runtimes/*
 !python_mediapipe/assets/runtimes/.gdignore
+!python_mediapipe/assets/runtimes/linux-x64/
+python_mediapipe/assets/runtimes/linux-x64/*
+!python_mediapipe/assets/runtimes/linux-x64/.gdignore
+!python_mediapipe/assets/runtimes/windows-x64/
+python_mediapipe/assets/runtimes/windows-x64/*
+!python_mediapipe/assets/runtimes/windows-x64/.gdignore
 
 # Build artifacts
 build/

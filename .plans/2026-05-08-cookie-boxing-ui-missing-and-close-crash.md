@@ -53,6 +53,7 @@ Follow-up research tightened that further: the screenshot is not the proving har
 | `REF-19` | Today’s execution constraint: use `ssh chip` as the crash sandbox, verify the remote repo/deps first, and let Derrick recover the GUI locally after each crash if needed | current session |
 | `REF-20` | Active close-path isolation toggle in proving harness / AutoStartManager | `/home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-input-mediapipe-python/.testbed/scripts/proving_harness.gd` + `/home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-input-mediapipe-python/src/autostart_manager.gd` |
 | `REF-21` | Chip console warning snapshot showing packet-backlog and stream-thread cleanup warnings during the dirty second-half rerun | `/home/derrick/.openclaw/workspace/.temp/nerve-uploads/2026/05/09/image-0bb3a3de.png` |
+| `REF-22` | Derrick’s 2026-05-09 Chip feedback: eliminate per-update console spam, investigate new CSV import warning, trim/dedupe shutdown logging, and prepare for a Penpot-driven boxing proving-scene redesign that replaces text-heavy status with gesture icons and active-state buttons | current session |
 
 ---
 
@@ -1673,6 +1674,99 @@ What is **not yet proven** without Derrick’s direct Chip truth pass: that the 
 **Status:** ⏳ Pending
 
 **Results:** Pending.
+
+---
+
+### Task 72: Research and scope console/logging cleanup on the Chip proving path
+
+**Bead ID:** `oc-t3u2`
+**SubAgent:** `primary` (for `research` workflow role)
+**Role:** `research`
+**References:** `REF-18`, `REF-20`, `REF-21`, `REF-22`
+**Prompt:** Audit the current proving/test-scene logging surfaces and identify the smallest truthful cleanup plan so normal playback has zero per-update console spam, useful startup messages are preserved, and exit-path logging stays concise and signal-rich for crash forensics. Include the new CSV import warning in scope triage so we know whether it belongs to repo layout/import settings or runtime packaging.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- `.testbed/`
+- `src/`
+- repo config/import surfaces only as needed for inspection
+
+**Files Created/Deleted/Modified:**
+- plan updates only unless a tiny truth-revealing probe is required
+
+**Status:** ✅ Complete
+
+**Results:** Source audit complete. The steady-state console spam on the proving path is repo-owned and currently comes from two loop-driven surfaces: (1) `.testbed/scripts/proving_harness.gd`, where `_process()` calls `_emit_console_snapshot_if_changed()` every 30 frames and the snapshot text includes constantly changing trail/live-state fields, so "if changed" still prints during normal playback; and (2) `src/camera_view.gd`, which emits preview cadence logs on the first few/each 60 decoded frames plus 5-second stream stats, creating background chatter even when nothing is wrong. Startup/status signal is otherwise already concentrated in `_on_*` handlers and `_record_event()` / `_update_status()` in `proving_harness.gd`, so the smallest truthful cleanup is to make loop-driven snapshot/telemetry logging opt-in debug (or remove the periodic call entirely) while preserving event-driven startup/failure/tracking-transition messages.
+
+Close-path logging is also repo-owned and noisier than it needs to be: `.testbed/scripts/proving_harness.gd` logs `WM_CLOSE_REQUEST`, `EXIT_TREE/PREDELETE`, and `_stop_everything()`; `src/autostart_manager.gd` logs again in `_exit_tree()`, `_notification()`, and `_should_skip_close_path_stop()`; and `src/camera_view.gd` logs `_exit_tree`, `stop_stream()`, thread realization, and stream end. That means a single close can legitimately fan out into several repeated lines even on the expected isolation path. Smallest next slice: keep one high-value harness summary for shutdown intent/result, keep true warnings/errors, and make the repeated close-path informational prints one-shot or debug-only so crash forensics still retain the first meaningful reason without burying it in teardown noise.
+
+CSV import-warning triage: this does not look like runtime Python behavior; it looks like Godot/project-layout scanning. The proving testbed mounts the whole repo back into `.testbed/addons/aerobeat-input-mediapipe-python` as a symlink to the repo root, and the vendored runtime/venv under `python_mediapipe/assets/runtimes/...` contains many `.csv` files from third-party packages (`numpy`, `matplotlib`, etc.). Even with `python_mediapipe/assets/runtimes/.gdignore` present, the warning family belongs to repo/testbed import surfaces first (symlinked addon layout / Godot scan scope), not MediaPipe runtime packaging logic. Recommended ownership for the follow-up is testbed layout/import hygiene rather than Python sidecar code.
+
+Smallest implementation slice for Task 73: (a) stop periodic proving-harness console snapshots by default, (b) gate `camera_view.gd` cadence/stats/connect chatter behind an explicit debug flag while preserving `push_error()` and real failure prints, (c) collapse repeated close-path info logs in `proving_harness.gd` + `autostart_manager.gd` to one concise summary plus real warnings, and (d) separately mitigate the CSV warning by tightening what the `.testbed` addon mount exposes to Godot or otherwise excluding the vendored runtime tree from import scanning. Likely owning files: `.testbed/scripts/proving_harness.gd`, `src/camera_view.gd`, `src/autostart_manager.gd`, and `.testbed/addons/aerobeat-input-mediapipe-python` / related testbed import-layout config.
+
+---
+
+### Task 73: Implement proving-path logging cleanup and import-warning mitigation
+
+**Bead ID:** `oc-dkpf`
+**SubAgent:** `primary` (for `coder` workflow role)
+**Role:** `coder`
+**References:** `REF-20`, `REF-21`, `REF-22`
+**Prompt:** Implement the smallest truthful fix set that removes per-update console spam from the proving path, keeps shutdown/startup logging intentional and low-volume, dedupes noisy repeated close-path messages where possible, and addresses the new CSV import warning if it is owned by this repo/testbed layout.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- `.testbed/`
+- `src/`
+- repo config/import surfaces if directly required
+
+**Files Created/Deleted/Modified:**
+- only directly owning source/config files required by the approved fix
+
+**Status:** ✅ Complete
+
+**Results:** Implemented the smallest repo-owned cleanup slice for the proving/logging branch and validated it locally. In `.testbed/scripts/proving_harness.gd`, steady-state console snapshots are now off by default via the new `steady_state_console_debug` flag, `CameraView` / `AutoStartManager` debug chatter is only re-enabled when those debug exports are turned on, and the close path now emits one concise harness shutdown summary instead of logging every close/teardown notification separately. In `src/camera_view.gd`, steady-state connect/cadence/stats/overflow/thread lifecycle prints are now gated behind exported `debug_logging=false` while preserving real failures via `push_error()` / `push_warning()`. In `src/autostart_manager.gd`, repeated close-path informational lines were collapsed into a one-shot shutdown summary, with lower-value internal lifecycle chatter moved behind `debug_logging`. For the CSV/import-noise mitigation, `.gitignore` now explicitly allows tracked `.gdignore` markers inside the repo-owned platform runtime roots, and new `python_mediapipe/assets/runtimes/linux-x64/.gdignore` plus `.../windows-x64/.gdignore` tighten the hidden boundary to the exact vendored runtime folders that can surface third-party `.csv` import warnings under the symlinked `.testbed` addon mount. Validation for this coder pass: `~/.local/bin/godot --headless --path .testbed --check-only --script scripts/proving_harness.gd`; `~/.local/bin/godot --headless --path .testbed --import --quit-after 1000`; `python3 -m py_compile python_mediapipe/*.py`; and `git diff --check` all passed. The generated validation logs for the headless checks contained zero matches for `.csv`, `MJPEG buffer overflow`, `Preview cadence`, `Thread object is being destroyed`, and the earlier `Failed to connect, status: 3` warning family, which is the best terminal-safe evidence that the default proving path is now quiet unless real errors occur. Commit: current HEAD (`Quiet proving harness logging by default`).
+
+---
+
+### Task 74: QA cleaned proving logs and shutdown-path signal quality on Chip
+
+**Bead ID:** `oc-0wba`
+**SubAgent:** `primary` (for `qa` workflow role)
+**Role:** `qa`
+**References:** `REF-20`, `REF-21`, `REF-22`
+**Prompt:** Independently verify that normal proving playback is no longer flooding the console, that shutdown logs are concise enough to be useful during crash hunting, and that the prior warning families are either gone or explicitly understood before the next Chip rerun.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+
+**Files Created/Deleted/Modified:**
+- plan updates / verification notes only unless a truthful docs correction is required
+
+**Status:** ⏳ Pending
+
+**Results:** Pending.
+
+---
+
+### Task 75: Prepare Penpot-driven Boxing proving-scene redesign branch
+
+**Bead ID:** `Pending`
+**SubAgent:** `primary` (for `research` / `coder` workflow roles)
+**Role:** `research`
+**References:** `REF-22`
+**Prompt:** Once Derrick provides the updated Penpot design slice, translate it into a concrete implementation branch for the Boxing gesture-detection proving scene: remove text-heavy status presentation, replace it with gesture icons and active-state/highlight buttons, and separate that UI redesign work from the immediate crash/logging cleanup branch.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- future design/source/UI paths as required
+
+**Files Created/Deleted/Modified:**
+- plan updates only until the Penpot slice exists
+
+**Status:** ⏳ Pending
+
+**Results:** Waiting on Derrick’s Penpot design slice.
 
 ---
 

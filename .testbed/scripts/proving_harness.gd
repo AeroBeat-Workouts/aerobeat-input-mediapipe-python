@@ -97,6 +97,8 @@ enum StartupMode {
 @export var show_landmarks := true
 @export var show_trails := true
 @export var trail_debug_logging := true
+@export var steady_state_console_debug := false
+@export var shutdown_console_debug := false
 @export var skip_sidecar_stop_on_close_debug := false
 
 @onready var status_label: Label = $Margin/VSplit/Header/StatusLabel
@@ -131,6 +133,7 @@ var _last_event_timestamps_ms: Dictionary = {}
 var _last_console_snapshot := ""
 var _preview_only_invalid_reason := ""
 var _preview_only_invalid_logged := false
+var _shutdown_summary_logged := false
 
 func _enter_tree() -> void:
 	if startup_mode != StartupMode.GODOT_ONLY_DEBUG:
@@ -168,6 +171,7 @@ func _setup_auto_start() -> void:
 		return
 
 	auto_start_manager.camera_source_override = _get_scene_camera_source_override()
+	auto_start_manager.debug_logging = steady_state_console_debug or shutdown_console_debug
 	auto_start_manager.skip_sidecar_stop_on_close_debug = skip_sidecar_stop_on_close_debug
 	if skip_sidecar_stop_on_close_debug:
 		print("[ProvingHarness][%s] Close-path isolation enabled: AutoStartManager will skip normal sidecar stop on close/scene teardown; heartbeat timeout should stop it after exit" % _mode_name())
@@ -200,7 +204,7 @@ func _process(_delta: float) -> void:
 			_latest_state = provider.get_detector_state()
 		_refresh_debug_panels()
 
-	if _frame_count % 30 == 0:
+	if steady_state_console_debug and _frame_count % 30 == 0:
 		_emit_console_snapshot_if_changed()
 
 func _on_check_progress(percentage: int, message: String) -> void:
@@ -599,6 +603,7 @@ func _start_camera_feed() -> void:
 	camera_view = MediaPipeCameraViewScript.new()
 	camera_view.name = "CameraView"
 	camera_view.stream_url = "http://127.0.0.1:4243/camera"
+	camera_view.debug_logging = steady_state_console_debug
 	camera_view.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
 	camera_view.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	camera_view.show_overlay = false
@@ -1205,12 +1210,12 @@ func _update_status(text: String, color: Color) -> void:
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
-		print("[ProvingHarness][%s] Window close request" % _mode_name())
-		_stop_everything()
+		_stop_everything("window_close_request")
 		get_tree().quit()
-	elif what == NOTIFICATION_EXIT_TREE or what == NOTIFICATION_PREDELETE:
-		print("[ProvingHarness][%s] Scene teardown notification=%d" % [_mode_name(), what])
-		_stop_everything()
+	elif what == NOTIFICATION_EXIT_TREE:
+		_stop_everything("exit_tree")
+	elif what == NOTIFICATION_PREDELETE:
+		_stop_everything("predelete")
 
 func _is_preview_only_mode() -> bool:
 	return startup_mode == StartupMode.PREVIEW_ONLY_DEBUG
@@ -1251,10 +1256,24 @@ func _clear_preview_only_overlay_state() -> void:
 	if trail_drawer:
 		trail_drawer.clear_trails()
 
-func _stop_everything() -> void:
-	print("[ProvingHarness][%s] Stopping harness resources" % _mode_name())
-	if skip_sidecar_stop_on_close_debug:
-		print("[ProvingHarness][%s] Close-path isolation is enabled; expected behavior is that the sidecar remains up briefly and then exits on heartbeat timeout after Godot closes" % _mode_name())
+func _log_shutdown_summary_once(reason: String) -> void:
+	if _shutdown_summary_logged:
+		if shutdown_console_debug:
+			print("[ProvingHarness][%s] Duplicate shutdown notification ignored (%s)" % [_mode_name(), reason])
+		return
+	_shutdown_summary_logged = true
+	var stop_mode := "heartbeat_only" if skip_sidecar_stop_on_close_debug else "normal_stop"
+	print("[ProvingHarness][%s] Shutdown summary: reason=%s stop_mode=%s server=%s camera=%s preview=%s" % [
+		_mode_name(),
+		reason,
+		stop_mode,
+		_server_status_text(),
+		_camera_status_text("streaming", "offline"),
+		_preview_only_audit_text(),
+	])
+
+func _stop_everything(reason: String = "unknown") -> void:
+	_log_shutdown_summary_once(reason)
 	if camera_view and camera_view.is_streaming():
 		camera_view.stop_stream()
 	if camera_view and is_instance_valid(camera_view):

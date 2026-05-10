@@ -32,6 +32,7 @@ signal mediapipe_not_found
 @export var no_filter: bool = true
 @export var heartbeat_interval_ms: int = 500
 @export var camera_source_override: String = ""
+@export var debug_logging: bool = false
 @export var skip_sidecar_stop_on_close_debug: bool = false
 
 var python_path: String = ""
@@ -45,8 +46,28 @@ var _heartbeat_timer: Timer = null
 var _launch_info: Dictionary = {}
 var _runtime_validation: Dictionary = {}
 var _is_stopping: bool = false
+var _shutdown_summary_logged: bool = false
 
 @onready var progress_timer: Timer = Timer.new()
+
+func _debug_log(message: String) -> void:
+	if not debug_logging:
+		return
+	print("[AutoStartManager] %s" % message)
+
+func _log_shutdown_summary_once(reason: String) -> void:
+	if _shutdown_summary_logged:
+		_debug_log("Duplicate shutdown notification ignored (%s)" % reason)
+		return
+	_shutdown_summary_logged = true
+	var stop_mode := "heartbeat_only" if skip_sidecar_stop_on_close_debug else "normal_stop"
+	print("[AutoStartManager] Shutdown summary: reason=%s stop_mode=%s pid=%d running=%s launch=%s" % [
+		reason,
+		stop_mode,
+		server_pid,
+		str(_is_running),
+		str(not _launch_info.is_empty()),
+	])
 
 func _ready() -> void:
 	add_child(progress_timer)
@@ -109,10 +130,10 @@ func is_server_running() -> bool:
 
 func start_server() -> bool:
 	if _is_running:
-		print("[AutoStartManager] Server already running")
+		_debug_log("Server already running")
 		return true
 	if _is_starting:
-		print("[AutoStartManager] Server start already in progress")
+		_debug_log("Server start already in progress")
 		return false
 
 	_is_starting = true
@@ -127,7 +148,7 @@ func stop_server() -> void:
 		return
 
 	_is_stopping = true
-	print("[AutoStartManager] stop_server() called, PID: ", server_pid)
+	_log_shutdown_summary_once("stop_server")
 	_stop_heartbeat()
 	OS.delay_msec(200)
 
@@ -142,7 +163,7 @@ func stop_server() -> void:
 	_cleanup_server_state()
 	_is_stopping = false
 	emit_signal("server_stopped")
-	print("[AutoStartManager] Server stopped")
+	_debug_log("Server stopped")
 
 func _has_active_server_state() -> bool:
 	return _is_running or server_pid > 1 or not _launch_info.is_empty()
@@ -340,14 +361,14 @@ func _start_detached_server() -> int:
 	return server_pid
 
 func _setup_heartbeat(heartbeat_port: int) -> void:
-	print("[AutoStartManager] Setting up heartbeat on port %d" % heartbeat_port)
+	_debug_log("Setting up heartbeat on port %d" % heartbeat_port)
 	if _heartbeat_udp == null:
 		_heartbeat_udp = PacketPeerUDP.new()
 		var err := _heartbeat_udp.set_dest_address("127.0.0.1", heartbeat_port)
 		if err != OK:
-			print("[AutoStartManager] ERROR: Failed to set heartbeat destination, error: %d" % err)
+			push_warning("[AutoStartManager] Failed to set heartbeat destination, error: %d" % err)
 		else:
-			print("[AutoStartManager] Heartbeat target: 127.0.0.1:%d" % heartbeat_port)
+			_debug_log("Heartbeat target: 127.0.0.1:%d" % heartbeat_port)
 
 	if _heartbeat_timer == null:
 		_heartbeat_timer = Timer.new()
@@ -355,7 +376,7 @@ func _setup_heartbeat(heartbeat_port: int) -> void:
 		_heartbeat_timer.autostart = true
 		_heartbeat_timer.timeout.connect(_send_heartbeat)
 		add_child(_heartbeat_timer)
-		print("[AutoStartManager] Heartbeat timer started (interval: %dms)" % heartbeat_interval_ms)
+		_debug_log("Heartbeat timer started (interval: %dms)" % heartbeat_interval_ms)
 	else:
 		_heartbeat_timer.start()
 
@@ -376,25 +397,25 @@ func _poll_for_server_pid() -> int:
 	return server_pid
 
 func _start_server() -> bool:
-	print("[AutoStartManager] _start_server() called")
+	_debug_log("_start_server() called")
 	var detached_pid: int = await _start_detached_server()
-	print("[AutoStartManager] _start_detached_server() returned PID: %d" % detached_pid)
+	_debug_log("_start_detached_server() returned PID: %d" % detached_pid)
 	if detached_pid <= 0:
 		emit_signal("server_failed", "Failed to start detached server")
 		return false
 
 	server_pid = detached_pid
 	_is_running = true
-	print("[AutoStartManager] Starting heartbeat immediately...")
+	_debug_log("Starting heartbeat immediately...")
 	_setup_heartbeat(server_port + 2)
 	_send_heartbeat()
-	print("[AutoStartManager] First heartbeat sent")
+	_debug_log("First heartbeat sent")
 	emit_signal("server_started", detached_pid)
 
-	print("[AutoStartManager] Waiting 2.0s for server to stabilize...")
+	_debug_log("Waiting 2.0s for server to stabilize...")
 	await get_tree().create_timer(2.0).timeout
 	if is_server_running():
-		print("[AutoStartManager] Server is running after wait!")
+		_debug_log("Server is running after wait!")
 		return true
 
 	var log_path := _get_server_log_path()
@@ -409,14 +430,15 @@ func _start_server() -> bool:
 	return false
 
 func _emit_progress(percentage: int, message: String) -> void:
-	print("[AutoStartManager] ", percentage, "% - ", message)
+	print("[AutoStartManager] %d%% - %s" % [percentage, message])
 	emit_signal("check_progress", percentage, message)
 
 func _exit_tree() -> void:
 	if _has_active_server_state():
 		if _should_skip_close_path_stop("EXIT_TREE"):
-			print("[AutoStartManager] EXIT_TREE - leaving sidecar running for close-path isolation; heartbeat timeout should stop it after Godot exits")
+			_log_shutdown_summary_once("exit_tree/heartbeat_only")
 		else:
+			_log_shutdown_summary_once("exit_tree/stop_sync")
 			_stop_sync()
 	progress_timer.stop()
 
@@ -426,27 +448,27 @@ func _notification(what: int) -> void:
 	match what:
 		NOTIFICATION_PREDELETE:
 			if _should_skip_close_path_stop("PREDELETE"):
-				print("[AutoStartManager] PREDELETE - leaving sidecar running for close-path isolation")
+				_log_shutdown_summary_once("predelete/heartbeat_only")
 			else:
-				print("[AutoStartManager] PREDELETE - emergency cleanup")
+				_log_shutdown_summary_once("predelete/stop_sync")
 				_stop_sync()
 		NOTIFICATION_EXIT_TREE:
 			if _should_skip_close_path_stop("EXIT_TREE"):
-				print("[AutoStartManager] EXIT_TREE - leaving sidecar running for close-path isolation")
+				_log_shutdown_summary_once("notification_exit_tree/heartbeat_only")
 			else:
-				print("[AutoStartManager] EXIT_TREE - stopping server")
+				_log_shutdown_summary_once("notification_exit_tree/stop_sync")
 				_stop_sync()
 		NOTIFICATION_WM_CLOSE_REQUEST:
 			if _should_skip_close_path_stop("WM_CLOSE_REQUEST"):
-				print("[AutoStartManager] WM_CLOSE_REQUEST - leaving sidecar running for close-path isolation")
+				_log_shutdown_summary_once("wm_close_request/heartbeat_only")
 			else:
-				print("[AutoStartManager] WM_CLOSE_REQUEST - stopping server")
+				_log_shutdown_summary_once("wm_close_request/stop_sync")
 				_stop_sync()
 
 func _should_skip_close_path_stop(reason: String) -> bool:
 	if not skip_sidecar_stop_on_close_debug:
 		return false
-	print("[AutoStartManager] Close-path isolation active (%s): skipping normal sidecar stop; sidecar should self-exit after heartbeat timeout (~3s)" % reason)
+	_debug_log("Close-path isolation active (%s): skipping normal sidecar stop; sidecar should self-exit after heartbeat timeout (~3s)" % reason)
 	return true
 
 func _stop_sync() -> void:

@@ -1,0 +1,1 @@
+# Hide the repo-owned Windows desktop runtime root from Godot/editor import scans.
