@@ -1883,26 +1883,23 @@ Truthful repo-local validation completed: `~/.local/bin/godot --headless --path 
 **Files Created/Deleted/Modified:**
 - plan updates / verification notes only unless a truthful docs correction is required
 
-**Status:** ❌ Failed
+**Status:** ✅ Complete
 
-**Results:** QA failed bead `oc-xkpr` on truth, not effort. Functional probe coverage is materially better now than the coder handoff, but the implemented Boxing proving UI is not a 1:1-enough match to `REF-23`, and I could not honestly certify live visual parity on an attached editor/runtime surface because no Godot plugin session was available and the shell had no live X11/Wayland display to capture from. I therefore combined source inspection with Godot runtime probes in `startup_mode=GODOT_ONLY_DEBUG` rather than rubber-stamping from code alone.
+**Results:** QA reran bead `oc-xkpr` against retry commit `caa8464` and the prior hard failures are now fixed strongly enough to hand the work to audit. I still do **not** have an attached Godot plugin/editor session or a usable live X11/Wayland capture surface from this shell, so I cannot truthfully claim pixel-perfect live screenshot parity from a real window. Instead I used the strongest combination available: source inspection of `.testbed/scenes/boxing_proving.tscn` + `.testbed/scripts/boxing_proving_harness.gd`, fresh Godot headless validation/import, a 1280×720 layout probe, and targeted runtime event/state probes in `startup_mode=GODOT_ONLY_DEBUG`.
 
-What was verified positively against the implemented scene/harness:
-- The scene still renders as a 16:9 surface in a 1280×720 SubViewport probe, with the expected left camera region, bottom-left event feed, and right-side gesture board shell.
-- The 3×3 tile ordering is correct: `Punch`, `Hook`, `Uppercut`, `Knee Strike`, `Guard`, `Leg Lift`, `Side Step`, `Squat`, `Dodge`.
-- Functional pulse wiring is correct for the beat-style gestures: scripted runtime checks confirmed `punch_left/right`, `hook_left/right`, `uppercut_left/right`, `knee_left/right`, and `leg_lift_left_start/right_start` each activate only the intended L/R badge.
-- Persistent center-state wiring is correct for `Guard` and `Squat`: when `gesture_states.guard=true` or `gesture_states.squat=true`, the centered pill becomes active; when false, it returns to idle.
-- State mapping is correct for the lateral rows: `Dodge` is driven from `lean_left` / `lean_right`, and `Side Step` is driven from `sidestep_left` / `sidestep_right`.
-- The event feed uses visible-order numbering and one detector event produces one new visible row. A scripted sequence seeded at 84 produced the expected rows `0085` through `0091` in order (`Squat Activated`, `Right Uppercut`, `Left Uppercut`, `Right Uppercut`, `Squat Deactivated`, `Right Punch`, `Left Punch`).
+Explicit rerun findings for the prior failure list:
+- **1. Full right-side 3×3 board fits in the visible 16:9 viewport with no scrolling:** fixed. Fresh 1280×720 runtime probe reported `scroll_vertical=0 max=566 page=566`, and the full third row (`Side Step`, `Squat`, `Dodge`) rendered at y=481 with height 158, staying inside the visible 720 px surface.
+- **2. Right side reads like one large translucent board rather than 9 separate cards:** fixed in source/layout. The shell remains a single rounded `BoardPanel`, while each tile now uses a transparent/lightweight `PanelContainer` shell with no standalone card border/background in the idle state; active emphasis is subtle instead of nine always-boxed cards.
+- **3. Guard / Squat chip treatment matches the mockup closely enough:** fixed as implemented. Inactive `Guard` / `Squat` no longer show an always-visible idle pill, and active state uses the centered title-case `Active` chip only when the corresponding persistent state is true.
+- **4. Camera shell treatment is simplified enough toward the mockup:** fixed in source/layout. The camera panel styling was reduced to a near-flat white-framed shell (`bg alpha 0.01`, faint border, small radius) rather than the heavier translucent rounded panel QA failed previously.
+- **5. Side Step / Dodge now behave correctly relative to the approved behavior:** fixed in runtime probes. `Side Step` now pulses only from `sidestep_left_start` / `sidestep_right_start`; `Dodge` now pulses only from `lean_left_start` / `lean_right_start`; neither tile exposes a persistent center-state chip, while `Guard` / `Squat` remain the only persistent centered-state gestures.
+- **6. Previously passing functional mappings still remain correct:** reverified. Runtime probes confirmed correct one-sided L/R activation for `punch_left/right`, `hook_left/right`, `uppercut_left/right`, `knee_left/right`, and `leg_lift_left_start/right_start`, and persistent center activation still works for `Guard` / `Squat` only.
+- **7. Event feed still uses visible-order numbering with one event -> one row:** reverified. On a clean seeded feed at sequence 84, the visible rows were exactly `0085: Squat Activated`, `0086: Right Uppercut`, `0087: Left Uppercut`, `0088: Right Uppercut`, `0089: Squat Deactivated`, `0090: Right Punch`, `0091: Left Punch`.
 
-Why QA still fails this bead:
-- The right-side board does not fit the intended single-screen 16:9 composition. In a 1280×720 runtime layout probe, `RightPanelScroll` had a visible height of 599 px while `BoardPanel` measured 894 px tall (`scroll_vertical=0`, `max=894`, `page=599`). The entire third row starts at y=712.5 and is below the visible board viewport, so the bottom row requires scrolling instead of being glanceable at once. That is a material miss against `REF-23`, where all 9 gesture cells are visible simultaneously inside one rounded board.
-- The implemented visual hierarchy is materially different from the mockup even before a screenshot-by-screenshot live pass: the code builds every gesture as its own rounded `PanelContainer` card (`_create_tile()`), while `REF-23` presents a single translucent rounded board with gesture content placed directly on it rather than nine boxed cards. That changes spacing, density, and overall visual intent.
-- `Guard` and `Squat` render an explicit idle pill labeled `IDLE` when inactive, and the active pill text is uppercase `ACTIVE`. The mockup uses title-case `Active` and does not read as an always-visible idle pill treatment for those two tiles. This is a visible styling mismatch, not a nit.
-- The left camera region shell is also visually different in source: the implementation wraps the camera in a rounded translucent bordered panel, whereas `REF-23` presents a plainer white-framed camera surface. Without a live screenshot I will not overstate how large that difference feels in practice, but it is a real implementation deviation.
-- Side Step and Dodge are implemented as persistent `state_lr` badges, not pulse-style event flashes. The user requirement explicitly called out persistence only for `Guard` / `Squat`, and the earlier task research against `REF-23` described Side Step / likely Dodge as event-driven side indicators. The current mapping is technically connected to the right detector states, but the behavioral parity here is at best uncertified and at worst wrong.
+What remains uncertified:
+- I could not perform a true live screenshot-by-screenshot comparison against `REF-23` on an attached editor/runtime surface because `godot_sessions` returned no plugin session and this shell had no exported `DISPLAY` / `WAYLAND_DISPLAY` for a direct compositor capture path. So the final call that the rendered surface is visually *exact enough* in practice is still best made by the auditor or Derrick on a real windowed surface.
 
-Bottom line: this is not ready for audit if the bar is “approved mockup parity” rather than “functional redesign landed.” The bead should stay open for another coder pass that fixes the board fit / no-scroll 3×3 composition first, then re-checks the tile visual treatment and Side Step / Dodge interaction semantics against `REF-23`.
+Practical verdict: QA no longer sees a material parity miss in the implemented board composition or behavior. The previously failing acceptance points are fixed, the functional mappings still hold, and this is now **ready for audit** rather than another coder retry.
 
 ### Task 81: Audit the redesigned Boxing gesture detector UI and close the branch truthfully
 
@@ -1945,9 +1942,11 @@ Guard / Squat chip treatment was corrected to match the mockup more closely: the
 **Files Created/Deleted/Modified:**
 - plan updates and audit notes only
 
-**Status:** ⏳ Pending
+**Status:** ✅ Complete
 
-**Results:** Pending.
+**Results:** Auditor pass completed and bead `oc-dtna` is ready to close. I re-checked the approved mockup (`REF-23`) directly against the current source, the retry diff from `62bf92b` to `caa8464`, and fresh headless/runtime probes instead of relying only on QA prose. What is now proven in source and probe output: the Boxing scene is using the intended one-board 16:9 story (`boxing_proving.tscn` keeps a single rounded `BoardPanel` with a 3x3 `BoardGrid`, while the old Summary/Signal/Metrics/Events right-column panels are hidden); the retry really tightened the mockup-parity surfaces (`caa8464` reduced outer/header/grid spacing, simplified the camera shell, made tile shells transparent by default, changed `Guard`/`Squat` center chips to hidden-unless-active title-case `Active`, and switched `Side Step`/`Dodge` from persistent LR state to event pulses); all 9 cells fit inside the visible board viewport at once in a fresh 1280x720 probe (`v_scroll max=566 page=566`, third row still within the visible grid bounds); and the agreed behavior mapping is correct in current code: Punch/Hook/Uppercut/Knee Strike/Leg Lift are L/R pulse tiles, Guard/Squat are persistent centered `Active`, Side Step pulses from `sidestep_left_start` / `sidestep_right_start`, Dodge pulses from `lean_left_start` / `lean_right_start`, and the event feed still yields one visible numbered row per event (`0085`..`0091` probe matched the approved QA sequence exactly).
+
+What remains uncertified: I still do not have a truthful live screenshot-to-screenshot capture from an attached Godot editor/runtime window on this shell, so I am **not** claiming pixel-perfect visual parity from a real rendered desktop surface. The remaining uncertainty is narrow and cosmetic/live-render-only, not a source/layout/behavior gap. Practical audit decision: the UI branch is ready to close and we should resume the crash branch. The implementation now matches the approved story and behavior closely enough in source plus runtime probes, with the only remaining limit being the already-known lack of live window screenshot certification.
 
 ---
 
