@@ -276,7 +276,7 @@ func _build_runtime_config() -> MediaPipeConfig:
 	config.min_visibility = overlay_visibility_threshold
 	config.track_left_foot = true
 	config.track_right_foot = true
-	config.flip_horizontal = true
+	config.flip_horizontal = _should_flip_horizontal_preview()
 	return config
 
 func _connect_mode_signals() -> void:
@@ -606,6 +606,7 @@ func _start_camera_feed() -> void:
 	camera_view.debug_logging = steady_state_console_debug
 	camera_view.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
 	camera_view.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	camera_view.flip_horizontal = _should_flip_horizontal_preview()
 	camera_view.show_overlay = false
 
 	var previous_display := camera_display
@@ -1165,6 +1166,9 @@ func _camera_source_compact_text() -> String:
 	if source == "0":
 		return "live"
 	return source.get_file() if source.get_file() != "" else source
+
+func _should_flip_horizontal_preview() -> bool:
+	return _get_effective_camera_source() == "0"
 
 func _mode_name() -> String:
 	return "Boxing" if harness_mode == HarnessMode.BOXING else "Flow"

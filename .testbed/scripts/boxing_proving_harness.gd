@@ -4,6 +4,8 @@ const BACKGROUND_TEXTURE_PATH := "res://assets/backgrounds/perfect-hue-may-08-20
 const HEADER_ICON_PATH := "res://assets/icons/boxing-glove-1.svg"
 const TILE_PULSE_MS := 420
 const MAX_BOXING_FEED_ROWS := 8
+const ACTIVE_PILL_FILL := Color8(0x3d, 0xdc, 0xdc, 0xff)
+const ACTIVE_PILL_TEXT := Color8(0x05, 0x22, 0x28, 0xff)
 const BOARD_ICON_PATHS := {
 	"punch": "res://assets/icons/boxing-punch-1.svg",
 	"hook": "res://assets/icons/boxing-hook-1.svg",
@@ -121,6 +123,10 @@ var _board_grid: GridContainer
 var _boxing_event_feed: Array[String] = []
 var _boxing_event_sequence := 0
 var _tile_refs := {}
+var _boxing_state_overrides := {
+	"guard": false,
+	"squat": false,
+}
 
 func _ready() -> void:
 	_resolve_boxing_shell_nodes()
@@ -146,11 +152,21 @@ func _refresh_debug_panels() -> void:
 	_update_tile_states()
 
 func _record_event(event_name: String, payload: Dictionary) -> void:
-	if harness_mode == HarnessMode.BOXING and UI_EVENT_LABELS.has(event_name):
-		_boxing_event_sequence += 1
-		_boxing_event_feed.append("%04d: %s" % [_boxing_event_sequence, String(UI_EVENT_LABELS[event_name])])
-		while _boxing_event_feed.size() > MAX_BOXING_FEED_ROWS:
-			_boxing_event_feed.remove_at(0)
+	if harness_mode == HarnessMode.BOXING:
+		match event_name:
+			"guard_start":
+				_boxing_state_overrides["guard"] = true
+			"guard_end":
+				_boxing_state_overrides["guard"] = false
+			"squat_start":
+				_boxing_state_overrides["squat"] = true
+			"squat_end":
+				_boxing_state_overrides["squat"] = false
+		if UI_EVENT_LABELS.has(event_name):
+			_boxing_event_sequence += 1
+			_boxing_event_feed.append("%04d: %s" % [_boxing_event_sequence, String(UI_EVENT_LABELS[event_name])])
+			while _boxing_event_feed.size() > MAX_BOXING_FEED_ROWS:
+				_boxing_event_feed.remove_at(0)
 	super._record_event(event_name, payload)
 
 func _update_status(text: String, color: Color) -> void:
@@ -340,8 +356,8 @@ func _update_badge(badge: Dictionary, text: String, active: bool) -> void:
 		return
 	label.text = text
 	if active:
-		_apply_panel_style(panel, Color(0.27, 0.89, 0.86, 0.92), Color(0.85, 1.0, 1.0, 0.95), 18, 1, 0)
-		label.add_theme_color_override("font_color", Color(0.05, 0.22, 0.28, 1.0))
+		_apply_panel_style(panel, ACTIVE_PILL_FILL, ACTIVE_PILL_FILL, 18, 1, 0)
+		label.add_theme_color_override("font_color", ACTIVE_PILL_TEXT)
 	else:
 		_apply_panel_style(panel, Color(0.16, 0.20, 0.28, 0.14), Color(1.0, 1.0, 1.0, 0.66), 18, 1, 0)
 		label.add_theme_color_override("font_color", Color(0.96, 0.97, 1.0, 1.0))
@@ -388,7 +404,10 @@ func _any_state_active(names_variant: Variant) -> bool:
 	var names: Array = names_variant if names_variant is Array else []
 	var gesture_states: Dictionary = _latest_state.get("gesture_states", {})
 	for name_variant: Variant in names:
-		if bool(gesture_states.get(String(name_variant), false)):
+		var state_name := String(name_variant)
+		if bool(gesture_states.get(state_name, false)):
+			return true
+		if bool(_boxing_state_overrides.get(state_name, false)):
 			return true
 	return false
 

@@ -1901,6 +1901,31 @@ What remains uncertified:
 
 Practical verdict: QA no longer sees a material parity miss in the implemented board composition or behavior. The previously failing acceptance points are fixed, the functional mappings still hold, and this is now **ready for audit** rather than another coder retry.
 
+### Task 83: Fix Boxing UI live-audit parity issues from Derrick's direct review
+
+**Bead ID:** `oc-lg65`
+**SubAgent:** `primary` (for `coder` workflow role)
+**Role:** `coder`
+**References:** `REF-23`
+**Prompt:** Fix the live-audit parity issues Derrick found during direct review of the Boxing gesture detector scene. Treat these as hard acceptance criteria: the camera feed from prerecorded video must not be flipped horizontally; `Guard` and `Squat` must show their `Active` pills below the icons when active; and all `L`, `R`, and `Active` pills must fill with color `#3ddcdc` when active. Preserve the already-correct layout/story, event feed behavior, and Boxing-only scope.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- `.testbed/scenes/`
+- `.testbed/scripts/`
+- any directly owning Boxing UI helper paths required by the fix
+
+**Files Created/Deleted/Modified:**
+- Boxing proving scene/harness/UI files required by the fix
+
+**Status:** ✅ Complete
+
+**Results:** Coder pass completed on bead `oc-lg65` with the smallest truthful fix set across the shared proving harness and the Boxing-only UI subclass. The prerecorded-video horizontal flip was coming from the existing mirrored-camera baseline being applied unconditionally in two places: `.testbed/scripts/proving_harness.gd` always set `MediaPipeConfig.flip_horizontal = true`, and `_start_camera_feed()` instantiated `MediaPipeCameraView` with its default `flip_horizontal = true`. That was still correct for live camera parity, but it incorrectly mirrored file-backed proving clips. The fix keeps live behavior intact while stopping the unwanted file mirroring: the proving harness now flips only when the effective camera source is the live default (`"0"`), so prerecorded/video-file sources run unflipped for both the preview surface and provider config.
+
+The pill fixes stayed Boxing-only in `.testbed/scripts/boxing_proving_harness.gd`. Active pills now use the exact requested fill color `#3ddcdc` (`Color8(0x3d, 0xdc, 0xdc, 0xff)`) for all `L`, `R`, and `Active` badges. Guard and Squat also gained a narrow event-backed state fallback (`guard_start/end`, `squat_start/end`) in addition to the existing detector-state read so their centered `Active` pills remain visible during the active runtime state even if the direct state refresh lags the visible transition by a frame.
+
+Validation passed: `~/.local/bin/godot --headless --path .testbed --check-only --script scripts/boxing_proving_harness.gd` stayed clean, and a targeted headless Boxing-scene probe confirmed `prerecorded_flip=false`, `live_flip=true`, `guard_visible=true`, `squat_visible=true`, and both active pill fills rendering as `3ddcdc`. Existing Boxing-only layout/story, full 3x3 board fit, visible-order event feed, and detector/event wiring were preserved.
+
 ### Task 81: Audit the redesigned Boxing gesture detector UI and close the branch truthfully
 
 ### Task 82: Retry Boxing gesture detector UI redesign to satisfy exact mockup-parity QA failures
@@ -1944,9 +1969,7 @@ Guard / Squat chip treatment was corrected to match the mockup more closely: the
 
 **Status:** ✅ Complete
 
-**Results:** Auditor pass completed and bead `oc-dtna` is ready to close. I re-checked the approved mockup (`REF-23`) directly against the current source, the retry diff from `62bf92b` to `caa8464`, and fresh headless/runtime probes instead of relying only on QA prose. What is now proven in source and probe output: the Boxing scene is using the intended one-board 16:9 story (`boxing_proving.tscn` keeps a single rounded `BoardPanel` with a 3x3 `BoardGrid`, while the old Summary/Signal/Metrics/Events right-column panels are hidden); the retry really tightened the mockup-parity surfaces (`caa8464` reduced outer/header/grid spacing, simplified the camera shell, made tile shells transparent by default, changed `Guard`/`Squat` center chips to hidden-unless-active title-case `Active`, and switched `Side Step`/`Dodge` from persistent LR state to event pulses); all 9 cells fit inside the visible board viewport at once in a fresh 1280x720 probe (`v_scroll max=566 page=566`, third row still within the visible grid bounds); and the agreed behavior mapping is correct in current code: Punch/Hook/Uppercut/Knee Strike/Leg Lift are L/R pulse tiles, Guard/Squat are persistent centered `Active`, Side Step pulses from `sidestep_left_start` / `sidestep_right_start`, Dodge pulses from `lean_left_start` / `lean_right_start`, and the event feed still yields one visible numbered row per event (`0085`..`0091` probe matched the approved QA sequence exactly).
-
-What remains uncertified: I still do not have a truthful live screenshot-to-screenshot capture from an attached Godot editor/runtime window on this shell, so I am **not** claiming pixel-perfect visual parity from a real rendered desktop surface. The remaining uncertainty is narrow and cosmetic/live-render-only, not a source/layout/behavior gap. Practical audit decision: the UI branch is ready to close and we should resume the crash branch. The implementation now matches the approved story and behavior closely enough in source plus runtime probes, with the only remaining limit being the already-known lack of live window screenshot certification.
+**Results:** Auditor pass had previously closed the branch from source/runtime evidence, but Derrick’s direct human audit overrode that closure with three real remaining runtime-visible parity issues: (1) the camera feed from the prerecorded video source is flipped horizontally, (2) `Guard` and `Squat` are missing their `Active` pills below their icons, and (3) the intended treatment for all `L`, `R`, and `Active` pills is to fill them with color `#3ddcdc` when active. That means the UI branch is not actually done yet, and the prior audit conclusion was too optimistic because the available non-live validation path missed visible runtime truth. The branch must be reopened for another coder retry using Derrick’s direct audit notes as the new top-priority acceptance criteria before it can be re-closed.
 
 ---
 
