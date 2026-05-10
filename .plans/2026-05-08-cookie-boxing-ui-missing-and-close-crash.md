@@ -1883,9 +1883,53 @@ Truthful repo-local validation completed: `~/.local/bin/godot --headless --path 
 **Files Created/Deleted/Modified:**
 - plan updates / verification notes only unless a truthful docs correction is required
 
-**Status:** ⏳ Pending
+**Status:** ❌ Failed
 
-**Results:** Pending.
+**Results:** QA failed bead `oc-xkpr` on truth, not effort. Functional probe coverage is materially better now than the coder handoff, but the implemented Boxing proving UI is not a 1:1-enough match to `REF-23`, and I could not honestly certify live visual parity on an attached editor/runtime surface because no Godot plugin session was available and the shell had no live X11/Wayland display to capture from. I therefore combined source inspection with Godot runtime probes in `startup_mode=GODOT_ONLY_DEBUG` rather than rubber-stamping from code alone.
+
+What was verified positively against the implemented scene/harness:
+- The scene still renders as a 16:9 surface in a 1280×720 SubViewport probe, with the expected left camera region, bottom-left event feed, and right-side gesture board shell.
+- The 3×3 tile ordering is correct: `Punch`, `Hook`, `Uppercut`, `Knee Strike`, `Guard`, `Leg Lift`, `Side Step`, `Squat`, `Dodge`.
+- Functional pulse wiring is correct for the beat-style gestures: scripted runtime checks confirmed `punch_left/right`, `hook_left/right`, `uppercut_left/right`, `knee_left/right`, and `leg_lift_left_start/right_start` each activate only the intended L/R badge.
+- Persistent center-state wiring is correct for `Guard` and `Squat`: when `gesture_states.guard=true` or `gesture_states.squat=true`, the centered pill becomes active; when false, it returns to idle.
+- State mapping is correct for the lateral rows: `Dodge` is driven from `lean_left` / `lean_right`, and `Side Step` is driven from `sidestep_left` / `sidestep_right`.
+- The event feed uses visible-order numbering and one detector event produces one new visible row. A scripted sequence seeded at 84 produced the expected rows `0085` through `0091` in order (`Squat Activated`, `Right Uppercut`, `Left Uppercut`, `Right Uppercut`, `Squat Deactivated`, `Right Punch`, `Left Punch`).
+
+Why QA still fails this bead:
+- The right-side board does not fit the intended single-screen 16:9 composition. In a 1280×720 runtime layout probe, `RightPanelScroll` had a visible height of 599 px while `BoardPanel` measured 894 px tall (`scroll_vertical=0`, `max=894`, `page=599`). The entire third row starts at y=712.5 and is below the visible board viewport, so the bottom row requires scrolling instead of being glanceable at once. That is a material miss against `REF-23`, where all 9 gesture cells are visible simultaneously inside one rounded board.
+- The implemented visual hierarchy is materially different from the mockup even before a screenshot-by-screenshot live pass: the code builds every gesture as its own rounded `PanelContainer` card (`_create_tile()`), while `REF-23` presents a single translucent rounded board with gesture content placed directly on it rather than nine boxed cards. That changes spacing, density, and overall visual intent.
+- `Guard` and `Squat` render an explicit idle pill labeled `IDLE` when inactive, and the active pill text is uppercase `ACTIVE`. The mockup uses title-case `Active` and does not read as an always-visible idle pill treatment for those two tiles. This is a visible styling mismatch, not a nit.
+- The left camera region shell is also visually different in source: the implementation wraps the camera in a rounded translucent bordered panel, whereas `REF-23` presents a plainer white-framed camera surface. Without a live screenshot I will not overstate how large that difference feels in practice, but it is a real implementation deviation.
+- Side Step and Dodge are implemented as persistent `state_lr` badges, not pulse-style event flashes. The user requirement explicitly called out persistence only for `Guard` / `Squat`, and the earlier task research against `REF-23` described Side Step / likely Dodge as event-driven side indicators. The current mapping is technically connected to the right detector states, but the behavioral parity here is at best uncertified and at worst wrong.
+
+Bottom line: this is not ready for audit if the bar is “approved mockup parity” rather than “functional redesign landed.” The bead should stay open for another coder pass that fixes the board fit / no-scroll 3×3 composition first, then re-checks the tile visual treatment and Side Step / Dodge interaction semantics against `REF-23`.
+
+### Task 81: Audit the redesigned Boxing gesture detector UI and close the branch truthfully
+
+### Task 82: Retry Boxing gesture detector UI redesign to satisfy exact mockup-parity QA failures
+
+**Bead ID:** `oc-12tw`
+**SubAgent:** `primary` (for `coder` workflow role)
+**Role:** `coder`
+**References:** `REF-23`
+**Prompt:** Fix the exact QA failures from Task 80 so the Boxing gesture detector scene is a true 1:1-enough match for Derrick’s approved mockup. Treat the QA report as hard acceptance criteria: all 9 gesture cells must fit at once in the visible 16:9 viewport with no board scrolling; the right side must read like one large translucent board rather than 9 separate card boxes; `Guard` / `Squat` chip treatment must match the mockup more closely; the camera shell treatment must be simplified toward the mockup; and `Side Step` / `Dodge` behavior must be revisited so only `Guard` / `Squat` remain persistent unless the mockup clearly implies otherwise. Preserve the already-correct functional wiring and event feed behavior while tightening layout/styling/behavior parity.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- `.testbed/scenes/`
+- `.testbed/scripts/`
+- any directly owning Boxing UI asset/helper paths required by the retry
+
+**Files Created/Deleted/Modified:**
+- Boxing proving scene/harness/UI files required by the retry
+
+**Status:** ✅ Complete
+
+**Results:** Coder retry completed on bead `oc-12tw`. The retry stayed scoped to the Boxing proving scene + Boxing-only subclass/harness styling. The no-scroll full-board issue was fixed truthfully by shrinking the board’s vertical budget instead of hiding overflow: `.testbed/scenes/boxing_proving.tscn` now uses tighter outer/header/content spacing, a slightly smaller left camera/event stack, and a narrower right-panel margin/grid gap budget; `.testbed/scripts/boxing_proving_harness.gd` now builds each gesture tile at a smaller fixed minimum (`132x158`), with smaller icons/badges and no vertical expand-fill. A direct 1280×720 Godot layout probe after the change showed `RightPanelScroll size=(632, 591)` and `BoardPanel size=(632, 591)` with `BoardPanel` minimum height `566`, meaning all 3 rows fit inside the visible board viewport at once with no remaining vertical overflow/scroll requirement.
+
+The visual hierarchy was corrected so the right side reads like one translucent rounded board instead of 9 separate boxed cards: the single `BoardPanel` keeps the rounded translucent shell, while the per-gesture tiles now render as transparent/lightweight placement containers with only subtle active highlighting rather than individual rounded card blocks. Camera shell treatment was also simplified toward the mockup by replacing the heavier rounded translucent camera panel styling with a much lighter near-flat white-framed shell.
+
+Guard / Squat chip treatment was corrected to match the mockup more closely: the centered state chip now uses title-case `Active`, and inactive state no longer shows an always-visible `IDLE` pill. Side Step / Dodge behavior was also revised per QA: both tiles now use event-style left/right pulse indicators (`sidestep_left_start` / `sidestep_right_start` and `lean_left_start` / `lean_right_start`) instead of persistent state badges, while Guard / Squat remain the only persistent centered-state chips. Existing functional detector wiring, Boxing-only scope, and visible-order event-feed numbering were preserved. Validation completed with `~/.local/bin/godot --headless --path .testbed --check-only --script scripts/boxing_proving_harness.gd` plus the explicit 1280×720 board-fit probe described above.
 
 ### Task 81: Audit the redesigned Boxing gesture detector UI and close the branch truthfully
 

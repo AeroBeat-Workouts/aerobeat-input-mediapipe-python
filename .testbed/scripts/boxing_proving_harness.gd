@@ -93,9 +93,9 @@ const TILE_CONFIGS := [
 		"id": "sidestep",
 		"label": "Side Step",
 		"icon": BOARD_ICON_PATHS["sidestep"],
-		"mode": "state_lr",
-		"left_states": ["sidestep_left"],
-		"right_states": ["sidestep_right"],
+		"mode": "pulse_lr",
+		"left_events": ["sidestep_left_start"],
+		"right_events": ["sidestep_right_start"],
 	},
 	{
 		"id": "squat",
@@ -108,9 +108,9 @@ const TILE_CONFIGS := [
 		"id": "dodge",
 		"label": "Dodge",
 		"icon": BOARD_ICON_PATHS["dodge"],
-		"mode": "state_lr",
-		"left_states": ["lean_left"],
-		"right_states": ["lean_right"],
+		"mode": "pulse_lr",
+		"left_events": ["lean_left_start"],
+		"right_events": ["lean_right_start"],
 	},
 ]
 
@@ -185,18 +185,18 @@ func _apply_boxing_visual_shell() -> void:
 		_header_icon.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
 		_header_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	if title_label:
-		title_label.add_theme_font_size_override("font_size", 26)
+		title_label.add_theme_font_size_override("font_size", 24)
 		title_label.add_theme_color_override("font_color", Color(0.97, 0.98, 1.0, 1.0))
 	if status_label:
-		status_label.add_theme_font_size_override("font_size", 13)
-		status_label.add_theme_color_override("font_color", Color(0.80, 0.90, 1.0, 1.0))
+		status_label.add_theme_font_size_override("font_size", 12)
+		status_label.add_theme_color_override("font_color", Color(0.84, 0.91, 0.98, 1.0))
 	if live_status_label:
-		live_status_label.add_theme_font_size_override("normal_font_size", 12)
-		live_status_label.add_theme_color_override("default_color", Color(0.88, 0.93, 0.98, 0.9))
+		live_status_label.add_theme_font_size_override("normal_font_size", 11)
+		live_status_label.add_theme_color_override("default_color", Color(0.88, 0.93, 0.98, 0.86))
 		live_status_label.fit_content = true
 		live_status_label.scroll_active = false
 	if quick_stats_label:
-		quick_stats_label.add_theme_font_size_override("normal_font_size", 17)
+		quick_stats_label.add_theme_font_size_override("normal_font_size", 15)
 		quick_stats_label.add_theme_color_override("default_color", Color(0.97, 0.98, 1.0, 1.0))
 		quick_stats_label.scroll_active = true
 		quick_stats_label.fit_content = false
@@ -204,18 +204,18 @@ func _apply_boxing_visual_shell() -> void:
 	if notes_label:
 		notes_label.visible = false
 	if camera_display:
-		camera_display.custom_minimum_size = Vector2(560, 315)
+		camera_display.custom_minimum_size = Vector2(520, 293)
 	if camera_display and camera_display.get_parent() is PanelContainer:
-		_apply_panel_style(camera_display.get_parent(), Color(1.0, 1.0, 1.0, 0.08), Color(1.0, 1.0, 1.0, 0.18), 18, 1, 10)
+		_apply_panel_style(camera_display.get_parent(), Color(1.0, 1.0, 1.0, 0.01), Color(1.0, 1.0, 1.0, 0.12), 4, 1, 0)
 	if quick_stats_label and quick_stats_label.get_parent() is PanelContainer:
-		quick_stats_label.get_parent().custom_minimum_size = Vector2(0, 248)
-		_apply_panel_style(quick_stats_label.get_parent(), Color(0.20, 0.21, 0.24, 0.88), Color(1.0, 1.0, 1.0, 0.10), 18, 1, 14)
+		quick_stats_label.get_parent().custom_minimum_size = Vector2(0, 210)
+		_apply_panel_style(quick_stats_label.get_parent(), Color(0.20, 0.21, 0.24, 0.90), Color(1.0, 1.0, 1.0, 0.08), 14, 1, 12)
 	if _board_panel:
-		_apply_panel_style(_board_panel, Color(0.25, 0.38, 0.53, 0.62), Color(1.0, 1.0, 1.0, 0.24), 26, 1, 22)
+		_apply_panel_style(_board_panel, Color(0.25, 0.38, 0.53, 0.56), Color(1.0, 1.0, 1.0, 0.26), 28, 1, 18)
 	if _board_grid:
 		_board_grid.columns = 3
-		_board_grid.add_theme_constant_override("h_separation", 18)
-		_board_grid.add_theme_constant_override("v_separation", 18)
+		_board_grid.add_theme_constant_override("h_separation", 10)
+		_board_grid.add_theme_constant_override("v_separation", 10)
 	if summary_label and summary_label.get_parent() is Control:
 		summary_label.get_parent().visible = false
 	if signal_status_label and signal_status_label.get_parent() is Control:
@@ -227,52 +227,52 @@ func _apply_boxing_visual_shell() -> void:
 
 func _create_tile(config: Dictionary) -> Dictionary:
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(150, 215)
+	panel.custom_minimum_size = Vector2(132, 158)
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_apply_panel_style(panel, Color(0.17, 0.28, 0.43, 0.72), Color(1.0, 1.0, 1.0, 0.16), 20, 1, 14)
+	panel.size_flags_vertical = 0
+	_apply_panel_style(panel, Color(1.0, 1.0, 1.0, 0.0), Color(1.0, 1.0, 1.0, 0.0), 0, 0, 0)
 
 	var margin := MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", 12)
-	margin.add_theme_constant_override("margin_top", 10)
-	margin.add_theme_constant_override("margin_right", 12)
-	margin.add_theme_constant_override("margin_bottom", 12)
+	margin.add_theme_constant_override("margin_left", 6)
+	margin.add_theme_constant_override("margin_top", 4)
+	margin.add_theme_constant_override("margin_right", 6)
+	margin.add_theme_constant_override("margin_bottom", 4)
 	panel.add_child(margin)
 
 	var column := VBoxContainer.new()
 	column.alignment = BoxContainer.ALIGNMENT_CENTER
-	column.add_theme_constant_override("separation", 10)
+	column.add_theme_constant_override("separation", 4)
 	margin.add_child(column)
 
 	var title := Label.new()
 	title.text = String(config["label"])
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 16)
+	title.add_theme_font_size_override("font_size", 14)
 	title.add_theme_color_override("font_color", Color(0.97, 0.98, 1.0, 1.0))
 	column.add_child(title)
 
 	var icon := TextureRect.new()
 	icon.texture = load(String(config["icon"]))
-	icon.custom_minimum_size = Vector2(0, 88)
-	icon.expand_mode = TextureRect.EXPAND_FIT_HEIGHT_PROPORTIONAL
+	icon.custom_minimum_size = Vector2(88, 54)
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	icon.modulate = Color(1.0, 1.0, 1.0, 1.0)
 	column.add_child(icon)
 
 	var badges := HBoxContainer.new()
 	badges.alignment = BoxContainer.ALIGNMENT_CENTER
-	badges.add_theme_constant_override("separation", 10)
+	badges.add_theme_constant_override("separation", 6)
 	column.add_child(badges)
 
 	var left_badge := _create_badge("L")
-	var center_badge := _create_badge("IDLE", true)
+	var center_badge := _create_badge("Active", true)
 	var right_badge := _create_badge("R")
 	badges.add_child(left_badge["panel"])
 	badges.add_child(center_badge["panel"])
 	badges.add_child(right_badge["panel"])
 
 	var mode := String(config.get("mode", "pulse_lr"))
-	center_badge["panel"].visible = mode == "state_center"
+	center_badge["panel"].visible = false
 	left_badge["panel"].visible = mode != "state_center"
 	right_badge["panel"].visible = mode != "state_center"
 
@@ -291,13 +291,13 @@ func _create_tile(config: Dictionary) -> Dictionary:
 
 func _create_badge(text: String, wide: bool = false) -> Dictionary:
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(76 if wide else 42, 42)
-	_apply_panel_style(panel, Color(0.16, 0.20, 0.28, 0.45), Color(1.0, 1.0, 1.0, 0.55), 21, 1, 0)
+	panel.custom_minimum_size = Vector2(68 if wide else 34, 34)
+	_apply_panel_style(panel, Color(0.16, 0.20, 0.28, 0.20), Color(1.0, 1.0, 1.0, 0.70), 18, 1, 0)
 	var label := Label.new()
 	label.text = text
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", 15 if wide else 16)
+	label.add_theme_font_size_override("font_size", 13 if wide else 14)
 	label.add_theme_color_override("font_color", Color(0.96, 0.97, 1.0, 1.0))
 	panel.add_child(label)
 	return {"panel": panel, "label": label}
@@ -327,7 +327,11 @@ func _update_lr_badges(tile: Dictionary, left_active: bool, right_active: bool) 
 	_update_badge(tile.get("right", {}), "R", right_active)
 
 func _update_center_badge(tile: Dictionary, active: bool) -> void:
-	_update_badge(tile.get("center", {}), "ACTIVE" if active else "IDLE", active)
+	var badge: Dictionary = tile.get("center", {})
+	var panel := badge.get("panel") as PanelContainer
+	if panel != null:
+		panel.visible = active
+	_update_badge(badge, "Active", active)
 
 func _update_badge(badge: Dictionary, text: String, active: bool) -> void:
 	var panel := badge.get("panel") as PanelContainer
@@ -336,10 +340,10 @@ func _update_badge(badge: Dictionary, text: String, active: bool) -> void:
 		return
 	label.text = text
 	if active:
-		_apply_panel_style(panel, Color(0.27, 0.89, 0.86, 0.92), Color(0.85, 1.0, 1.0, 1.0), 21, 1, 0)
+		_apply_panel_style(panel, Color(0.27, 0.89, 0.86, 0.92), Color(0.85, 1.0, 1.0, 0.95), 18, 1, 0)
 		label.add_theme_color_override("font_color", Color(0.05, 0.22, 0.28, 1.0))
 	else:
-		_apply_panel_style(panel, Color(0.16, 0.20, 0.28, 0.30), Color(1.0, 1.0, 1.0, 0.60), 21, 1, 0)
+		_apply_panel_style(panel, Color(0.16, 0.20, 0.28, 0.14), Color(1.0, 1.0, 1.0, 0.66), 18, 1, 0)
 		label.add_theme_color_override("font_color", Color(0.96, 0.97, 1.0, 1.0))
 
 func _update_tile_shell(tile: Dictionary, active: bool) -> void:
@@ -347,9 +351,9 @@ func _update_tile_shell(tile: Dictionary, active: bool) -> void:
 	if panel == null:
 		return
 	if active:
-		_apply_panel_style(panel, Color(0.21, 0.67, 0.78, 0.34), Color(0.60, 1.0, 1.0, 0.85), 20, 2, 14)
+		_apply_panel_style(panel, Color(0.22, 0.78, 0.88, 0.14), Color(0.60, 1.0, 1.0, 0.38), 12, 1, 0)
 	else:
-		_apply_panel_style(panel, Color(0.17, 0.28, 0.43, 0.72), Color(1.0, 1.0, 1.0, 0.16), 20, 1, 14)
+		_apply_panel_style(panel, Color(1.0, 1.0, 1.0, 0.0), Color(1.0, 1.0, 1.0, 0.0), 0, 0, 0)
 
 func _build_boxing_event_feed_text() -> String:
 	var lines := ["Detected events"]
