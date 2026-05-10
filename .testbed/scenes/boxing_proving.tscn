@@ -17,6 +17,7 @@ prerecorded_video_source = "res://assets/fixtures/boxing/punch_left/boxing__punc
 scene_title = "Boxing Detector Proving"
 scene_notes = "Live proving ground for punches, guard, squat, lean, sidestep, knees, and leg lifts.
 Use the event feed plus threshold readouts on the right to tune gesture behavior without rewriting detector logic."
+skip_sidecar_stop_on_close_debug = true
 
 [node name="AutoStartManager" type="Node" parent="." unique_id=140099864]
 script = ExtResource("4_autostart")
