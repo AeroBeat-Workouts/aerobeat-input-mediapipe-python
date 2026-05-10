@@ -1808,9 +1808,11 @@ Terminal-safe validation passed locally. `~/.local/bin/godot --headless --path .
 **Files Created/Deleted/Modified:**
 - plan updates / verification notes only unless a truthful docs correction is required
 
-**Status:** ⏳ Pending
+**Status:** ✅ Complete
 
-**Results:** Pending.
+**Results:** QA completed against commit `71c3716` (`Quiet proving harness event logging`) using terminal-safe validation only; bead `oc-nqp8` is ready to close. Independent evidence says the default prerecorded proving path is now finally quiet enough to use as a crash-hunting console surface. Fresh local QA artifacts live under `.temp/task77/`. Validation details: `godot --headless --path .testbed --check-only --script scripts/proving_harness.gd` passed, `godot --headless --path .testbed --import --quit-after 1000` passed with `0` `.csv` warning matches, and an independent 8-second prerecorded Boxing run with `AEROBEAT_MEDIAPIPE_CAMERA_SOURCE=.testbed/assets/videos/boxing.mp4` produced just `20` total log lines, `0` `[ProvingHarness][Boxing] mode=...` snapshot lines, `0` detector event-print lines, `0` `Preview cadence` lines, `0` `MJPEG buffer overflow` lines, `0` thread-destruction warnings, and `0` `Failed to connect, status: 3` warnings. A second graceful-shutdown driver pass against the same prerecorded source produced `23` total log lines with `0` snapshot/event spam and exactly `2` shutdown summaries: one concise harness summary plus one concise AutoStartManager summary. Startup/exit signal stayed meaningful in that pass: initialization, runtime/dependency readiness, sidecar start, `Boxing harness live`, then clean shutdown summaries.
+
+What is now proven: commit `71c3716` removed the remaining default proving-harness event/snapshot spam identified in Task 74, and the terminal log surface is quiet enough by default for the next Chip crash rerun while preserving useful startup and exit markers. What is **not** proven by this QA pass: real Chip-hosted editor/runtime behavior on the actual crash path. Derrick still needs the direct Chip truth pass to confirm that the quieter console really stays this clean during the host-specific close-path repro and that no new runtime-only warning family appears there.
 
 ---
 
@@ -1837,32 +1839,37 @@ Terminal-safe validation passed locally. `~/.local/bin/godot --headless --path .
 
 ## Session Handoff / Current Stopping Point
 
-- Tonight’s biggest product win: prerecorded proving playback is now a real feature path instead of a frozen stub.
-  - Boxing/Flow proving scenes can now select prerecorded clips through the shared Inspector file-picker `prerecorded_video_source`.
-  - File-backed preview now advances visibly and loops correctly after the producer-pacing / file-FPS fix in `python_mediapipe/main.py`.
-- Important crash-forensics breakthrough: the final one-shot close-path isolation toggle (`skip_sidecar_stop_on_close_debug`) prevented the Cookie GUI/session crash when enabled.
-  - Same connected preview during playback.
-  - Different close-time teardown behavior.
-  - Derrick’s direct result: **with sidecar stop on close skipped, Cookie did not crash**.
-  - That is now the sharpest truth cut in the whole branch and strongly implicates the AutoStartManager / sidecar shutdown path on close as the prime suspect cluster.
-- Current crash matrix after tonight:
-  - `GODOT_ONLY_DEBUG` → no crash
-  - connected `PREVIEW_ONLY_DEBUG` → crash
-  - connected `PREVIEW_ONLY_DEBUG` + file-backed source → crash
-  - connected preview + `skip_sidecar_stop_on_close_debug=true` → **no crash**
-- What this now rules out strongly:
-  - bare Godot/editor close as sufficient
-  - `MediaPipeProvider.start()` as required
-  - live camera / V4L teardown as required
-  - texture-size mismatch as the primary cause
-- What remains product-side but separate from the crash:
-  - file-backed preview is now usable and loops, but should still be treated as newly landed feature work that may want polish/docs later
+- File-backed prerecorded proving is now a real supported proving path, not a stub:
+  - Boxing/Flow proving scenes can select clips through the shared Inspector file-picker `prerecorded_video_source`.
+  - File-backed preview now advances, loops, and is quiet enough by default to use during crash hunting.
+- Cookie still provided the sharpest crash-forensics truth cut:
+  - connected `PREVIEW_ONLY_DEBUG` could crash Cookie
+  - connected file-backed `PREVIEW_ONLY_DEBUG` could also crash Cookie
+  - but the same close path with `skip_sidecar_stop_on_close_debug=true` did **not** crash Cookie
+  - best current read remains: the prime suspect cluster is the normal `AutoStartManager` / sidecar shutdown path on close
+- Chip became the active crash sandbox for today because Cookie was unavailable.
+  - First Chip A/B result with `skip_sidecar_stop_on_close_debug=true` closed cleanly.
+  - The initial second-half Chip run with the flag back to `false` did **not** crash, but that run was contaminated by a dirty runtime state (`Buffer full, dropping packets!` plus stream-thread cleanup warning), so it was not treated as a clean falsification of the Cookie shutdown hypothesis.
+- To clean the Chip repro surface before the next live rerun, we landed three focused cleanup branches:
+  1. `c247339` — preview-only self-audit + `camera_view.gd` thread teardown fix
+  2. `d811c09` — quiet proving/logging by default + CSV/import-warning mitigation
+  3. `71c3716` — final proving-harness event/snapshot quieting
+- Current terminal-safe QA state is good:
+  - prerecorded Boxing headless runs now stay near ~20 log lines instead of 1,568+
+  - snapshot/event spam is gone by default
+  - CSV import warnings are gone in validated scope
+  - the old `Thread object is being destroyed...` warning family is gone in validated prerecorded scope
+  - startup/exit signal remains concise and readable
 - Important local-host rule carried forward:
-  - avoid risky live GUI proving on Pico’s own machine; the session-reset/Xwayland family was reproduced locally earlier in the night and local GUI work should stay minimized unless explicitly needed
+  - avoid risky live GUI proving on Pico’s own machine; continue using Chip for live repro unless explicitly needed otherwise
 - Exact next-session starting point:
-  1. begin from the close-time sidecar shutdown path, not from broad crash theories
-  2. compare narrower shutdown behaviors inside `AutoStartManager` / proving close path (immediate stop vs deferred stop vs heartbeat-only stop and any specific kill/cleanup calls)
-  3. keep using file-backed proving as the cleaner repro surface while pursuing that shutdown-sequence isolation
+  1. resume on Chip, not Pico
+  2. rerun the cleaned file-backed `PREVIEW_ONLY_DEBUG` A/B on Chip using the quieter default proving path
+  3. first with `skip_sidecar_stop_on_close_debug=true`, then with only that flag flipped to `false`
+  4. treat any new provider activity, packet-backlog spam, or thread-cleanup warnings as an invalid/dirty rerun
+  5. if the rerun is clean, audit whether the Cookie-style shutdown crash reappears on Chip or whether a host-specific difference still dominates
+- Separate product/UI branch remains queued:
+  - wait for Derrick’s Penpot slice, then redesign the Boxing proving scene to replace text-heavy status with gesture icons and active-state/highlight buttons
 
 ## Final Results
 
@@ -1871,22 +1878,32 @@ Terminal-safe validation passed locally. `~/.local/bin/godot --headless --path .
 **What We Built:**
 - A working file-backed prerecorded proving path for Boxing/Flow scenes, including Inspector-based clip selection and visibly advancing/looping preview playback.
 - A system-scope forensics harness strong enough to survive the rollover boundary.
-- A one-shot close-path isolation toggle that produced the night’s decisive non-crash result.
+- A one-shot close-path isolation toggle that produced the decisive Cookie non-crash result.
+- A cleaned Chip proving surface for the next crash repro:
+  - preview-only self-audit to invalidate dirty provider drift
+  - proper `camera_view.gd` stream-thread realization on teardown
+  - quiet-by-default proving/camera/autostart logging
+  - runtime-tree `.gdignore` shields to stop Godot CSV import noise
+  - harness event/snapshot spam reduced to concise startup/exit signal
 
 **Reference Check:**
-- `REF-04` / `REF-06`: satisfied for the file-backed proving feature work and proving-harness/source-owned changes.
-- `REF-10`: satisfied for the crash-forensics comparisons and active-plan traceability.
+- `REF-04` / `REF-06`: satisfied for the proving-harness/source-owned feature and cleanup work.
+- `REF-18` / `REF-20`: satisfied for the close-path isolation and Chip cleanup branches.
+- `REF-21` / `REF-22`: satisfied for the warning-driven logging/thread cleanup and current-session triage.
 
 **Commits:**
 - `47698a0` - `Fix file-backed preview playback pacing`
 - `e719624` - `Add close-path isolation toggle for preview crash repro`
-- plus earlier same-session support commits already recorded above for video-source selection, preview readiness, warning cleanup, and crash-harness hardening.
+- `c247339` - `Harden preview-only audit and camera thread teardown`
+- `d811c09` - `Quiet proving harness logging by default`
+- `71c3716` - `Quiet proving harness event logging`
 
 **Lessons Learned:**
 - Treat prerecorded proving playback as a first-class product feature, not just a debugging convenience.
-- The strongest crash-isolation progress came from changing one teardown variable while keeping playback constant.
-- For GUI-sensitive branches, Derrick’s direct observation remains the ground truth; subagent/source/headless work should be used to sharpen the next human repro, not replace it.
+- Dirty repro surfaces are worse than slow repro surfaces; when crash hunting, reject contaminated runs instead of over-interpreting them.
+- The strongest crash-isolation progress still comes from changing one teardown variable while keeping playback constant.
+- For GUI-sensitive branches, Derrick’s direct observation remains the ground truth; subagent/source/headless work should sharpen the next human repro, not replace it.
 
 ---
 
-*Completed on 2026-05-09*
+*Updated on 2026-05-09*
