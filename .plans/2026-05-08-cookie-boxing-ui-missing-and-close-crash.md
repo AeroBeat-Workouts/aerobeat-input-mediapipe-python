@@ -54,6 +54,7 @@ Follow-up research tightened that further: the screenshot is not the proving har
 | `REF-20` | Active close-path isolation toggle in proving harness / AutoStartManager | `/home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-input-mediapipe-python/.testbed/scripts/proving_harness.gd` + `/home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-input-mediapipe-python/src/autostart_manager.gd` |
 | `REF-21` | Chip console warning snapshot showing packet-backlog and stream-thread cleanup warnings during the dirty second-half rerun | `/home/derrick/.openclaw/workspace/.temp/nerve-uploads/2026/05/09/image-0bb3a3de.png` |
 | `REF-22` | Derrick’s 2026-05-09 Chip feedback: eliminate per-update console spam, investigate new CSV import warning, trim/dedupe shutdown logging, and prepare for a Penpot-driven boxing proving-scene redesign that replaces text-heavy status with gesture icons and active-state buttons | current session |
+| `REF-23` | 2026-05-10 Boxing gesture detector UI mockup screenshot provided by Derrick for the next proving-scene redesign pass | `/home/derrick/.openclaw/workspace/.temp/nerve-uploads/2026/05/10/aerobeat-boxing-gesture-detector-0a43eb94.png` |
 
 ---
 
@@ -1749,24 +1750,32 @@ Smallest implementation slice for Task 73: (a) stop periodic proving-harness con
 
 ---
 
-### Task 75: Prepare Penpot-driven Boxing proving-scene redesign branch
+### Task 75: Break down Derrick’s Boxing gesture detector mockup and identify implementation questions
 
-**Bead ID:** `Pending`
-**SubAgent:** `primary` (for `research` / `coder` workflow roles)
+**Bead ID:** `oc-kdg3`
+**SubAgent:** `primary` (for `research` workflow role)
 **Role:** `research`
-**References:** `REF-22`
-**Prompt:** Once Derrick provides the updated Penpot design slice, translate it into a concrete implementation branch for the Boxing gesture-detection proving scene: remove text-heavy status presentation, replace it with gesture icons and active-state/highlight buttons, and separate that UI redesign work from the immediate crash/logging cleanup branch.
+**References:** `REF-22`, `REF-23`
+**Prompt:** Claim bead `oc-kdg3`, inspect Derrick’s mockup screenshot at `/home/derrick/.openclaw/workspace/.temp/nerve-uploads/2026/05/10/aerobeat-boxing-gesture-detector-0a43eb94.png`, compare it to the current Boxing proving scene structure (`.testbed/scenes/boxing_proving.tscn` + `.testbed/scripts/proving_harness.gd`), and produce a concrete design breakdown for implementation. Focus on layout regions, reusable UI patterns, likely Godot node mapping, gesture-state behavior, assets/questions that still need Derrick clarification, and the smallest truthful first implementation slice. Claim the bead on start with `bd update oc-kdg3 --status in_progress --json` and close it on completion with a concise reason.
 
 **Folders Created/Deleted/Modified:**
 - `.plans/`
-- future design/source/UI paths as required
+- `.testbed/scenes/`
+- `.testbed/scripts/`
+- mockup/reference asset paths only for reading
 
 **Files Created/Deleted/Modified:**
-- plan updates only until the Penpot slice exists
+- plan updates / analysis notes only unless a tiny reference note is required
 
-**Status:** ⏳ Pending
+**Status:** ✅ Complete
 
-**Results:** Waiting on Derrick’s Penpot design slice.
+**Results:** Research breakdown complete against `REF-23` and the current Boxing proving scene/harness in `REF-22`. Practical read: the mockup is not a minor skin on the current text-debug surface; it is a two-column proving UI where the left ~48% of the screen is a presentation/test area (title row, large camera preview, compact scrolling event log) and the right ~52% is a single rounded translucent selection board containing a 3x3 gesture grid. The current camera pipeline, detector state/event plumbing, and scroll-backed event history are reusable, but most of the present right-column text panels (`Summary`, `SignalStatus`, `Metrics`, and the current text-heavy `Events` presentation) should be replaced for this path with visual gesture cards/buttons plus a bottom-left log panel.
+
+Likely Godot mapping: keep `BoxingProving` root, header/title status wiring, provider startup, `CameraPanel`, `CameraDisplay`, landmark/trail overlays, and the `_event_lines` backing store. Replace the current `HSplitContainer` composition with a deliberate layout shell: left column containing title/header + camera panel + event-log panel, and right column containing a `PanelContainer`/styled board with a `GridContainer` of 9 gesture cells (`Punch`, `Hook`, `Uppercut`, `Knee Strike`, `Guard`, `Leg Lift`, `Side Step`, `Squat`, `Dodge`). Each cell likely wants icon/illustration, title, and either L/R hit buttons or a centered persistent-state chip. Inferred behavior: attack families with handedness expose two per-side indicators (`L` / `R`) that flash/highlight on event fire and otherwise idle; persistent states like `Guard` and `Squat` use a centered `Active` pill while state is true; `Leg Lift`, `Knee Strike`, `Punch`, `Hook`, `Uppercut`, `Side Step`, and likely `Dodge` are event-driven side indicators rather than latched buttons. The log is chronological, newest visible at the bottom in the mockup styling, with compact numbered entries and a scrollbar; implementation can truthfully keep the existing event buffer but should render it bottom-anchored / mockup-styled instead of as a debug text block.
+
+Derrick clarified the open behavior mappings on 2026-05-10: `Dodge` maps directly to `lean_left` / `lean_right`; `Side Step` maps directly to `sidestep_left` / `sidestep_right`; `Leg Lift` uses left/right pulse indicators; the right-side tiles are status-only for now; and event numbers are visible ordering only, with one new detected beat event producing one new visible list row. Derrick also clarified the product intent: this redesign is meant to replace the current Boxing gesture detection scene because it makes the scene readable at a glance, not just add an alternate debug surface. The final icon assets already exist under `.testbed/assets/icons/*.svg`, and the background image target is `.testbed/assets/backgrounds/perfect-hue-may-08-2026-hd.png`; implementation may need a repo sync first so those assets are present locally.
+
+That leaves only one meaningful fidelity question before coder work: how tightly to chase the mockup's exact spacing/proportions versus matching its visual system and glanceability within the existing 16:9 proving-scene constraints. Smallest truthful implementation slice has now widened slightly because the key behavior ambiguities are resolved: sync the latest repo/assets if needed, rebuild the Boxing proving scene shell, preserve the detector plumbing, wire all nine gesture tiles to the approved event/state mappings, and render the simplified visible-order event list on the left.
 
 ---
 
@@ -1827,6 +1836,67 @@ What is now proven: commit `71c3716` removed the remaining default proving-harne
 **Folders Created/Deleted/Modified:**
 - `.plans/`
 - forensic/log dirs only for reading / notes
+
+**Files Created/Deleted/Modified:**
+- plan updates and audit notes only
+
+**Status:** ⏳ Pending
+
+**Results:** Pending.
+
+### Task 79: Implement the approved Boxing gesture detector UI redesign in the proving scene
+
+**Bead ID:** `oc-s4y7`
+**SubAgent:** `primary` (for `coder` workflow role)
+**Role:** `coder`
+**References:** `REF-23`
+**Prompt:** After Derrick confirms the mockup breakdown, implement the new Boxing gesture detector UI in the owning source. Replace the current text-heavy proving-scene presentation with the approved visual layout, preserve the actual detector/tracking behavior, and keep the change scoped to the Boxing proving path unless Derrick explicitly asks for Flow parity in the same pass.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- `.testbed/scenes/`
+- `.testbed/scripts/`
+- any directly owning Boxing proving UI asset paths required by the approved design
+
+**Files Created/Deleted/Modified:**
+- Boxing proving scene/harness/UI assets as required by the approved implementation
+
+**Status:** ✅ Complete
+
+**Results:** Coder pass completed on bead `oc-s4y7`. The checkout was truthfully brought up to the approved repo-owned UI assets first by pulling just the exact asset paths from `origin/main` into this working tree: `.testbed/assets/backgrounds/perfect-hue-may-08-2026-hd.png` plus the approved `.testbed/assets/icons/boxing-*.svg` set. The Boxing proving scene itself was then rebuilt around the mockup’s 16:9 composition in `.testbed/scenes/boxing_proving.tscn`: full-screen approved background, compact header, large left camera surface, dark simplified event-feed panel below it, and a right-side rounded translucent board containing a 3x3 gesture grid.
+
+To keep Flow isolated, the redesign was implemented through a new Boxing-only subclass script at `.testbed/scripts/boxing_proving_harness.gd` rather than broad rewrites to the shared `proving_harness.gd`. Detector/camera/provider/event plumbing remains inherited from the shared harness, while the subclass replaces the Boxing-facing shell/presentation only. The new board uses the approved icons and real detector mappings across all 9 tiles: Punch/Hook/Uppercut/Knee Strike pulse their L/R badges from the real left/right event timestamps; Guard and Squat show a centered active/idle pill from persistent gesture state; Dodge maps to `lean_left` / `lean_right`; Side Step maps to `sidestep_left` / `sidestep_right`; and Leg Lift pulses from `leg_lift_left_start` / `leg_lift_right_start`. The left event feed is now simplified visible-order rows with mockup-style zero-padded sequence numbers and human-readable gesture labels, with one new Boxing detector event producing one new visible row.
+
+Truthful repo-local validation completed: `~/.local/bin/godot --headless --path .testbed --check-only --script scripts/boxing_proving_harness.gd` passed; `~/.local/bin/godot --headless --path .testbed --import --quit-after 1000` completed and imported the new approved assets cleanly; and a headless scene probe loaded/instantiated `res://scenes/boxing_proving.tscn` in `startup_mode=GODOT_ONLY_DEBUG` and confirmed the new board exists with 9 generated gesture tiles. Important limitation: there was no attached Godot plugin/editor session available for a true screenshot-by-screenshot visual parity pass against `REF-23`, so the final visible mockup comparison still belongs to QA / auditor / Derrick on the real editor/runtime surface.
+
+### Task 80: QA the redesigned Boxing gesture detector UI on the real proving path
+
+**Bead ID:** `oc-xkpr`
+**SubAgent:** `primary` (for `qa` workflow role)
+**Role:** `qa`
+**References:** `REF-23`
+**Prompt:** Independently verify that the redesigned Boxing gesture detector UI matches Derrick’s approved mockup closely enough on the real proving path, that the active/inactive gesture states behave correctly, and that the new layout is still usable in the target 16:9 proving viewport.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+
+**Files Created/Deleted/Modified:**
+- plan updates / verification notes only unless a truthful docs correction is required
+
+**Status:** ⏳ Pending
+
+**Results:** Pending.
+
+### Task 81: Audit the redesigned Boxing gesture detector UI and close the branch truthfully
+
+**Bead ID:** `oc-dtna`
+**SubAgent:** `primary` (for `auditor` workflow role)
+**Role:** `auditor`
+**References:** `REF-23`
+**Prompt:** Independently audit the implemented Boxing gesture detector UI against Derrick’s approved mockup, the final diff, and QA evidence. Confirm what matches exactly, what intentionally differs, and whether the branch is ready to close before crash testing resumes.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
 
 **Files Created/Deleted/Modified:**
 - plan updates and audit notes only
