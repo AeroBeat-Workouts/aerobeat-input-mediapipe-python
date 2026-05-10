@@ -96,7 +96,7 @@ enum StartupMode {
 @export var overlay_visibility_threshold := 0.35
 @export var show_landmarks := true
 @export var show_trails := true
-@export var trail_debug_logging := true
+@export var trail_debug_logging := false
 @export var steady_state_console_debug := false
 @export var shutdown_console_debug := false
 @export var skip_sidecar_stop_on_close_debug := false
@@ -980,9 +980,16 @@ func _record_event(event_name: String, payload: Dictionary) -> void:
 	_event_lines.push_front(line)
 	while _event_lines.size() > MAX_EVENT_LINES:
 		_event_lines.pop_back()
-	print("[ProvingHarness][%s] %s%s" % [_mode_name(), event_name, _format_event_payload(payload)])
+	if _should_log_event_to_console(event_name):
+		print("[ProvingHarness][%s] %s%s" % [_mode_name(), event_name, _format_event_payload(payload)])
 	_refresh_debug_panels()
-	_emit_console_snapshot_if_changed(true)
+	if steady_state_console_debug:
+		_emit_console_snapshot_if_changed()
+
+func _should_log_event_to_console(event_name: String) -> bool:
+	if steady_state_console_debug:
+		return true
+	return event_name in ["server_failed", "camera_stream_failed", "preview_only_invalid"]
 
 func _format_event_payload(payload: Dictionary) -> String:
 	if payload.is_empty():

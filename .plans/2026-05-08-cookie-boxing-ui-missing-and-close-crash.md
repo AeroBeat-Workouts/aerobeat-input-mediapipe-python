@@ -1743,9 +1743,9 @@ Smallest implementation slice for Task 73: (a) stop periodic proving-harness con
 **Files Created/Deleted/Modified:**
 - plan updates / verification notes only unless a truthful docs correction is required
 
-**Status:** ⏳ Pending
+**Status:** ✅ Complete
 
-**Results:** Pending.
+**Results:** QA completed in terminal-safe scope against commit `d811c09` and bead `oc-0wba` can close, but the acceptance result is mixed and not yet clean enough to skip another Chip truth pass. What is proven by source/headless validation: (1) the intended low-value warning families targeted by this cleanup are gone in the validated paths — `--check-only` and `--import` produced no `.csv` import warnings, and prerecorded Boxing playback produced zero `Preview cadence`, zero `MJPEG buffer overflow`, zero `Thread object is being destroyed`, and zero `Failed to connect, status: 3` lines; (2) the new shutdown surface is materially cleaner when teardown is exercised directly — a controlled headless driver produced exactly one harness shutdown summary (`[ProvingHarness][Boxing] Shutdown summary: reason=qa_driver ...`) and one AutoStartManager shutdown summary (`[AutoStartManager] Shutdown summary: reason=exit_tree/stop_sync ...`) with no old `Window close request`, `Scene teardown notification`, or `stop_server() called` spam; and (3) source inspection confirms the quieter defaults are wired as intended (`steady_state_console_debug=false`, `CameraView.debug_logging=false`, `AutoStartManager.debug_logging=false`). What is also proven, and is the important blocker: normal prerecorded proving playback still floods the terminal from the harness event path itself. In an 8-second headless Boxing run against `.testbed/assets/videos/boxing.mp4`, the log contained 1,568 total lines, including 774 repeated `[ProvingHarness][Boxing] mode=...` snapshot lines plus hundreds of guard/squat/event prints because `_record_event()` still prints every event and force-emits a full console snapshot while `trail_debug_logging` remains true by default. So the steady-state camera/connect/thread spam is cleaned up, but the proving harness is not yet terminal-quiet under active detector traffic. One warning family also remains explicitly understood rather than globally gone: on the no-camera local live path, `Failed to connect, status: 3` still appears because the sidecar cannot open camera `0`; that is expected for this host’s no-camera run and does not invalidate the prerecorded playback evidence. Net QA call: shutdown logging is now concise enough to help crash hunting, the prior noisy warning families are mostly removed or understood, but normal proving playback is still too chatty to certify this bead’s user-facing goal as fully met. Derrick still needs a direct Chip rerun for the actual crash path truth, and before that rerun the next code pass should specifically gate or coalesce `_record_event()` / forced snapshot emission (and likely revisit `trail_debug_logging` default) rather than touching the already-cleaned camera-thread/info logs. Validation artifacts: `.temp/qa-task74/check-only.log`, `.temp/qa-task74/import.log`, `.temp/qa-task74/prerecorded-headless.log`, and `.temp/qa-task74/shutdown-driver.log`.
 
 ---
 
@@ -1767,6 +1767,71 @@ Smallest implementation slice for Task 73: (a) stop periodic proving-harness con
 **Status:** ⏳ Pending
 
 **Results:** Waiting on Derrick’s Penpot design slice.
+
+---
+
+### Task 76: Implement final harness event-verbosity cleanup before Chip rerun
+
+**Bead ID:** `oc-q8u1`
+**SubAgent:** `primary` (for `coder` workflow role)
+**Role:** `coder`
+**References:** `REF-20`, `REF-21`, `REF-22`
+**Prompt:** Implement the smallest final harness-only logging cleanup before the next Chip rerun. Target the remaining spam identified by QA: gate or coalesce `_record_event()`, stop force-emitting full snapshots on every event, and revisit `trail_debug_logging` defaults so normal prerecorded proving playback is quiet by default while preserving intentionally useful startup/exit signal.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- `.testbed/`
+
+**Files Created/Deleted/Modified:**
+- `.testbed/scripts/proving_harness.gd`
+- any directly owning proving-harness support files only if truly required
+
+**Status:** ✅ Complete
+
+**Results:** Coder pass completed and bead `oc-q8u1` is ready to close. Scope stayed harness-only in `.testbed/scripts/proving_harness.gd`. The remaining detector-event spam was removed by changing `_record_event()` from an unconditional console logger + forced snapshot trigger into a quiet-by-default UI recorder: event history/counts/panels still update, but console event prints now happen only when `steady_state_console_debug=true` or for the small high-signal failure set (`server_failed`, `camera_stream_failed`, `preview_only_invalid`). Full console snapshots are no longer force-emitted on every event; they now emit only through the existing steady-state debug path and only when the snapshot text actually changes. `trail_debug_logging` was also flipped from default `true` to `false`, so ordinary prerecorded proving playback no longer injects trail-continuity detail into the console snapshot by default.
+
+Terminal-safe validation passed locally. `~/.local/bin/godot --headless --path .testbed --check-only --script scripts/proving_harness.gd` exited cleanly, `~/.local/bin/godot --headless --path .testbed --import --quit-after 1000` stayed clean, and an 8-second prerecorded Boxing headless run with `AEROBEAT_MEDIAPIPE_CAMERA_SOURCE=.testbed/assets/videos/boxing.mp4` shrank from the prior QA baseline of 1,568 log lines / 774 snapshot lines to just 23 total log lines with `0` `[ProvingHarness][Boxing] mode=...` snapshot lines and `0` detector event-print lines, while preserving useful startup + shutdown signal (`Initializing`, sidecar readiness, `Python server started`, `Boxing harness live`, and one each of the AutoStartManager / ProvingHarness shutdown summaries). Validation artifacts for this coder pass: `.temp/task76/check-only.log`, `.temp/task76/import.log`, and `.temp/task76/prerecorded-headless.log`. Commit: final coder commit for this task (`Quiet proving harness event logging`).
+
+---
+
+### Task 77: QA final harness log quieting before Chip rerun
+
+**Bead ID:** `oc-nqp8`
+**SubAgent:** `primary` (for `qa` workflow role)
+**Role:** `qa`
+**References:** `REF-20`, `REF-21`, `REF-22`
+**Prompt:** Independently verify that normal prerecorded proving playback is finally quiet enough by default for Chip crash hunting, while keeping startup/exit logs and real warnings meaningful.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+
+**Files Created/Deleted/Modified:**
+- plan updates / verification notes only unless a truthful docs correction is required
+
+**Status:** ⏳ Pending
+
+**Results:** Pending.
+
+---
+
+### Task 78: Audit post-quieting Chip rerun and decide next crash branch
+
+**Bead ID:** `oc-6ist`
+**SubAgent:** `primary` (for `auditor` workflow role)
+**Role:** `auditor`
+**References:** `REF-20`, `REF-21`, `REF-22`
+**Prompt:** After the final quieted Chip rerun lands, audit whether the repro surface is finally clean enough to trust and decide whether the shutdown-path crash family reappears on Chip or whether another host-specific difference still dominates.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- forensic/log dirs only for reading / notes
+
+**Files Created/Deleted/Modified:**
+- plan updates and audit notes only
+
+**Status:** ⏳ Pending
+
+**Results:** Pending.
 
 ---
 
