@@ -149,8 +149,10 @@ func _enter_tree() -> void:
 		auto_start_node.queue_free()
 
 func _ready() -> void:
-	title_label.text = scene_title
-	notes_label.text = scene_notes
+	if title_label:
+		title_label.text = scene_title
+	if notes_label:
+		notes_label.text = scene_notes
 	for label_variant: Variant in [live_status_label, quick_stats_label, summary_label, signal_status_label, metrics_label, events_label]:
 		if label_variant is RichTextLabel:
 			label_variant.bbcode_enabled = false
@@ -978,6 +980,10 @@ func _fmt_flow_index(value_variant: Variant, ui_label_variant: Variant, is_place
 	return "%d[u%d]%s" % [value, ui_label, suffix]
 
 func _build_events_text() -> String:
+	if harness_mode == HarnessMode.FLOW:
+		if _event_lines.is_empty():
+			return "Waiting for events..."
+		return "\n".join(_event_lines)
 	var lines := ["Live events", "==========="]
 	if _event_lines.is_empty():
 		lines.append("(waiting for detector activity)")
@@ -1025,14 +1031,11 @@ func _record_event(event_name: String, payload: Dictionary) -> void:
 
 func _append_event_feed_lines(event_name: String, payload: Dictionary) -> void:
 	var lines := _build_event_feed_lines(event_name, payload)
-	var numbered_lines: Array[String] = []
 	for line: String in lines:
 		_event_sequence += 1
-		numbered_lines.append("%04d: %s" % [_event_sequence, line])
-	for index: int in range(numbered_lines.size() - 1, -1, -1):
-		_event_lines.push_front(numbered_lines[index])
+		_event_lines.append("%04d: %s" % [_event_sequence, line])
 	while _event_lines.size() > MAX_EVENT_LINES:
-		_event_lines.pop_back()
+		_event_lines.remove_at(0)
 
 func _build_event_feed_lines(event_name: String, payload: Dictionary) -> Array[String]:
 	if harness_mode == HarnessMode.FLOW and payload.has("placement") and payload.has("direction"):
