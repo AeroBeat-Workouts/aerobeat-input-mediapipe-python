@@ -100,6 +100,8 @@ enum StartupMode {
 @export var steady_state_console_debug := false
 @export var shutdown_console_debug := false
 @export var skip_sidecar_stop_on_close_debug := false
+@export var skip_sidecar_terminate_sync_on_close_debug := false
+@export var skip_linux_pkill_main_py_on_close_debug := false
 
 @onready var status_label: Label = get_node_or_null("Margin/VSplit/Header/StatusLabel") as Label
 @onready var live_status_label: RichTextLabel = get_node_or_null("Margin/VSplit/Header/LiveStatusLabel") as RichTextLabel
@@ -180,8 +182,12 @@ func _setup_auto_start() -> void:
 	auto_start_manager.camera_source_override = _get_scene_camera_source_override()
 	auto_start_manager.debug_logging = steady_state_console_debug or shutdown_console_debug
 	auto_start_manager.skip_sidecar_stop_on_close_debug = skip_sidecar_stop_on_close_debug
+	auto_start_manager.skip_sidecar_terminate_sync_on_close_debug = skip_sidecar_terminate_sync_on_close_debug
+	auto_start_manager.skip_linux_pkill_main_py_on_close_debug = skip_linux_pkill_main_py_on_close_debug
 	if skip_sidecar_stop_on_close_debug:
 		print("[ProvingHarness][%s] Close-path isolation enabled: AutoStartManager will skip normal sidecar stop on close/scene teardown; heartbeat timeout should stop it after exit" % _mode_name())
+	elif skip_sidecar_terminate_sync_on_close_debug or skip_linux_pkill_main_py_on_close_debug:
+		print("[ProvingHarness][%s] Narrow close-path debug enabled: stop_mode=%s" % [_mode_name(), _get_close_path_stop_mode_label()])
 
 	auto_start_manager.server_started.connect(_on_server_started)
 	auto_start_manager.server_failed.connect(_on_server_failed)
@@ -1343,13 +1349,23 @@ func _clear_preview_only_overlay_state() -> void:
 	if trail_drawer:
 		trail_drawer.clear_trails()
 
+func _get_close_path_stop_mode_label() -> String:
+	if skip_sidecar_stop_on_close_debug:
+		return "heartbeat_only"
+	var parts: PackedStringArray = ["normal_stop"]
+	if skip_sidecar_terminate_sync_on_close_debug:
+		parts.append("skip_terminate_sync")
+	if skip_linux_pkill_main_py_on_close_debug:
+		parts.append("skip_linux_pkill_main_py")
+	return "+".join(parts)
+
 func _log_shutdown_summary_once(reason: String) -> void:
 	if _shutdown_summary_logged:
 		if shutdown_console_debug:
 			print("[ProvingHarness][%s] Duplicate shutdown notification ignored (%s)" % [_mode_name(), reason])
 		return
 	_shutdown_summary_logged = true
-	var stop_mode := "heartbeat_only" if skip_sidecar_stop_on_close_debug else "normal_stop"
+	var stop_mode := _get_close_path_stop_mode_label()
 	print("[ProvingHarness][%s] Shutdown summary: reason=%s stop_mode=%s server=%s camera=%s preview=%s" % [
 		_mode_name(),
 		reason,

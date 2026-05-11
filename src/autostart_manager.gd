@@ -34,6 +34,8 @@ signal mediapipe_not_found
 @export var camera_source_override: String = ""
 @export var debug_logging: bool = false
 @export var skip_sidecar_stop_on_close_debug: bool = false
+@export var skip_sidecar_terminate_sync_on_close_debug: bool = false
+@export var skip_linux_pkill_main_py_on_close_debug: bool = false
 
 var python_path: String = ""
 var server_pid: int = -1
@@ -60,7 +62,7 @@ func _log_shutdown_summary_once(reason: String) -> void:
 		_debug_log("Duplicate shutdown notification ignored (%s)" % reason)
 		return
 	_shutdown_summary_logged = true
-	var stop_mode := "heartbeat_only" if skip_sidecar_stop_on_close_debug else "normal_stop"
+	var stop_mode := _get_close_path_stop_mode_label()
 	print("[AutoStartManager] Shutdown summary: reason=%s stop_mode=%s pid=%d running=%s launch=%s" % [
 		reason,
 		stop_mode,
@@ -168,10 +170,23 @@ func stop_server() -> void:
 func _has_active_server_state() -> bool:
 	return _is_running or server_pid > 1 or not _launch_info.is_empty()
 
+func _get_close_path_stop_mode_label() -> String:
+	if skip_sidecar_stop_on_close_debug:
+		return "heartbeat_only"
+	var parts: PackedStringArray = ["normal_stop"]
+	if skip_sidecar_terminate_sync_on_close_debug:
+		parts.append("skip_terminate_sync")
+	if OS.get_name() == "Linux" and skip_linux_pkill_main_py_on_close_debug:
+		parts.append("skip_linux_pkill_main_py")
+	return "+".join(parts)
+
 func _run_linux_cleanup_patterns() -> void:
 	var output: Array = []
-	OS.execute("pkill", ["-9", "-f", "python_mediapipe/main.py"], output, false)
-	OS.delay_msec(100)
+	if skip_linux_pkill_main_py_on_close_debug:
+		_debug_log("Close-path debug enabled: skipping Linux pkill -9 -f python_mediapipe/main.py")
+	else:
+		OS.execute("pkill", ["-9", "-f", "python_mediapipe/main.py"], output, false)
+		OS.delay_msec(100)
 	OS.execute("pkill", ["-9", "-f", "main.py"], output, false)
 	OS.delay_msec(100)
 	OS.execute("fuser", ["-k", "-9", "/dev/video0"], output, false)
@@ -476,8 +491,10 @@ func _stop_sync() -> void:
 		return
 	_stop_heartbeat()
 	OS.delay_msec(200)
-	_desktop_sidecar_launcher().terminate_sync(_launch_info)
+	if skip_sidecar_terminate_sync_on_close_debug:
+		_debug_log("Close-path debug enabled: skipping DesktopSidecarLauncher.terminate_sync(_launch_info)")
+	else:
+		_desktop_sidecar_launcher().terminate_sync(_launch_info)
 	if OS.get_name() == "Linux":
-		var output: Array = []
-		OS.execute("pkill", ["-9", "-f", "python_mediapipe/main.py"], output, false)
+		_run_linux_cleanup_patterns()
 	_cleanup_server_state()
