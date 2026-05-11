@@ -1896,10 +1896,12 @@ Explicit rerun findings for the prior failure list:
 - **6. Previously passing functional mappings still remain correct:** reverified. Runtime probes confirmed correct one-sided L/R activation for `punch_left/right`, `hook_left/right`, `uppercut_left/right`, `knee_left/right`, and `leg_lift_left_start/right_start`, and persistent center activation still works for `Guard` / `Squat` only.
 - **7. Event feed still uses visible-order numbering with one event -> one row:** reverified. On a clean seeded feed at sequence 84, the visible rows were exactly `0085: Squat Activated`, `0086: Right Uppercut`, `0087: Left Uppercut`, `0088: Right Uppercut`, `0089: Squat Deactivated`, `0090: Right Punch`, `0091: Left Punch`.
 
+Post-`oc-lg65` rerun on commit `2f67674` (fresh QA, 2026-05-10 evening): I reran the strongest truthful repo-local validation path on the exact live-audit parity fixes. Headless Godot validation/import still passed; a fresh 1280×720 layout probe still reported `scroll_vertical=0`, `scroll_max=566`, `scroll_page=566`, and the full third row bottom at y=639 inside the 720 px viewport; and a targeted runtime parity probe on the live Boxing scene now reports `prerecorded_preview=false`, `prerecorded_config=false`, `live_preview=true`, `live_config=true`, `guard.center.visible=true`, `squat.center.visible=true`, `guard.center.bg=3ddcdcff`, `squat.center.bg=3ddcdcff`, `punch.left.bg=3ddcdcff`, `punch.right.bg=3ddcdcff`, `sidestep.left.bg=3ddcdcff`, and `dodge.right.bg=3ddcdcff`. That same probe also confirmed the `Guard` / `Squat` centered `Active` pills render below their icons (`center_below_icon=true` for both), the board remains one translucent parent surface with inactive tile backgrounds still transparent (`BoardPanel bg=4061878f`, every inactive tile bg=`ffffff00`), `Side Step` / `Dodge` still pulse correctly without becoming persistent center-state tiles, and the event feed still uses visible-order numbering with one event -> one visible row (`0085` through `0091` on the seeded rerun).
+
 What remains uncertified:
 - I could not perform a true live screenshot-by-screenshot comparison against `REF-23` on an attached editor/runtime surface because `godot_sessions` returned no plugin session and this shell had no exported `DISPLAY` / `WAYLAND_DISPLAY` for a direct compositor capture path. So the final call that the rendered surface is visually *exact enough* in practice is still best made by the auditor or Derrick on a real windowed surface.
 
-Practical verdict: QA no longer sees a material parity miss in the implemented board composition or behavior. The previously failing acceptance points are fixed, the functional mappings still hold, and this is now **ready for audit** rather than another coder retry.
+Practical verdict: QA no longer sees a material parity miss in the implemented board composition or behavior. Derrick’s three explicit live-audit criteria now pass in fresh probes, the previously accepted layout/behavior checks still hold, and this is **ready for audit / closure** rather than another coder retry.
 
 ### Task 83: Fix Boxing UI live-audit parity issues from Derrick's direct review
 
@@ -1969,7 +1971,18 @@ Guard / Squat chip treatment was corrected to match the mockup more closely: the
 
 **Status:** ✅ Complete
 
-**Results:** Auditor pass had previously closed the branch from source/runtime evidence, but Derrick’s direct human audit overrode that closure with three real remaining runtime-visible parity issues: (1) the camera feed from the prerecorded video source is flipped horizontally, (2) `Guard` and `Squat` are missing their `Active` pills below their icons, and (3) the intended treatment for all `L`, `R`, and `Active` pills is to fill them with color `#3ddcdc` when active. That means the UI branch is not actually done yet, and the prior audit conclusion was too optimistic because the available non-live validation path missed visible runtime truth. The branch must be reopened for another coder retry using Derrick’s direct audit notes as the new top-priority acceptance criteria before it can be re-closed.
+**Results:** Final independent rerun audit completed after Derrick’s parity-fix commits `3de39c2` and `2f67674`. I re-ran repo-local Godot validation on `2f67674` (`~/.local/bin/godot --headless --path .testbed --check-only --script scripts/boxing_proving_harness.gd`, `~/.local/bin/godot --headless --path .testbed --import --quit-after 1000`) and then used fresh headless runtime probes against the real Boxing scene at 1280×720 in `startup_mode=GODOT_ONLY_DEBUG`.
+
+Proven in those probes:
+- prerecorded source is **not** horizontally flipped (`prerecorded_preview=false`, `prerecorded_config=false`) while live camera path stays mirrored (`live_preview=true`, `live_config=true`)
+- `Guard` and `Squat` centered `Active` pills are visible, use exact fill `#3ddcdc`, and render below the icons when active
+- active `L` / `R` pills also use exact fill `#3ddcdc`
+- the right side still behaves as one board, not nine separate cards (`BoardPanel` translucent background present; inactive tile backgrounds transparent)
+- full 3×3 board still fits in visible 16:9 area with no scroll (`scroll_vertical=0`, `scroll_max=566`, `scroll_page=566`, third row bottom `639 < 720`)
+- `Side Step` / `Dodge` still use pulse-style L/R behavior rather than persistent centered state
+- event feed still renders visible-order numbering with one seeded event -> one visible row on a clean rerun (`0085` through `0091` for seven injected events)
+
+Explicit limit: I still do **not** have a literal human-observed live window or attached Godot editor/plugin session from this shell, so I am not claiming fresh pixel-perfect live-window proof beyond Derrick’s own direct review. What is certified here is the strongest repo-local runtime truth available from independent headless Godot scene probes, and that evidence now matches Derrick’s required parity criteria. On that basis the branch is truthfully ready to close.
 
 ---
 
