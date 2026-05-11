@@ -1,12 +1,12 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene format=3 uid="uid://83jxycoubyxd"]
 
-[ext_resource type="Script" path="res://scripts/boxing_proving_harness.gd" id="1_harness"]
-[ext_resource type="Script" path="res://scripts/landmark_drawer.gd" id="2_landmarks"]
-[ext_resource type="Script" path="res://scripts/hand_trail_drawer.gd" id="3_trails"]
-[ext_resource type="Script" path="res://addons/aerobeat-input-mediapipe-python/src/autostart_manager.gd" id="4_autostart"]
-[ext_resource type="Texture2D" path="res://assets/backgrounds/perfect-hue-may-08-2026-hd.png" id="5_background"]
+[ext_resource type="Script" uid="uid://d2qmw5c7pnoth" path="res://scripts/boxing_proving_harness.gd" id="1_harness"]
+[ext_resource type="Script" uid="uid://b7yrfwv07ycys" path="res://scripts/landmark_drawer.gd" id="2_landmarks"]
+[ext_resource type="Script" uid="uid://cl21tmxhvdd0x" path="res://scripts/hand_trail_drawer.gd" id="3_trails"]
+[ext_resource type="Script" uid="uid://cntshlv75amau" path="res://addons/aerobeat-input-mediapipe-python/src/autostart_manager.gd" id="4_autostart"]
+[ext_resource type="Texture2D" uid="uid://cv2cmj48bnykt" path="res://assets/backgrounds/perfect-hue-may-08-2026-hd.png" id="5_background"]
 
-[node name="BoxingProving" type="Control"]
+[node name="BoxingProving" type="Control" unique_id=212338292]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -14,15 +14,16 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_harness")
-harness_mode = 0
+startup_mode = 1
+prerecorded_video_source = "res://assets/fixtures/boxing/punch_left/boxing__punch_left__positive__guard_start_end__take_01.mp4"
 scene_title = "BOXING GESTURE DETECTION"
 show_landmarks = false
 show_trails = false
 
-[node name="AutoStartManager" type="Node" parent="."]
+[node name="AutoStartManager" type="Node" parent="." unique_id=343298553]
 script = ExtResource("4_autostart")
 
-[node name="Background" type="TextureRect" parent="."]
+[node name="Background" type="TextureRect" parent="." unique_id=2072136514]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -33,7 +34,7 @@ texture = ExtResource("5_background")
 expand_mode = 1
 stretch_mode = 6
 
-[node name="BackgroundTint" type="ColorRect" parent="."]
+[node name="BackgroundTint" type="ColorRect" parent="." unique_id=1626656074]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -42,7 +43,7 @@ grow_horizontal = 2
 grow_vertical = 2
 color = Color(0.05, 0.12, 0.22, 0.24)
 
-[node name="HeaderIcon" type="TextureRect" parent="."]
+[node name="HeaderIcon" type="TextureRect" parent="." unique_id=946012489]
 custom_minimum_size = Vector2(34, 34)
 layout_mode = 0
 offset_left = 22.0
@@ -52,7 +53,7 @@ offset_bottom = 56.0
 expand_mode = 1
 stretch_mode = 5
 
-[node name="Margin" type="MarginContainer" parent="."]
+[node name="Margin" type="MarginContainer" parent="." unique_id=567614309]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -64,54 +65,52 @@ theme_override_constants/margin_top = 20
 theme_override_constants/margin_right = 24
 theme_override_constants/margin_bottom = 20
 
-[node name="VSplit" type="VBoxContainer" parent="Margin"]
+[node name="VSplit" type="VBoxContainer" parent="Margin" unique_id=118545709]
 layout_mode = 2
 theme_override_constants/separation = 12
 
-[node name="Header" type="VBoxContainer" parent="Margin/VSplit"]
+[node name="Header" type="VBoxContainer" parent="Margin/VSplit" unique_id=239819429]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 2
 
-[node name="TitleLabel" type="Label" parent="Margin/VSplit/Header"]
+[node name="TitleLabel" type="Label" parent="Margin/VSplit/Header" unique_id=594719029]
 layout_mode = 2
 text = "BOXING GESTURE DETECTION"
 
-[node name="StatusLabel" type="Label" parent="Margin/VSplit/Header"]
+[node name="StatusLabel" type="Label" parent="Margin/VSplit/Header" unique_id=751002113]
 layout_mode = 2
 text = "Initializing..."
 
-[node name="LiveStatusLabel" type="RichTextLabel" parent="Margin/VSplit/Header"]
-layout_mode = 2
+[node name="LiveStatusLabel" type="RichTextLabel" parent="Margin/VSplit/Header" unique_id=1178114352]
 custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
 text = "waiting for provider..."
 fit_content = true
 scroll_active = false
 
-[node name="NotesLabel" type="Label" parent="Margin/VSplit/Header"]
+[node name="NotesLabel" type="Label" parent="Margin/VSplit/Header" unique_id=234435807]
 visible = false
 layout_mode = 2
-text = ""
 
-[node name="Content" type="HBoxContainer" parent="Margin/VSplit"]
+[node name="Content" type="HBoxContainer" parent="Margin/VSplit" unique_id=2147327404]
 layout_mode = 2
 size_flags_vertical = 3
 theme_override_constants/separation = 18
 
-[node name="LeftColumn" type="VBoxContainer" parent="Margin/VSplit/Content"]
-custom_minimum_size = Vector2(0, 0)
+[node name="LeftColumn" type="VBoxContainer" parent="Margin/VSplit/Content" unique_id=827581533]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 size_flags_stretch_ratio = 0.96
 theme_override_constants/separation = 12
 
-[node name="CameraPanel" type="PanelContainer" parent="Margin/VSplit/Content/LeftColumn"]
+[node name="CameraPanel" type="PanelContainer" parent="Margin/VSplit/Content/LeftColumn" unique_id=609295185]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
-[node name="CameraDisplay" type="TextureRect" parent="Margin/VSplit/Content/LeftColumn/CameraPanel"]
+[node name="CameraDisplay" type="TextureRect" parent="Margin/VSplit/Content/LeftColumn/CameraPanel" unique_id=1732901453]
 custom_minimum_size = Vector2(520, 293)
 layout_mode = 2
 size_flags_horizontal = 3
@@ -119,7 +118,7 @@ size_flags_vertical = 3
 expand_mode = 1
 stretch_mode = 5
 
-[node name="LandmarkDrawer" type="Control" parent="Margin/VSplit/Content/LeftColumn/CameraPanel/CameraDisplay"]
+[node name="LandmarkDrawer" type="Control" parent="Margin/VSplit/Content/LeftColumn/CameraPanel/CameraDisplay" unique_id=137031776]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -129,7 +128,7 @@ grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("2_landmarks")
 
-[node name="TrailDrawer" type="Control" parent="Margin/VSplit/Content/LeftColumn/CameraPanel/CameraDisplay"]
+[node name="TrailDrawer" type="Control" parent="Margin/VSplit/Content/LeftColumn/CameraPanel/CameraDisplay" unique_id=990877793]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -139,83 +138,78 @@ grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("3_trails")
 
-[node name="QuickStatsPanel" type="PanelContainer" parent="Margin/VSplit/Content/LeftColumn"]
+[node name="QuickStatsPanel" type="PanelContainer" parent="Margin/VSplit/Content/LeftColumn" unique_id=1045360063]
 custom_minimum_size = Vector2(0, 210)
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 0
 
-[node name="QuickStats" type="RichTextLabel" parent="Margin/VSplit/Content/LeftColumn/QuickStatsPanel"]
+[node name="QuickStats" type="RichTextLabel" parent="Margin/VSplit/Content/LeftColumn/QuickStatsPanel" unique_id=157111469]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
-text = "Detected events\n\nWaiting for boxing gestures..."
-scroll_active = true
+text = "Detected events
 
-[node name="RightPanelScroll" type="ScrollContainer" parent="Margin/VSplit/Content"]
+Waiting for boxing gestures..."
+
+[node name="RightPanelScroll" type="ScrollContainer" parent="Margin/VSplit/Content" unique_id=206392130]
 custom_minimum_size = Vector2(470, 0)
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 size_flags_stretch_ratio = 1.04
 horizontal_scroll_mode = 0
-vertical_scroll_mode = 1
 
-[node name="RightColumn" type="VBoxContainer" parent="Margin/VSplit/Content/RightPanelScroll"]
+[node name="RightColumn" type="VBoxContainer" parent="Margin/VSplit/Content/RightPanelScroll" unique_id=1244011291]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 theme_override_constants/separation = 0
 
-[node name="BoardPanel" type="PanelContainer" parent="Margin/VSplit/Content/RightPanelScroll/RightColumn"]
-custom_minimum_size = Vector2(0, 0)
+[node name="BoardPanel" type="PanelContainer" parent="Margin/VSplit/Content/RightPanelScroll/RightColumn" unique_id=5295170]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
-[node name="BoardMargin" type="MarginContainer" parent="Margin/VSplit/Content/RightPanelScroll/RightColumn/BoardPanel"]
+[node name="BoardMargin" type="MarginContainer" parent="Margin/VSplit/Content/RightPanelScroll/RightColumn/BoardPanel" unique_id=2091010054]
 layout_mode = 2
 theme_override_constants/margin_left = 18
 theme_override_constants/margin_top = 18
 theme_override_constants/margin_right = 18
 theme_override_constants/margin_bottom = 18
 
-[node name="BoardGrid" type="GridContainer" parent="Margin/VSplit/Content/RightPanelScroll/RightColumn/BoardPanel/BoardMargin"]
+[node name="BoardGrid" type="GridContainer" parent="Margin/VSplit/Content/RightPanelScroll/RightColumn/BoardPanel/BoardMargin" unique_id=1728650539]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
-columns = 3
 theme_override_constants/h_separation = 10
 theme_override_constants/v_separation = 10
+columns = 3
 
-[node name="SummaryPanel" type="PanelContainer" parent="Margin/VSplit/Content/RightPanelScroll/RightColumn"]
+[node name="SummaryPanel" type="PanelContainer" parent="Margin/VSplit/Content/RightPanelScroll/RightColumn" unique_id=1222469681]
 visible = false
 layout_mode = 2
 
-[node name="Summary" type="RichTextLabel" parent="Margin/VSplit/Content/RightPanelScroll/RightColumn/SummaryPanel"]
+[node name="Summary" type="RichTextLabel" parent="Margin/VSplit/Content/RightPanelScroll/RightColumn/SummaryPanel" unique_id=966127623]
 layout_mode = 2
-text = ""
 
-[node name="SignalPanel" type="PanelContainer" parent="Margin/VSplit/Content/RightPanelScroll/RightColumn"]
+[node name="SignalPanel" type="PanelContainer" parent="Margin/VSplit/Content/RightPanelScroll/RightColumn" unique_id=1806819682]
 visible = false
 layout_mode = 2
 
-[node name="SignalStatus" type="RichTextLabel" parent="Margin/VSplit/Content/RightPanelScroll/RightColumn/SignalPanel"]
+[node name="SignalStatus" type="RichTextLabel" parent="Margin/VSplit/Content/RightPanelScroll/RightColumn/SignalPanel" unique_id=1613771378]
 layout_mode = 2
-text = ""
 
-[node name="MetricsPanel" type="PanelContainer" parent="Margin/VSplit/Content/RightPanelScroll/RightColumn"]
+[node name="MetricsPanel" type="PanelContainer" parent="Margin/VSplit/Content/RightPanelScroll/RightColumn" unique_id=1231085906]
 visible = false
 layout_mode = 2
 
-[node name="Metrics" type="RichTextLabel" parent="Margin/VSplit/Content/RightPanelScroll/RightColumn/MetricsPanel"]
+[node name="Metrics" type="RichTextLabel" parent="Margin/VSplit/Content/RightPanelScroll/RightColumn/MetricsPanel" unique_id=818061117]
 layout_mode = 2
-text = ""
 
-[node name="EventsPanel" type="PanelContainer" parent="Margin/VSplit/Content/RightPanelScroll/RightColumn"]
+[node name="EventsPanel" type="PanelContainer" parent="Margin/VSplit/Content/RightPanelScroll/RightColumn" unique_id=656382824]
 visible = false
 layout_mode = 2
 
-[node name="Events" type="RichTextLabel" parent="Margin/VSplit/Content/RightPanelScroll/RightColumn/EventsPanel"]
+[node name="Events" type="RichTextLabel" parent="Margin/VSplit/Content/RightPanelScroll/RightColumn/EventsPanel" unique_id=2097888607]
 layout_mode = 2
-text = ""
