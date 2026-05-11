@@ -11,7 +11,7 @@ config_version=5
 [application]
 
 config/name="AeroBeat MediaPipe Testbed"
-run/main_scene="res://scenes/boxing_proving.tscn"
+run/main_scene="uid://djor28v3p7k2v"
 config/features=PackedStringArray("4.6")
 
 [config]
