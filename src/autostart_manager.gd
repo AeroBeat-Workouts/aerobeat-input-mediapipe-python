@@ -183,12 +183,12 @@ func _get_close_path_stop_mode_label() -> String:
 func _run_linux_cleanup_patterns() -> void:
 	var output: Array = []
 	if skip_linux_pkill_main_py_on_close_debug:
-		_debug_log("Close-path debug enabled: skipping Linux pkill -9 -f python_mediapipe/main.py")
+		_debug_log("Close-path debug enabled: skipping Linux pkill patterns that target python_mediapipe/main.py")
 	else:
 		OS.execute("pkill", ["-9", "-f", "python_mediapipe/main.py"], output, false)
 		OS.delay_msec(100)
-	OS.execute("pkill", ["-9", "-f", "main.py"], output, false)
-	OS.delay_msec(100)
+		OS.execute("pkill", ["-9", "-f", "main.py"], output, false)
+		OS.delay_msec(100)
 	OS.execute("fuser", ["-k", "-9", "/dev/video0"], output, false)
 	OS.delay_msec(100)
 
