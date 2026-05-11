@@ -101,18 +101,22 @@ enum StartupMode {
 @export var shutdown_console_debug := false
 @export var skip_sidecar_stop_on_close_debug := false
 
-@onready var status_label: Label = $Margin/VSplit/Header/StatusLabel
-@onready var live_status_label: RichTextLabel = $Margin/VSplit/Header/LiveStatusLabel
-@onready var title_label: Label = $Margin/VSplit/Header/TitleLabel
-@onready var notes_label: Label = $Margin/VSplit/Header/NotesLabel
-@onready var camera_display: TextureRect = $Margin/VSplit/Content/LeftColumn/CameraPanel/CameraDisplay
-@onready var landmark_drawer: Control = $Margin/VSplit/Content/LeftColumn/CameraPanel/CameraDisplay/LandmarkDrawer
-@onready var trail_drawer: Control = $Margin/VSplit/Content/LeftColumn/CameraPanel/CameraDisplay/TrailDrawer
-@onready var quick_stats_label: RichTextLabel = $Margin/VSplit/Content/LeftColumn/QuickStatsPanel/QuickStats
-@onready var summary_label: RichTextLabel = $Margin/VSplit/Content/RightPanelScroll/RightColumn/SummaryPanel/Summary
-@onready var signal_status_label: RichTextLabel = $Margin/VSplit/Content/RightPanelScroll/RightColumn/SignalPanel/SignalStatus
-@onready var metrics_label: RichTextLabel = $Margin/VSplit/Content/RightPanelScroll/RightColumn/MetricsPanel/Metrics
-@onready var events_label: RichTextLabel = $Margin/VSplit/Content/RightPanelScroll/RightColumn/EventsPanel/Events
+@onready var status_label: Label = get_node_or_null("Margin/VSplit/Header/StatusLabel") as Label
+@onready var live_status_label: RichTextLabel = get_node_or_null("Margin/VSplit/Header/LiveStatusLabel") as RichTextLabel
+@onready var title_label: Label = get_node_or_null("Margin/VSplit/Header/TitleLabel") as Label
+@onready var notes_label: Label = get_node_or_null("Margin/VSplit/Header/NotesLabel") as Label
+@onready var camera_display: TextureRect = get_node_or_null("Margin/VSplit/Content/LeftColumn/CameraPanel/CameraDisplay") as TextureRect
+@onready var landmark_drawer: Control = find_child("LandmarkDrawer", true, false) as Control
+@onready var trail_drawer: Control = find_child("TrailDrawer", true, false) as Control
+@onready var quick_stats_label: RichTextLabel = find_child("QuickStats", true, false) as RichTextLabel
+@onready var summary_label: RichTextLabel = find_child("Summary", true, false) as RichTextLabel
+@onready var signal_status_label: RichTextLabel = find_child("SignalStatus", true, false) as RichTextLabel
+@onready var metrics_label: RichTextLabel = find_child("Metrics", true, false) as RichTextLabel
+@onready var events_label: RichTextLabel = find_child("Events", true, false) as RichTextLabel
+@onready var left_placement_chart: Control = find_child("LeftPlacementChart", true, false) as Control
+@onready var right_placement_chart: Control = find_child("RightPlacementChart", true, false) as Control
+@onready var left_direction_chart: Control = find_child("LeftDirectionChart", true, false) as Control
+@onready var right_direction_chart: Control = find_child("RightDirectionChart", true, false) as Control
 
 var provider: MediaPipeProvider = null
 var auto_start_manager: Node = null
@@ -130,6 +134,7 @@ var _last_flow_events := {}
 var _event_counts: Dictionary = {}
 var _last_event_payloads: Dictionary = {}
 var _last_event_timestamps_ms: Dictionary = {}
+var _event_sequence := 0
 var _last_console_snapshot := ""
 var _preview_only_invalid_reason := ""
 var _preview_only_invalid_logged := false
@@ -637,6 +642,7 @@ func _refresh_debug_panels() -> void:
 		metrics_label.text = _build_metrics_text()
 	if events_label:
 		events_label.text = _build_events_text()
+	_refresh_flow_ring_board()
 
 func _build_live_status_text() -> String:
 	var state: Dictionary = _latest_state
@@ -979,21 +985,70 @@ func _build_events_text() -> String:
 		lines.append_array(_event_lines)
 	return "\n".join(lines)
 
+func _refresh_flow_ring_board() -> void:
+	if harness_mode != HarnessMode.FLOW:
+		return
+	var flow_debug: Dictionary = (_latest_state.get("gesture_debug", {}) as Dictionary).get("flow", {})
+	var left_flow: Dictionary = flow_debug.get("left", {})
+	var right_flow: Dictionary = flow_debug.get("right", {})
+	_set_flow_chart_active_index(left_placement_chart, _resolve_flow_board_index(left_flow, true, false))
+	_set_flow_chart_active_index(right_placement_chart, _resolve_flow_board_index(right_flow, true, false))
+	_set_flow_chart_active_index(left_direction_chart, _resolve_flow_board_index(left_flow, false, false))
+	_set_flow_chart_active_index(right_direction_chart, _resolve_flow_board_index(right_flow, false, false))
+
+func _resolve_flow_board_index(hand_debug: Dictionary, is_placement: bool, prefer_last_emitted: bool) -> int:
+	var candidate_key := "placement_candidate" if is_placement else "direction_candidate"
+	var emitted_meta_key := "trail_meta"
+	if prefer_last_emitted and hand_debug.has(emitted_meta_key):
+		var emitted_meta: Dictionary = hand_debug.get(emitted_meta_key, {})
+		var emitted_index := int(emitted_meta.get("placement" if is_placement else "direction", -1))
+		if emitted_index >= 0:
+			return emitted_index
+	return int(hand_debug.get(candidate_key, -1))
+
+func _set_flow_chart_active_index(chart: Control, active_index: int) -> void:
+	if chart == null or not is_instance_valid(chart):
+		return
+	chart.set("active_index", active_index)
+
 func _record_event(event_name: String, payload: Dictionary) -> void:
-	var timestamp := Time.get_time_string_from_system()
 	var timestamp_ms := Time.get_ticks_msec()
 	_event_counts[event_name] = int(_event_counts.get(event_name, 0)) + 1
 	_last_event_payloads[event_name] = payload.duplicate(true)
 	_last_event_timestamps_ms[event_name] = timestamp_ms
-	var line := "%s  %s%s" % [timestamp, event_name, _format_event_payload(payload)]
-	_event_lines.push_front(line)
-	while _event_lines.size() > MAX_EVENT_LINES:
-		_event_lines.pop_back()
+	_append_event_feed_lines(event_name, payload)
 	if _should_log_event_to_console(event_name):
 		print("[ProvingHarness][%s] %s%s" % [_mode_name(), event_name, _format_event_payload(payload)])
 	_refresh_debug_panels()
 	if steady_state_console_debug:
 		_emit_console_snapshot_if_changed()
+
+func _append_event_feed_lines(event_name: String, payload: Dictionary) -> void:
+	var lines := _build_event_feed_lines(event_name, payload)
+	var numbered_lines: Array[String] = []
+	for line: String in lines:
+		_event_sequence += 1
+		numbered_lines.append("%04d: %s" % [_event_sequence, line])
+	for index: int in range(numbered_lines.size() - 1, -1, -1):
+		_event_lines.push_front(numbered_lines[index])
+	while _event_lines.size() > MAX_EVENT_LINES:
+		_event_lines.pop_back()
+
+func _build_event_feed_lines(event_name: String, payload: Dictionary) -> Array[String]:
+	if harness_mode == HarnessMode.FLOW and payload.has("placement") and payload.has("direction"):
+		var side_label := "Left Bat" if event_name.ends_with("_left") else "Right Bat"
+		return [
+			"%s Placement - %d" % [side_label, _flow_ui_label_from_value(int(payload.get("placement", -1)), true)],
+			"%s Direction - %d" % [side_label, _flow_ui_label_from_value(int(payload.get("direction", -1)), false)],
+		]
+	return [event_name + _format_event_payload(payload)]
+
+func _flow_ui_label_from_value(value: int, is_placement: bool) -> int:
+	if value < 0:
+		return 0
+	if is_placement and value == 12:
+		return 13
+	return value + 1
 
 func _should_log_event_to_console(event_name: String) -> bool:
 	if steady_state_console_debug:
@@ -1038,6 +1093,7 @@ func _reset_event_tracking() -> void:
 	_event_counts = {}
 	_last_event_payloads = {}
 	_last_event_timestamps_ms = {}
+	_event_sequence = 0
 	for event_name: String in BOXING_EVENT_ORDER + FLOW_EVENT_ORDER + ["provider_started", "tracking_lost", "tracking_restored", "camera_stream_failed", "server_failed", "preview_only_provider_disabled", "preview_only_invalid"]:
 		_event_counts[event_name] = 0
 

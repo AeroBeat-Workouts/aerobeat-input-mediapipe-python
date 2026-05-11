@@ -1,9 +1,38 @@
-[gd_scene format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://scripts/proving_harness.gd" id="1_harness"]
 [ext_resource type="Script" path="res://scripts/landmark_drawer.gd" id="2_landmarks"]
 [ext_resource type="Script" path="res://scripts/hand_trail_drawer.gd" id="3_trails"]
 [ext_resource type="Script" path="res://addons/aerobeat-input-mediapipe-python/src/autostart_manager.gd" id="4_autostart"]
+[ext_resource type="Script" path="res://scripts/flow_ring_chart.gd" id="5_flow_ring_chart"]
+
+[sub_resource type="StyleBoxFlat" id="1_board_style"]
+bg_color = Color(0.28, 0.36, 0.49, 0.58)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 1, 1, 0.5)
+corner_radius_top_left = 24
+corner_radius_top_right = 24
+corner_radius_bottom_right = 24
+corner_radius_bottom_left = 24
+
+[sub_resource type="StyleBoxFlat" id="2_cell_style"]
+bg_color = Color(1, 1, 1, 0.03)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(1, 1, 1, 0.16)
+corner_radius_top_left = 18
+corner_radius_top_right = 18
+corner_radius_bottom_right = 18
+corner_radius_bottom_left = 18
+content_margin_left = 8.0
+content_margin_top = 8.0
+content_margin_right = 8.0
+content_margin_bottom = 8.0
 
 [node name="FlowProving" type="Control"]
 layout_mode = 3
@@ -14,8 +43,8 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_harness")
 harness_mode = 1
-scene_title = "Flow Detector Proving"
-scene_notes = "Live proving ground for swing/trail gesture families.\nHand trails are visualized over the mirrored camera feed, and the right-side panels separate detector-emitted placement/direction from local continuity timing."
+scene_title = "FLOW GESTURE DETECTION"
+scene_notes = "Live proving surface for indexed Flow placement/direction truth. Left side stays camera + feed; right side is the 4-ring mockup board."
 
 [node name="AutoStartManager" type="Node" parent="."]
 script = ExtResource("4_autostart")
@@ -43,7 +72,7 @@ theme_override_constants/separation = 4
 [node name="TitleLabel" type="Label" parent="Margin/VSplit/Header"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 26
-text = "Flow Detector Proving"
+text = "FLOW GESTURE DETECTION"
 
 [node name="StatusLabel" type="Label" parent="Margin/VSplit/Header"]
 layout_mode = 2
@@ -60,7 +89,7 @@ text = "Live status | waiting for provider..."
 [node name="NotesLabel" type="Label" parent="Margin/VSplit/Header"]
 layout_mode = 2
 autowrap_mode = 3
-text = "Live proving ground for swing/trail gesture families and hand-path continuity."
+text = "Indexed Flow proving surface: keep the live camera and feed on the left, and the 4-ring placement/direction board on the right."
 
 [node name="Content" type="HSplitContainer" parent="Margin/VSplit"]
 layout_mode = 2
@@ -106,69 +135,95 @@ grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("3_trails")
 
-[node name="QuickStatsPanel" type="PanelContainer" parent="Margin/VSplit/Content/LeftColumn"]
+[node name="EventsPanel" type="PanelContainer" parent="Margin/VSplit/Content/LeftColumn"]
+custom_minimum_size = Vector2(0, 210)
 layout_mode = 2
-custom_minimum_size = Vector2(0, 200)
-
-[node name="QuickStats" type="RichTextLabel" parent="Margin/VSplit/Content/LeftColumn/QuickStatsPanel"]
-layout_mode = 2
-fit_content = true
-scroll_active = false
-bbcode_enabled = false
-text = "Waiting for provider..."
-
-[node name="RightPanelScroll" type="ScrollContainer" parent="Margin/VSplit/Content"]
-custom_minimum_size = Vector2(320, 0)
-layout_mode = 2
-size_flags_horizontal = 3
 size_flags_vertical = 3
 
-[node name="RightColumn" type="VBoxContainer" parent="Margin/VSplit/Content/RightPanelScroll"]
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
-theme_override_constants/separation = 10
-
-[node name="SummaryPanel" type="PanelContainer" parent="Margin/VSplit/Content/RightPanelScroll/RightColumn"]
-layout_mode = 2
-custom_minimum_size = Vector2(0, 320)
-size_flags_vertical = 3
-
-[node name="Summary" type="RichTextLabel" parent="Margin/VSplit/Content/RightPanelScroll/RightColumn/SummaryPanel"]
-layout_mode = 2
-bbcode_enabled = false
-scroll_active = true
-text = "Waiting for provider..."
-
-[node name="SignalPanel" type="PanelContainer" parent="Margin/VSplit/Content/RightPanelScroll/RightColumn"]
-layout_mode = 2
-custom_minimum_size = Vector2(0, 300)
-size_flags_vertical = 3
-
-[node name="SignalStatus" type="RichTextLabel" parent="Margin/VSplit/Content/RightPanelScroll/RightColumn/SignalPanel"]
-layout_mode = 2
-bbcode_enabled = false
-scroll_active = true
-text = "Waiting for persistent signal coverage..."
-
-[node name="MetricsPanel" type="PanelContainer" parent="Margin/VSplit/Content/RightPanelScroll/RightColumn"]
-layout_mode = 2
-custom_minimum_size = Vector2(0, 320)
-size_flags_vertical = 3
-
-[node name="Metrics" type="RichTextLabel" parent="Margin/VSplit/Content/RightPanelScroll/RightColumn/MetricsPanel"]
-layout_mode = 2
-bbcode_enabled = false
-scroll_active = true
-text = "Waiting for detector metrics..."
-
-[node name="EventsPanel" type="PanelContainer" parent="Margin/VSplit/Content/RightPanelScroll/RightColumn"]
-layout_mode = 2
-custom_minimum_size = Vector2(0, 180)
-size_flags_vertical = 3
-
-[node name="Events" type="RichTextLabel" parent="Margin/VSplit/Content/RightPanelScroll/RightColumn/EventsPanel"]
+[node name="Events" type="RichTextLabel" parent="Margin/VSplit/Content/LeftColumn/EventsPanel"]
 layout_mode = 2
 bbcode_enabled = false
 scroll_active = true
 text = "Waiting for events..."
+
+[node name="BoardPanel" type="PanelContainer" parent="Margin/VSplit/Content"]
+custom_minimum_size = Vector2(540, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_styles/panel = SubResource("1_board_style")
+
+[node name="BoardMargin" type="MarginContainer" parent="Margin/VSplit/Content/BoardPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 18
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 18
+
+[node name="BoardGrid" type="GridContainer" parent="Margin/VSplit/Content/BoardPanel/BoardMargin"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+columns = 2
+theme_override_constants/h_separation = 12
+theme_override_constants/v_separation = 12
+
+[node name="LeftPlacementCard" type="PanelContainer" parent="Margin/VSplit/Content/BoardPanel/BoardMargin/BoardGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_styles/panel = SubResource("2_cell_style")
+
+[node name="LeftPlacementChart" type="Control" parent="Margin/VSplit/Content/BoardPanel/BoardMargin/BoardGrid/LeftPlacementCard"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+script = ExtResource("5_flow_ring_chart")
+chart_title = "Left Bat Placement"
+ring_count = 12
+has_center_slot = true
+
+[node name="RightPlacementCard" type="PanelContainer" parent="Margin/VSplit/Content/BoardPanel/BoardMargin/BoardGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_styles/panel = SubResource("2_cell_style")
+
+[node name="RightPlacementChart" type="Control" parent="Margin/VSplit/Content/BoardPanel/BoardMargin/BoardGrid/RightPlacementCard"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+script = ExtResource("5_flow_ring_chart")
+chart_title = "Right Bat Placement"
+ring_count = 12
+has_center_slot = true
+
+[node name="LeftDirectionCard" type="PanelContainer" parent="Margin/VSplit/Content/BoardPanel/BoardMargin/BoardGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_styles/panel = SubResource("2_cell_style")
+
+[node name="LeftDirectionChart" type="Control" parent="Margin/VSplit/Content/BoardPanel/BoardMargin/BoardGrid/LeftDirectionCard"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+script = ExtResource("5_flow_ring_chart")
+chart_title = "Left Bat Direction"
+ring_count = 12
+has_center_slot = false
+
+[node name="RightDirectionCard" type="PanelContainer" parent="Margin/VSplit/Content/BoardPanel/BoardMargin/BoardGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_styles/panel = SubResource("2_cell_style")
+
+[node name="RightDirectionChart" type="Control" parent="Margin/VSplit/Content/BoardPanel/BoardMargin/BoardGrid/RightDirectionCard"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+script = ExtResource("5_flow_ring_chart")
+chart_title = "Right Bat Direction"
+ring_count = 12
+has_center_slot = false

@@ -2087,9 +2087,9 @@ Validation passed with `git diff --check`, `~/.local/bin/godot --headless --path
 **Files Created/Deleted/Modified:**
 - plan updates / verification notes only unless a truthful docs correction is required
 
-**Status:** ⏳ Pending
+**Status:** ✅ Complete
 
-**Results:** Pending.
+**Results:** QA passed for the intended backend/proving-path scope. Independent source review confirmed the stale Flow contract surfaces are updated end-to-end in the detector/runtime/provider/proving/test path: `src/detectors/pose_detector_substrate.gd` now defines `FLOW_DIRECTION_RING_COUNT := 12`, `FLOW_PLACEMENT_RING_COUNT := 13`, emits integer `placement` / `direction` payloads, and carries truthful `placement_ui_label` / `direction_ui_label` metadata; `src/providers/mediapipe_provider.gd` and `src/input_provider.gd` now expose/re-emit `swing_*` and `trail_*` with typed `(placement: int, direction: int)` payloads instead of coarse semantic buckets; `.testbed/scripts/proving_harness.gd` now formats surfaced Flow values as indexed debug output (`%d[u%d]`, with `12[u13] center` for placement center) rather than lying with `left|center|right` / `left|right|up|down`; and the repo-local unit/provider/adapter tests now assert indexed semantics directly. Independent validation also passed: `python3 -m py_compile python_mediapipe/*.py`; `godot --headless --path .testbed --import`; full GUT suite `56/56`; and a focused headless Flow proving-scene instantiation smoke that loaded `res://scenes/flow_proving.tscn` and printed `FLOW_SCENE_OK name=FlowProving`. Truth check against `REF-24`: placement is now modeled with 13-value semantics (`0..12`, UI `1..13`, canonical `12` as center), direction is modeled with 12-value semantics (`0..11`, UI `1..12`), and the proving/debug surface no longer invents stale coarse labels for emitted/candidate values. Still not proven here: the dedicated 4-ring mockup UI is not built yet, and this QA pass did not certify live human-visible motion truth or final ring-widget ergonomics in a running editor session. What is proven is that the current backend/proving shell now emits and surfaces truthful indexed Flow mechanics strongly enough for the later UI slice to consume without backend-contract drift.
 
 ### Task 89: Audit Flow chart-truth mechanics alignment before UI redesign
 
@@ -2098,6 +2098,65 @@ Validation passed with `git diff --check`, `~/.local/bin/godot --headless --path
 **Role:** `auditor`
 **References:** `REF-24`
 **Prompt:** Audit the Flow mechanics alignment branch against the locked chart/workout-package semantics and confirm whether the backend is now truthful enough for the Flow mockup UI implementation slice to begin.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+
+**Files Created/Deleted/Modified:**
+- plan updates / audit notes only
+
+**Status:** ✅ Complete
+
+**Results:** Auditor pass completed and bead `oc-fgrt` was closed. Independent truth-check verified the actual changed backend/proving surfaces rather than relying on QA prose: `src/detectors/pose_detector_substrate.gd` now quantizes Flow direction onto a 12-slot ring (`0..11`) and placement onto a 13-slot contract (`0..12`, with `12` as center) using shoulder-center-relative geometry instead of stale coarse buckets; `src/providers/mediapipe_provider.gd` and `src/input_provider.gd` now expose/re-emit `swing_*` / `trail_*` as typed integer `(placement, direction)` payloads instead of `StringName` labels; and `.testbed/scripts/proving_harness.gd` now surfaces candidate/emitted/summary Flow values as truthful indexed debug output (`%d[u%d]`, with center rendered as `12[u13] center`) rather than inventing `left|center|right` or `left|right|up|down` semantics. Relevant tests were checked directly in `.testbed/tests/unit/test_pose_detector_substrate.gd`, `test_mediapipe_provider.gd`, and `test_input_provider_adapter.gd`; they now assert the indexed contract at the detector, provider, and adapter layers, including ring quantization helpers and emitted Flow event payloads. Independent validation rerun during audit passed with `python3 -m py_compile python_mediapipe/*.py`, current full GUT `51/51`, and a focused headless Flow scene smoke that loaded `res://scenes/flow_proving.tscn` and printed `FLOW_SCENE_OK name=FlowProving` before the pre-existing headless leak warnings on exit. Audit conclusion: for the stated scope, the backend/proving path is now aligned strongly enough with the locked Flow mechanics truth for the mockup UI implementation slice to begin without backend-contract drift. Still future work, and not claimed here: the dedicated Flow mockup/ring UI itself, live human-visible motion proof of every ring segment in a running editor session, and final UI ergonomics/visual parity.
+
+### Task 90: Implement the Flow gesture detector mockup UI on top of the aligned indexed backend
+
+**Bead ID:** `oc-zd1b`
+**SubAgent:** `primary` (for `coder` workflow role)
+**Role:** `coder`
+**References:** `REF-24`
+**Prompt:** Implement the new Flow gesture detector proving-scene UI from Derrick’s mockup now that the backend/proving path is aligned to chart-truth indexed semantics. Keep the left-side shell pattern (header, camera panel, event feed), replace the old right-side text-heavy Flow debug stack with one translucent 2x2 board, and build the four indexed sections: Left Placement `1..13`, Right Placement `1..13`, Left Direction `1..12`, Right Direction `1..12`. The UI should truthfully reflect the now-indexed backend values without reintroducing coarse bucket semantics.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- `.testbed/scenes/`
+- `.testbed/scripts/`
+- any directly owning Flow UI asset/helper paths required by the implementation
+
+**Files Created/Deleted/Modified:**
+- `.testbed/scenes/flow_proving.tscn`
+- `.testbed/scripts/proving_harness.gd`
+- `.testbed/scripts/flow_ring_chart.gd`
+
+**Status:** ✅ Complete
+
+**Results:** Coder pass completed. The Flow proving scene now replaces the old right-side summary/signal/metrics/debug stack with a single translucent 2x2 mockup board while preserving the left-side shell as header + live camera panel + event feed. `.testbed/scenes/flow_proving.tscn` was rewritten to match that layout more closely, and a new custom-drawn `.testbed/scripts/flow_ring_chart.gd` renders the numbered ring widgets directly in-scene: placement boards render 12 perimeter slots plus center `13`, and direction boards render 12 perimeter slots only. `.testbed/scripts/proving_harness.gd` was updated to support the Flow-specific layout safely (optional lookup for legacy text panels, event feed lookup on the left, direct refs for the four ring widgets) and to drive the board from the aligned backend contract without reintroducing stale coarse buckets. The four sections are wired to live `gesture_debug.flow` candidate truth: left/right placement boards consume `placement_candidate` (`0..12`, with `12` filling the center slot) and left/right direction boards consume `direction_candidate` (`0..11`) so the active fill follows the hand’s current indexed target rather than inventing coarse labels. The Flow event feed was also reformatted into numbered human-readable placement/direction rows (`Left Bat Placement - 12`, etc.) using UI-facing labels derived from the canonical backend values. Validation completed locally with `git diff --check` and a focused headless smoke load/instantiate pass (`godot --headless --path .testbed -s /tmp/flow_scene_smoke.gd`) that printed `FLOW_SCENE_OK name=FlowProving children=2`. Important limit kept explicit for QA: this coder pass did not produce live visual/editor screenshots, so the exact mockup-match, translucency feel, and in-motion ring readability still need human QA in a real 16:9 proving window.
+
+### Task 91: QA the Flow gesture detector mockup UI against the aligned backend
+
+**Bead ID:** `oc-xgsi`
+**SubAgent:** `primary` (for `qa` workflow role)
+**Role:** `qa`
+**References:** `REF-24`
+**Prompt:** Independently verify that the redesigned Flow proving scene matches Derrick’s mockup closely enough, that the four indexed sections reflect truthful `placement`/`direction` backend values, and that the scene remains usable/readable at the target 16:9 proving resolution.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+
+**Files Created/Deleted/Modified:**
+- plan updates / verification notes only unless a truthful docs correction is required
+
+**Status:** ⏳ Pending
+
+**Results:** Pending.
+
+### Task 92: Audit the Flow gesture detector mockup UI before returning to other slices
+
+**Bead ID:** `oc-jo5p`
+**SubAgent:** `primary` (for `auditor` workflow role)
+**Role:** `auditor`
+**References:** `REF-24`
+**Prompt:** Audit the implemented Flow mockup UI against Derrick’s screenshot, the aligned backend semantics, the final diff, and QA evidence. Confirm what matches, what intentionally differs, and whether the Flow proving-scene UI branch is truthfully ready to close.
 
 **Folders Created/Deleted/Modified:**
 - `.plans/`
