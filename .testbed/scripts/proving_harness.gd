@@ -357,12 +357,14 @@ func _append_trail_point(trail: Array, landmark: Dictionary, timestamp_ms: int, 
 	debug_state["frame_samples"] = int(debug_state.get("frame_samples", 0)) + 1
 	if landmark.is_empty():
 		_note_trail_debug_skip(debug_state, "missing")
+		_break_trail_for_gap(trail, timestamp_ms, debug_state, "missing")
 		return
 	var visibility := float(landmark.get("v", 0.0))
 	var trail_visibility_threshold := _trail_visibility_threshold()
 	if visibility < trail_visibility_threshold:
 		_note_trail_debug_skip(debug_state, "low_visibility")
 		debug_state["last_visibility"] = visibility
+		_break_trail_for_gap(trail, timestamp_ms, debug_state, "low_visibility")
 		return
 	var point := Vector2(float(landmark.get("x", 0.0)), float(landmark.get("y", 0.0)))
 	debug_state["last_visibility"] = visibility
@@ -474,6 +476,13 @@ func _append_trail_break(trail: Array, timestamp_ms: int) -> void:
 		"v": 0.0,
 		"timestamp_ms": timestamp_ms,
 	})
+
+func _break_trail_for_gap(trail: Array, timestamp_ms: int, debug_state: Dictionary, reason: String) -> void:
+	if trail.is_empty() or _trail_needs_reseed(trail):
+		return
+	_append_trail_break(trail, timestamp_ms)
+	debug_state["continuity_breaks"] = int(debug_state.get("continuity_breaks", 0)) + 1
+	debug_state["last_action"] = "break_%s" % reason
 
 func _trail_needs_reseed(trail: Array) -> bool:
 	if trail.is_empty():

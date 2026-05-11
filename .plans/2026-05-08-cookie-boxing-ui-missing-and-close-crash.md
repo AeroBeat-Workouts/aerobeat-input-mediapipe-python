@@ -2239,6 +2239,70 @@ Residual uncertainty kept explicit: I did not have an attached Godot plugin/edit
 
 Audit conclusion: **pass**. After the clean rerun, the branch is truthfully ready to close for the Flow mockup UI slice, and bead `oc-q66t` should close.
 
+### Task 96: Diagnose and fix shared proving-hand trail rendering
+
+**Bead ID:** `oc-exde`
+**SubAgent:** `primary` (for `coder` workflow role)
+**Role:** `coder`
+**References:** `REF-04`, `REF-05`, `REF-24`
+**Prompt:** Investigate the shared proving-scene hand trail rendering bug visible in both Boxing and Flow. Current truth from Derrick: with `Show Trails` enabled, the trail appears like a raycast and only starts appearing when the left or right hand is near the center of the camera panel/scene. The repro is strong on the left-hand boxing punch fixture and also appears in Flow, across live and prerecorded modes, with landmarks on or off. Determine whether the fault is in shared trail history collection, coordinate-space conversion, or shared draw math; land the smallest truthful source fix; validate in the safest available scope; and preserve the now-stable non-crash proving setup.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- `.testbed/scripts/`
+- `.testbed/scenes/` if layout/wiring adjustments are required
+
+**Files Created/Deleted/Modified:**
+- `.testbed/scripts/proving_harness.gd`
+- `.testbed/tests/unit/test_proving_harness_trails.gd`
+
+**Status:** ✅ Complete
+
+**Results:** Coder pass completed on bead `oc-exde`. Source inspection across the shared proving path showed the bug was in **shared trail history continuity**, not in screen projection math or scene-specific wiring. The existing trail collector already broke continuity for implausible spatial jumps and out-of-bounds samples, but it did **not** break continuity when the hand temporarily dropped to missing/low-visibility samples. Because both Boxing and Flow share `_append_trail_point()` in `.testbed/scripts/proving_harness.gd`, that meant a hand could disappear or become too low-confidence near the edge, then reappear near center and get reconnected to stale pre-gap history as one long straight segment — which matches Derrick’s "raycast" symptom and the center-of-scene repro pattern.
+
+The fix stayed intentionally small and shared: `_append_trail_point()` now inserts a single trail break marker when an existing live segment encounters a missing or low-visibility gap, so the next usable point reseeds a fresh segment instead of drawing a stale straight-line bridge across the invisible interval. Repeated missing/low-visibility frames do not stack extra break markers because the helper exits once the trail is already in reseed state. No scene layout, projection math, MediaPipe runtime wiring, or close-path behavior was changed.
+
+Safe validation completed without running MediaPipe/live/prerecorded proving paths: `git diff --check`; `~/.local/bin/godot --headless --path .testbed --check-only --script scripts/proving_harness.gd`; and a focused GUT run `~/.local/bin/godot --headless --path .testbed -s addons/gut/gut_cmdln.gd -gdir=res://tests/unit -ginclude_subdirs -gselect=test_proving_harness_trails.gd -gexit`, which passed `11/11`. Added regression coverage proves two important continuity cases directly: low-visibility gaps now break and reseed instead of connecting stale history, and repeated missing frames only insert one break marker. Ready for QA / Derrick’s manual visual confirmation on Cookie.
+
+### Task 97: Fix Boxing proving header icon/title overlap
+
+**Bead ID:** `oc-8gxz`
+**SubAgent:** `primary` (for `coder` workflow role)
+**Role:** `coder`
+**References:** `REF-04`
+**Prompt:** Fix the Boxing proving-scene header composition so the top-left icon no longer overlaps the title text. Match the current branded shell direction used in the proving scenes and keep the change tightly scoped to truthful layout cleanup.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- `.testbed/scenes/`
+- `.testbed/scripts/` if a shared header helper needs adjustment
+
+**Files Created/Deleted/Modified:**
+- Boxing proving scene/header surfaces required by the fix
+
+**Status:** ⏳ Pending
+
+**Results:** Pending.
+
+### Task 98: Draw Flow ring arcs behind the numbered slots
+
+**Bead ID:** `oc-jm59`
+**SubAgent:** `primary` (for `coder` workflow role)
+**Role:** `coder`
+**References:** `REF-24`
+**Prompt:** Adjust the Flow ring-chart rendering so the underlying circle ring sits visually behind the numbered slot circles. In the visible slot positions, the ring stroke should not show through the numbered circles. Keep the existing numbering, placement center slot, direction ring semantics, and current branded board layout intact.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- `.testbed/scripts/`
+
+**Files Created/Deleted/Modified:**
+- `/.testbed/scripts/flow_ring_chart.gd` and any tightly related helper surfaces if required
+
+**Status:** ⏳ Pending
+
+**Results:** Pending.
+
 ## Session Handoff / Current Stopping Point
 
 - File-backed prerecorded proving is now a real supported proving path, not a stub:

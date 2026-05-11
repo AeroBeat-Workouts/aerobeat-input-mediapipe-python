@@ -80,6 +80,35 @@ func test_resolves_trail_hand_point_by_clamping_near_edge_jitter() -> void:
 	assert_true(float(resolved.get("x", 0.0)) >= 0.98 and float(resolved.get("x", 0.0)) <= 1.0)
 	assert_true(float(resolved.get("y", 0.0)) >= 0.39 and float(resolved.get("y", 0.0)) <= 0.43)
 
+func test_low_visibility_gap_breaks_existing_trail_before_reseed() -> void:
+	var trail: Array = []
+	var debug_state := _debug_state()
+	harness._append_trail_point(trail, {"x": 0.40, "y": 0.45, "v": 0.99}, 1000, debug_state)
+	harness._append_trail_point(trail, {"x": 0.42, "y": 0.47, "v": 0.05}, 1033, debug_state)
+	assert_eq(trail.size(), 2)
+	assert_true(float(trail[1].get("x", 0.0)) < 0.0)
+	assert_true(float(trail[1].get("y", 0.0)) < 0.0)
+	assert_eq(int(debug_state.get("continuity_breaks", 0)), 1)
+	assert_eq(String(debug_state.get("last_action", "")), "break_low_visibility")
+	harness._append_trail_point(trail, {"x": 0.46, "y": 0.48, "v": 0.99}, 1066, debug_state)
+	assert_eq(trail.size(), 3)
+	assert_true(is_equal_approx(float(trail[2].get("x", 0.0)), 0.46))
+	assert_true(is_equal_approx(float(trail[2].get("y", 0.0)), 0.48))
+	assert_eq(int(debug_state.get("reseeds", 0)), 2)
+
+func test_missing_gap_breaks_existing_trail_once() -> void:
+	var trail: Array = []
+	var debug_state := _debug_state()
+	harness._append_trail_point(trail, {"x": 0.35, "y": 0.44, "v": 0.99}, 1000, debug_state)
+	harness._append_trail_point(trail, {}, 1033, debug_state)
+	harness._append_trail_point(trail, {}, 1066, debug_state)
+	assert_eq(trail.size(), 2)
+	assert_true(float(trail[1].get("x", 0.0)) < 0.0)
+	assert_true(float(trail[1].get("y", 0.0)) < 0.0)
+	assert_eq(int(debug_state.get("continuity_breaks", 0)), 1)
+	assert_eq(int(debug_state.get("missing_skips", 0)), 2)
+	assert_eq(String(debug_state.get("last_action", "")), "missing")
+
 func test_out_of_bounds_point_still_clears_trail() -> void:
 	var trail: Array = []
 	var debug_state := _debug_state()
