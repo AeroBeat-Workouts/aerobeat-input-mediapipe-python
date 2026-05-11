@@ -2193,6 +2193,52 @@ The Flow event feed ordering bug was fixed directly in the shared harness instea
 
 Validation completed locally with `git diff --check`, `~/.local/bin/godot --headless --path .testbed --check-only --script scripts/proving_harness.gd`, and a focused headless Flow parity/layout probe (`.testbed/.temp/task93_flow_probe.gd`) at `1280x720`, `960x540`, and `854x480`. That probe confirmed no horizontal clipping/off-screen overflow at those sizes (`offscreen_left` stayed positive and right overflow stayed negative), the camera remained taller than the feed (`camera_to_events_height_ratio` ≈ `3.33`, `2.08`, `1.90` respectively), the board still exposed all four active indexed sections, and seeded events rendered in ascending visible order. Remaining truthful limit for QA: this pass did not produce a human-observed live editor screenshot comparison, so QA should focus next on real-window visual parity of the new mark/background/translucency feel and confirm the narrower `854x480` runtime still feels readable, not just geometrically non-clipped.
 
+### Task 94: QA rerun the Flow gesture detector mockup UI after the parity retry
+
+**Bead ID:** `oc-5ux8`
+**SubAgent:** `primary` (for `qa` workflow role)
+**Role:** `qa`
+**References:** `REF-24`
+**Prompt:** Independently QA the updated Flow proving scene after commit `d365959` against Derrick’s mockup and the aligned indexed backend. Verify the branded blue shell/top-left mark, reduced header drift, left-column proportions, ascending event-feed order, and responsive 16:9 behavior at `1280x720`, `960x540`, and `854x480`, while re-checking that the four ring sections still reflect truthful indexed `placement`/`direction` semantics with no stale coarse bucket drift. Use the strongest truthful validation path available; if live visual parity remains uncertified, say exactly what is still uncertified.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+
+**Files Created/Deleted/Modified:**
+- plan updates / verification notes only unless a truthful QA fix is required
+
+**Status:** ✅ Complete
+
+**Results:** QA rerun passed in the strongest truthful repo-local scope available after commit `d365959`, with one explicit remaining uncertainty about live-window visual feel. Validation used: (1) direct source review of `.testbed/scenes/flow_proving.tscn`, `.testbed/scripts/proving_harness.gd`, `.testbed/scripts/flow_ring_chart.gd`, and `.testbed/scripts/flow_brand_mark.gd`; (2) `~/.local/bin/godot --headless --path .testbed --check-only --script scripts/proving_harness.gd`; and (3) a fresh headless Flow QA probe at `1280x720`, `960x540`, and `854x480` that seeded indexed Flow candidate/event data, measured layout geometry, and checked visible event-feed ordering plus active ring indexes. What is now proven: the mockup shell retry materially fixed the earlier QA failures — the approved blue branded background is present, a top-left brand-mark treatment is present, the extra header/status/notes drift is gone from the visible shell, the left column now keeps the camera materially taller than the event feed at all three requested sizes (`camera_to_events_height_ratio` ≈ `3.33`, `2.08`, `1.90`), the right side remains a translucent 2x2 board, seeded event rows render in sensible ascending visible order (`0001`→`0008` top-to-bottom), and the scene no longer clips/pushes content off-screen at `1280x720`, `960x540`, or `854x480` (`offscreen_left` stayed positive and right overflow stayed negative in all three probes). Backend truth also remained aligned: the four board sections still reflect indexed semantics with no coarse-bucket regression, and the active probe values resolved exactly as expected (`left_placement=11` => UI `12`, `right_placement=12` => center/UI `13`, both directions `=5` => UI `6`). Ring numbering/orientation still matches the intended feel from the mockup (`12` at top, `1` upper-right, clockwise numbering; placement gets a centered `13`, direction does not).
+
+Exact remaining uncertainty: I still did not have an attached Godot plugin/editor session or a usable compositor capture path from this shell, so I could not truthfully certify literal live-window screenshot parity for translucency, spacing polish, or human comfort/readability feel — especially at the tightest `854x480` size. What is proven there is geometric fit plus responsive font/board sizing from the scene/script math, not a human-observed live screenshot pass. On balance, the previous material misses are resolved strongly enough that QA should now hand this branch to the auditor instead of failing it again.
+
+### Task 95: Audit the Flow gesture detector mockup UI after the parity retry
+
+**Bead ID:** `oc-q66t`
+**SubAgent:** `primary` (for `auditor` workflow role)
+**Role:** `auditor`
+**References:** `REF-24`
+**Prompt:** Audit the post-retry Flow proving-scene UI against Derrick’s mockup, the aligned indexed backend semantics, the final diff around `d365959`, and QA evidence from Task 94. Confirm what now matches, what still differs, and whether the branch is truthfully ready to close.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+
+**Files Created/Deleted/Modified:**
+- plan updates / audit notes only
+
+**Status:** ✅ Complete
+
+**Results:** Auditor pass completed on bead `oc-q66t`. I used the required desktop-control screenshot-first path on the real host Wayland desktop, not just headless layout probes. First I captured the live desktop state, then launched `res://scenes/flow_proving.tscn` in a real Godot window with a prerecorded Flow fixture. The first live run surfaced an important truth correction: a stale orphaned headless Godot process was still bound to UDP `127.0.0.1:4242`, so the scene auto-shifted to another port and the visible shell came up without truthful ring/event activity. I explicitly treated that first window as poisoned evidence, killed only the stale repo-owned `--check-only`/orphaned processes, relaunched cleanly, and re-captured the live window after `MediaPipeServer` successfully bound back to `127.0.0.1:4242`.
+
+What is now **proven by live desktop/window evidence** from the clean rerun: the Flow scene truthfully presents the branded blue shell in a real window, including the blue background treatment, top-left brand mark, and title row; the left column composition is materially aligned to the mockup shape, with a visibly taller camera panel over a shorter event feed; the right side reads as one translucent 2x2 board; the four labeled sections are present (`Left Bat Placement`, `Right Bat Placement`, `Left Bat Direction`, `Right Bat Direction`); placement rings visibly include the center `13` slot while direction rings do not; clockwise ring orientation matches the intended mockup feel (`12` at top, `1` upper-right); active indexed highlights render in the live window; and the visible event feed is in sensible ascending chronological order (`0022`, `0023`, `0024`, `0025`, `0026` top-to-bottom in the captured proof) rather than the old descending/newest-first failure. Overall readability and visual feel in the real window are good enough to call this a truthful mockup match for the implemented scope, with the main visible deviation being the intentional file-preview HUD inside the camera panel during prerecorded proving.
+
+What is **reconfirmed only by source/headless evidence**, not by the desktop screenshots alone: backend contract preservation remains correct end-to-end (`placement` as the 13-value indexed ring with center slot, `direction` as the 12-value indexed ring) and stale coarse semantics were not reintroduced. I rechecked the owning runtime/proving code directly: `src/detectors/pose_detector_substrate.gd` still defines `FLOW_DIRECTION_RING_COUNT := 12` and `FLOW_PLACEMENT_RING_COUNT := 13`, emits `placement_ui_label` / `direction_ui_label`, and no longer depends on the stale coarse `left|center|right` / `left|right|up|down` model; `.testbed/scripts/proving_harness.gd` still appends Flow event-feed rows chronologically and drives the four board charts from indexed candidate values; `.testbed/scripts/flow_ring_chart.gd` still renders placement with a center slot and direction without one. That source/headless layer matches the prior QA truth and the live-window behavior I saw.
+
+Residual uncertainty kept explicit: I did not have an attached Godot plugin/editor session, so this is a real standalone proving-window audit rather than a literal embedded-editor screenshot match; I also did not prove every possible ring index live in one run, only that the live board updates truthfully and the indexed backend/source contract remains correct. Those are acceptable limits for this bead because the branch goal here was the truthful Flow mockup UI audit, not exhaustive detector coverage.
+
+Audit conclusion: **pass**. After the clean rerun, the branch is truthfully ready to close for the Flow mockup UI slice, and bead `oc-q66t` should close.
+
 ## Session Handoff / Current Stopping Point
 
 - File-backed prerecorded proving is now a real supported proving path, not a stub:
