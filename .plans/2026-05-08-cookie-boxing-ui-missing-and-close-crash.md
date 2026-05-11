@@ -1986,6 +1986,27 @@ Explicit limit: I still do **not** have a literal human-observed live window or 
 
 ---
 
+### Task 84: Fix Guard/Squat Active pills not appearing in Derrick's live Boxing runtime
+
+**Bead ID:** `oc-h043`
+**SubAgent:** `primary` (for `coder` workflow role)
+**Role:** `coder`
+**References:** `REF-23`
+**Prompt:** Derrick directly confirmed that the prerecorded video camera flip fix now works, but in his actual live Boxing test run the `Guard` and `Squat` `Active` pills still do not appear. Treat Derrick’s live runtime observation as the top truth source. Reproduce and fix why those centered `Active` pills are still missing in the real run, while preserving the already-accepted camera orientation fix, one-board layout, no-scroll 3x3 board fit, active fill color `#3ddcdc`, and the current Boxing-only scope. Do not close this unless the live-runtime path is fixed strongly enough for Derrick to verify in his next run.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- `.testbed/scenes/`
+- `.testbed/scripts/`
+- any directly owning Boxing UI/runtime helper paths required by the fix
+
+**Files Created/Deleted/Modified:**
+- Boxing proving scene/harness/UI/runtime files required by the fix
+
+**Status:** ✅ Complete
+
+**Results:** Derrick’s live report demoted the earlier headless-confidence result, and the root cause turned out to be live-runtime timing rather than missing tile wiring or wrong styling: the centered `Guard` / `Squat` pills were still driven by state that could start and end within the same human-visible instant, so a real live run could flicker `guard_start/end` or `squat_start/end` quickly enough that the centered `Active` chip never stayed on-screen long enough to see even though the code path existed. The fix stayed Boxing-only in `.testbed/scripts/boxing_proving_harness.gd`: `guard_start` / `squat_start` now arm a short centered-pill minimum-visible latch (`650 ms`) while preserving the direct detector-state read, and `guard_end` / `squat_end` still clear the explicit override so persistent truth remains state-backed once the latch expires. This keeps the prerecorded camera-flip fix intact, preserves the accepted one-board/no-scroll/full-3x3 layout, and preserves the exact active fill color `#3ddcdc`. Validation passed with `~/.local/bin/godot --headless --path .testbed --check-only --script scripts/boxing_proving_harness.gd` plus a targeted runtime probe (`.temp/task84-pill-runtime-probe.gd`) that confirmed `live_flip=true`, `prerecorded_flip=false`, immediate `guard`/`squat` `start+end` pairs still leave the centered `Active` pills visible through the latch window, both active pill fills remain `3ddcdc`, and both pills clear again after the latch expires. Ready for Derrick to rerun live Boxing and verify the pills now visibly surface in the real runtime.
+
 ## Session Handoff / Current Stopping Point
 
 - File-backed prerecorded proving is now a real supported proving path, not a stub:
