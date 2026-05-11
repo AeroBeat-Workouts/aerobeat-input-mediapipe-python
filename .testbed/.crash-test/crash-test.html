@@ -335,7 +335,12 @@
       <p class="sub">
         Offline local checklist for repeated Cookie/Chip crash testing. This matrix is wired to the real proving knobs in this repo:
         <code>TRACKING</code>, <code>PREVIEW_ONLY_DEBUG</code>, <code>GODOT_ONLY_DEBUG</code>,
-        file-backed vs live source, and <code>skip_sidecar_stop_on_close_debug</code> on/off.
+        file-backed vs live source, and the expanded close-path <code>shutdownMode</code> ladder.
+      </p>
+      <p class="tiny">
+        <strong>Truth guard:</strong> <code>skip_sidecar_stop_on_close_debug</code> is the broad override. If it is on, the effective shutdown mode is always
+        <code>heartbeat_only</code> and the narrower Inspector toggles do not matter. Also note that <code>boxing_proving.tscn</code> currently bakes that broad
+        override on by default, so narrow-mode testing is misleading unless you first change the root Inspector values.
       </p>
     </section>
 
@@ -376,11 +381,11 @@
           <div><strong>Scenes:</strong> Boxing, Flow</div>
           <div><strong>Sources:</strong> live camera, prerecorded video</div>
           <div><strong>Startup modes:</strong> Tracking, Preview-only debug, Godot-only debug</div>
-          <div><strong>Close-path toggle:</strong> skip-sidecar on/off</div>
+          <div><strong>Shutdown mode axis:</strong> normal stop, heartbeat-only override, and the two narrow normal-stop skips</div>
           <div><strong>Row fields:</strong> tested, crashed, bad-window-only, notes</div>
           <div class="tiny">
             <strong>Note:</strong> <code>GODOT_ONLY_DEBUG</code> intentionally skips sidecar/camera/provider startup.
-            Source + skip-sidecar are still listed for matrix completeness so every close-path rung can be logged consistently.
+            Source + shutdown mode are still listed for matrix completeness so every close-path rung can be logged consistently.
           </div>
         </div>
       </aside>
@@ -396,7 +401,7 @@
                 <th>Scene</th>
                 <th>Source</th>
                 <th>Startup mode</th>
-                <th>Skip sidecar stop on close</th>
+                <th>Shutdown mode</th>
                 <th class="checkbox-cell">Tested</th>
                 <th class="checkbox-cell">Crashed</th>
                 <th class="checkbox-cell">Bad window only</th>
@@ -411,7 +416,8 @@
   </div>
 
   <script>
-    const STORAGE_KEY = "aerobeat-crash-test-matrix-v1";
+    const STORAGE_KEY = "aerobeat-crash-test-matrix-v2";
+    const LEGACY_STORAGE_KEYS = ["aerobeat-crash-test-matrix-v1"];
     const FILE_NAME = ".crash-test-state.json";
     const IS_FILE_ORIGIN = window.location.protocol === "file:";
     const CAN_PICK_EXISTING_FILE = typeof window.showOpenFilePicker === "function";
@@ -427,10 +433,17 @@
       { id: "PREVIEW_ONLY_DEBUG", label: "Preview-only debug" },
       { id: "GODOT_ONLY_DEBUG", label: "Godot-only debug" }
     ];
-    const skipSidecarModes = [
-      { id: "normal_stop", label: "Off" },
-      { id: "skip_sidecar", label: "On" }
+    const shutdownModes = [
+      { id: "normal_stop", label: "Normal stop" },
+      { id: "heartbeat_only", label: "Heartbeat-only (broad skip-sidecar)" },
+      { id: "normal_stop+skip_terminate_sync", label: "Normal stop + skip terminate_sync" },
+      { id: "normal_stop+skip_linux_pkill_main_py", label: "Normal stop + skip Linux pkill main.py" },
+      { id: "normal_stop+skip_terminate_sync+skip_linux_pkill_main_py", label: "Normal stop + skip terminate_sync + skip Linux pkill main.py" }
     ];
+    const legacyShutdownModeMap = {
+      normal_stop: "normal_stop",
+      skip_sidecar: "heartbeat_only"
+    };
 
     const rowsTbody = document.getElementById("rows");
     const summaryGrid = document.getElementById("summary-grid");
@@ -446,14 +459,14 @@
       for (const scene of scenes) {
         for (const source of sources) {
           for (const startupMode of startupModes) {
-            for (const skipSidecar of skipSidecarModes) {
+            for (const shutdownMode of shutdownModes) {
               combos.push({
                 index,
-                id: `${scene.toLowerCase()}__${source.id}__${startupMode.id}__${skipSidecar.id}`,
+                id: buildComboId(scene, source.id, startupMode.id, shutdownMode.id),
                 scene,
                 source,
                 startupMode,
-                skipSidecar
+                shutdownMode
               });
               index += 1;
             }
@@ -463,19 +476,35 @@
       return combos;
     }
 
+    function buildComboId(scene, sourceId, startupModeId, shutdownModeId) {
+      return `${scene.toLowerCase()}__${sourceId}__${startupModeId}__${shutdownModeId}`;
+    }
+
+    function getLegacyModeIdForShutdownMode(shutdownModeId) {
+      return Object.keys(legacyShutdownModeMap).find((legacyId) => legacyShutdownModeMap[legacyId] === shutdownModeId) || null;
+    }
+
+    function getPriorRow(rows, combo) {
+      if (rows && rows[combo.id]) return rows[combo.id];
+      const legacyModeId = getLegacyModeIdForShutdownMode(combo.shutdownMode.id);
+      if (!legacyModeId || !rows) return {};
+      return rows[buildComboId(combo.scene, combo.source.id, combo.startupMode.id, legacyModeId)] || {};
+    }
+
     const combos = buildRows();
     let state = loadState();
 
     function normalizeState(candidate) {
       const safe = candidate && typeof candidate === "object" ? candidate : {};
+      const safeRows = safe.rows && typeof safe.rows === "object" ? safe.rows : {};
       const next = {
-        version: 1,
+        version: 2,
         updatedAt: safe.updatedAt || null,
         rows: {}
       };
 
       for (const combo of combos) {
-        const prior = safe.rows && safe.rows[combo.id] ? safe.rows[combo.id] : {};
+        const prior = getPriorRow(safeRows, combo);
         next.rows[combo.id] = {
           tested: Boolean(prior.tested),
           crashed: Boolean(prior.crashed),
@@ -490,8 +519,12 @@
     function loadState() {
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) return normalizeState({});
-        return normalizeState(JSON.parse(raw));
+        if (raw) return normalizeState(JSON.parse(raw));
+        for (const legacyKey of LEGACY_STORAGE_KEYS) {
+          const legacyRaw = localStorage.getItem(legacyKey);
+          if (legacyRaw) return normalizeState(JSON.parse(legacyRaw));
+        }
+        return normalizeState({});
       } catch (error) {
         console.warn("Failed to load local state", error);
         return normalizeState({});
@@ -534,13 +567,13 @@
           <td>
             <div class="combo">
               <strong>${combo.scene} · ${combo.source.label}</strong>
-              <span>${combo.startupMode.label} · skip-sidecar ${combo.skipSidecar.label}</span>
+              <span>${combo.startupMode.label} · ${combo.shutdownMode.label}</span>
             </div>
           </td>
           <td>${combo.scene}</td>
           <td>${combo.source.label}</td>
           <td><code>${combo.startupMode.id}</code></td>
-          <td>${combo.skipSidecar.label}</td>
+          <td>${combo.shutdownMode.label}</td>
           <td class="checkbox-cell">
             <label class="checkbox-wrap"><input type="checkbox" data-id="${combo.id}" data-field="tested" ${rowState.tested ? "checked" : ""}></label>
           </td>
@@ -613,14 +646,14 @@
     function exportPayload() {
       return {
         app: "aerobeat-crash-test-matrix",
-        version: 1,
+        version: 2,
         generatedAt: new Date().toISOString(),
-        combos: combos.map(({ id, scene, source, startupMode, skipSidecar }) => ({
+        combos: combos.map(({ id, scene, source, startupMode, shutdownMode }) => ({
           id,
           scene,
           source: source.id,
           startupMode: startupMode.id,
-          skipSidecar: skipSidecar.id
+          shutdownMode: shutdownMode.id
         })),
         state
       };

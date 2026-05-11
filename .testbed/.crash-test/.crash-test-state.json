@@ -1,6 +1,6 @@
 {
   "app": "aerobeat-crash-test-matrix",
-  "version": 1,
+  "version": 2,
   "generatedAt": "2026-05-11T20:05:36.419Z",
   "combos": [
     {
@@ -8,172 +8,424 @@
       "scene": "Boxing",
       "source": "live_camera",
       "startupMode": "TRACKING",
-      "skipSidecar": "normal_stop"
+      "shutdownMode": "normal_stop"
     },
     {
-      "id": "boxing__live_camera__TRACKING__skip_sidecar",
+      "id": "boxing__live_camera__TRACKING__heartbeat_only",
       "scene": "Boxing",
       "source": "live_camera",
       "startupMode": "TRACKING",
-      "skipSidecar": "skip_sidecar"
+      "shutdownMode": "heartbeat_only"
+    },
+    {
+      "id": "boxing__live_camera__TRACKING__normal_stop+skip_terminate_sync",
+      "scene": "Boxing",
+      "source": "live_camera",
+      "startupMode": "TRACKING",
+      "shutdownMode": "normal_stop+skip_terminate_sync"
+    },
+    {
+      "id": "boxing__live_camera__TRACKING__normal_stop+skip_linux_pkill_main_py",
+      "scene": "Boxing",
+      "source": "live_camera",
+      "startupMode": "TRACKING",
+      "shutdownMode": "normal_stop+skip_linux_pkill_main_py"
+    },
+    {
+      "id": "boxing__live_camera__TRACKING__normal_stop+skip_terminate_sync+skip_linux_pkill_main_py",
+      "scene": "Boxing",
+      "source": "live_camera",
+      "startupMode": "TRACKING",
+      "shutdownMode": "normal_stop+skip_terminate_sync+skip_linux_pkill_main_py"
     },
     {
       "id": "boxing__live_camera__PREVIEW_ONLY_DEBUG__normal_stop",
       "scene": "Boxing",
       "source": "live_camera",
       "startupMode": "PREVIEW_ONLY_DEBUG",
-      "skipSidecar": "normal_stop"
+      "shutdownMode": "normal_stop"
     },
     {
-      "id": "boxing__live_camera__PREVIEW_ONLY_DEBUG__skip_sidecar",
+      "id": "boxing__live_camera__PREVIEW_ONLY_DEBUG__heartbeat_only",
       "scene": "Boxing",
       "source": "live_camera",
       "startupMode": "PREVIEW_ONLY_DEBUG",
-      "skipSidecar": "skip_sidecar"
+      "shutdownMode": "heartbeat_only"
+    },
+    {
+      "id": "boxing__live_camera__PREVIEW_ONLY_DEBUG__normal_stop+skip_terminate_sync",
+      "scene": "Boxing",
+      "source": "live_camera",
+      "startupMode": "PREVIEW_ONLY_DEBUG",
+      "shutdownMode": "normal_stop+skip_terminate_sync"
+    },
+    {
+      "id": "boxing__live_camera__PREVIEW_ONLY_DEBUG__normal_stop+skip_linux_pkill_main_py",
+      "scene": "Boxing",
+      "source": "live_camera",
+      "startupMode": "PREVIEW_ONLY_DEBUG",
+      "shutdownMode": "normal_stop+skip_linux_pkill_main_py"
+    },
+    {
+      "id": "boxing__live_camera__PREVIEW_ONLY_DEBUG__normal_stop+skip_terminate_sync+skip_linux_pkill_main_py",
+      "scene": "Boxing",
+      "source": "live_camera",
+      "startupMode": "PREVIEW_ONLY_DEBUG",
+      "shutdownMode": "normal_stop+skip_terminate_sync+skip_linux_pkill_main_py"
     },
     {
       "id": "boxing__live_camera__GODOT_ONLY_DEBUG__normal_stop",
       "scene": "Boxing",
       "source": "live_camera",
       "startupMode": "GODOT_ONLY_DEBUG",
-      "skipSidecar": "normal_stop"
+      "shutdownMode": "normal_stop"
     },
     {
-      "id": "boxing__live_camera__GODOT_ONLY_DEBUG__skip_sidecar",
+      "id": "boxing__live_camera__GODOT_ONLY_DEBUG__heartbeat_only",
       "scene": "Boxing",
       "source": "live_camera",
       "startupMode": "GODOT_ONLY_DEBUG",
-      "skipSidecar": "skip_sidecar"
+      "shutdownMode": "heartbeat_only"
+    },
+    {
+      "id": "boxing__live_camera__GODOT_ONLY_DEBUG__normal_stop+skip_terminate_sync",
+      "scene": "Boxing",
+      "source": "live_camera",
+      "startupMode": "GODOT_ONLY_DEBUG",
+      "shutdownMode": "normal_stop+skip_terminate_sync"
+    },
+    {
+      "id": "boxing__live_camera__GODOT_ONLY_DEBUG__normal_stop+skip_linux_pkill_main_py",
+      "scene": "Boxing",
+      "source": "live_camera",
+      "startupMode": "GODOT_ONLY_DEBUG",
+      "shutdownMode": "normal_stop+skip_linux_pkill_main_py"
+    },
+    {
+      "id": "boxing__live_camera__GODOT_ONLY_DEBUG__normal_stop+skip_terminate_sync+skip_linux_pkill_main_py",
+      "scene": "Boxing",
+      "source": "live_camera",
+      "startupMode": "GODOT_ONLY_DEBUG",
+      "shutdownMode": "normal_stop+skip_terminate_sync+skip_linux_pkill_main_py"
     },
     {
       "id": "boxing__prerecorded_video__TRACKING__normal_stop",
       "scene": "Boxing",
       "source": "prerecorded_video",
       "startupMode": "TRACKING",
-      "skipSidecar": "normal_stop"
+      "shutdownMode": "normal_stop"
     },
     {
-      "id": "boxing__prerecorded_video__TRACKING__skip_sidecar",
+      "id": "boxing__prerecorded_video__TRACKING__heartbeat_only",
       "scene": "Boxing",
       "source": "prerecorded_video",
       "startupMode": "TRACKING",
-      "skipSidecar": "skip_sidecar"
+      "shutdownMode": "heartbeat_only"
+    },
+    {
+      "id": "boxing__prerecorded_video__TRACKING__normal_stop+skip_terminate_sync",
+      "scene": "Boxing",
+      "source": "prerecorded_video",
+      "startupMode": "TRACKING",
+      "shutdownMode": "normal_stop+skip_terminate_sync"
+    },
+    {
+      "id": "boxing__prerecorded_video__TRACKING__normal_stop+skip_linux_pkill_main_py",
+      "scene": "Boxing",
+      "source": "prerecorded_video",
+      "startupMode": "TRACKING",
+      "shutdownMode": "normal_stop+skip_linux_pkill_main_py"
+    },
+    {
+      "id": "boxing__prerecorded_video__TRACKING__normal_stop+skip_terminate_sync+skip_linux_pkill_main_py",
+      "scene": "Boxing",
+      "source": "prerecorded_video",
+      "startupMode": "TRACKING",
+      "shutdownMode": "normal_stop+skip_terminate_sync+skip_linux_pkill_main_py"
     },
     {
       "id": "boxing__prerecorded_video__PREVIEW_ONLY_DEBUG__normal_stop",
       "scene": "Boxing",
       "source": "prerecorded_video",
       "startupMode": "PREVIEW_ONLY_DEBUG",
-      "skipSidecar": "normal_stop"
+      "shutdownMode": "normal_stop"
     },
     {
-      "id": "boxing__prerecorded_video__PREVIEW_ONLY_DEBUG__skip_sidecar",
+      "id": "boxing__prerecorded_video__PREVIEW_ONLY_DEBUG__heartbeat_only",
       "scene": "Boxing",
       "source": "prerecorded_video",
       "startupMode": "PREVIEW_ONLY_DEBUG",
-      "skipSidecar": "skip_sidecar"
+      "shutdownMode": "heartbeat_only"
+    },
+    {
+      "id": "boxing__prerecorded_video__PREVIEW_ONLY_DEBUG__normal_stop+skip_terminate_sync",
+      "scene": "Boxing",
+      "source": "prerecorded_video",
+      "startupMode": "PREVIEW_ONLY_DEBUG",
+      "shutdownMode": "normal_stop+skip_terminate_sync"
+    },
+    {
+      "id": "boxing__prerecorded_video__PREVIEW_ONLY_DEBUG__normal_stop+skip_linux_pkill_main_py",
+      "scene": "Boxing",
+      "source": "prerecorded_video",
+      "startupMode": "PREVIEW_ONLY_DEBUG",
+      "shutdownMode": "normal_stop+skip_linux_pkill_main_py"
+    },
+    {
+      "id": "boxing__prerecorded_video__PREVIEW_ONLY_DEBUG__normal_stop+skip_terminate_sync+skip_linux_pkill_main_py",
+      "scene": "Boxing",
+      "source": "prerecorded_video",
+      "startupMode": "PREVIEW_ONLY_DEBUG",
+      "shutdownMode": "normal_stop+skip_terminate_sync+skip_linux_pkill_main_py"
     },
     {
       "id": "boxing__prerecorded_video__GODOT_ONLY_DEBUG__normal_stop",
       "scene": "Boxing",
       "source": "prerecorded_video",
       "startupMode": "GODOT_ONLY_DEBUG",
-      "skipSidecar": "normal_stop"
+      "shutdownMode": "normal_stop"
     },
     {
-      "id": "boxing__prerecorded_video__GODOT_ONLY_DEBUG__skip_sidecar",
+      "id": "boxing__prerecorded_video__GODOT_ONLY_DEBUG__heartbeat_only",
       "scene": "Boxing",
       "source": "prerecorded_video",
       "startupMode": "GODOT_ONLY_DEBUG",
-      "skipSidecar": "skip_sidecar"
+      "shutdownMode": "heartbeat_only"
+    },
+    {
+      "id": "boxing__prerecorded_video__GODOT_ONLY_DEBUG__normal_stop+skip_terminate_sync",
+      "scene": "Boxing",
+      "source": "prerecorded_video",
+      "startupMode": "GODOT_ONLY_DEBUG",
+      "shutdownMode": "normal_stop+skip_terminate_sync"
+    },
+    {
+      "id": "boxing__prerecorded_video__GODOT_ONLY_DEBUG__normal_stop+skip_linux_pkill_main_py",
+      "scene": "Boxing",
+      "source": "prerecorded_video",
+      "startupMode": "GODOT_ONLY_DEBUG",
+      "shutdownMode": "normal_stop+skip_linux_pkill_main_py"
+    },
+    {
+      "id": "boxing__prerecorded_video__GODOT_ONLY_DEBUG__normal_stop+skip_terminate_sync+skip_linux_pkill_main_py",
+      "scene": "Boxing",
+      "source": "prerecorded_video",
+      "startupMode": "GODOT_ONLY_DEBUG",
+      "shutdownMode": "normal_stop+skip_terminate_sync+skip_linux_pkill_main_py"
     },
     {
       "id": "flow__live_camera__TRACKING__normal_stop",
       "scene": "Flow",
       "source": "live_camera",
       "startupMode": "TRACKING",
-      "skipSidecar": "normal_stop"
+      "shutdownMode": "normal_stop"
     },
     {
-      "id": "flow__live_camera__TRACKING__skip_sidecar",
+      "id": "flow__live_camera__TRACKING__heartbeat_only",
       "scene": "Flow",
       "source": "live_camera",
       "startupMode": "TRACKING",
-      "skipSidecar": "skip_sidecar"
+      "shutdownMode": "heartbeat_only"
+    },
+    {
+      "id": "flow__live_camera__TRACKING__normal_stop+skip_terminate_sync",
+      "scene": "Flow",
+      "source": "live_camera",
+      "startupMode": "TRACKING",
+      "shutdownMode": "normal_stop+skip_terminate_sync"
+    },
+    {
+      "id": "flow__live_camera__TRACKING__normal_stop+skip_linux_pkill_main_py",
+      "scene": "Flow",
+      "source": "live_camera",
+      "startupMode": "TRACKING",
+      "shutdownMode": "normal_stop+skip_linux_pkill_main_py"
+    },
+    {
+      "id": "flow__live_camera__TRACKING__normal_stop+skip_terminate_sync+skip_linux_pkill_main_py",
+      "scene": "Flow",
+      "source": "live_camera",
+      "startupMode": "TRACKING",
+      "shutdownMode": "normal_stop+skip_terminate_sync+skip_linux_pkill_main_py"
     },
     {
       "id": "flow__live_camera__PREVIEW_ONLY_DEBUG__normal_stop",
       "scene": "Flow",
       "source": "live_camera",
       "startupMode": "PREVIEW_ONLY_DEBUG",
-      "skipSidecar": "normal_stop"
+      "shutdownMode": "normal_stop"
     },
     {
-      "id": "flow__live_camera__PREVIEW_ONLY_DEBUG__skip_sidecar",
+      "id": "flow__live_camera__PREVIEW_ONLY_DEBUG__heartbeat_only",
       "scene": "Flow",
       "source": "live_camera",
       "startupMode": "PREVIEW_ONLY_DEBUG",
-      "skipSidecar": "skip_sidecar"
+      "shutdownMode": "heartbeat_only"
+    },
+    {
+      "id": "flow__live_camera__PREVIEW_ONLY_DEBUG__normal_stop+skip_terminate_sync",
+      "scene": "Flow",
+      "source": "live_camera",
+      "startupMode": "PREVIEW_ONLY_DEBUG",
+      "shutdownMode": "normal_stop+skip_terminate_sync"
+    },
+    {
+      "id": "flow__live_camera__PREVIEW_ONLY_DEBUG__normal_stop+skip_linux_pkill_main_py",
+      "scene": "Flow",
+      "source": "live_camera",
+      "startupMode": "PREVIEW_ONLY_DEBUG",
+      "shutdownMode": "normal_stop+skip_linux_pkill_main_py"
+    },
+    {
+      "id": "flow__live_camera__PREVIEW_ONLY_DEBUG__normal_stop+skip_terminate_sync+skip_linux_pkill_main_py",
+      "scene": "Flow",
+      "source": "live_camera",
+      "startupMode": "PREVIEW_ONLY_DEBUG",
+      "shutdownMode": "normal_stop+skip_terminate_sync+skip_linux_pkill_main_py"
     },
     {
       "id": "flow__live_camera__GODOT_ONLY_DEBUG__normal_stop",
       "scene": "Flow",
       "source": "live_camera",
       "startupMode": "GODOT_ONLY_DEBUG",
-      "skipSidecar": "normal_stop"
+      "shutdownMode": "normal_stop"
     },
     {
-      "id": "flow__live_camera__GODOT_ONLY_DEBUG__skip_sidecar",
+      "id": "flow__live_camera__GODOT_ONLY_DEBUG__heartbeat_only",
       "scene": "Flow",
       "source": "live_camera",
       "startupMode": "GODOT_ONLY_DEBUG",
-      "skipSidecar": "skip_sidecar"
+      "shutdownMode": "heartbeat_only"
+    },
+    {
+      "id": "flow__live_camera__GODOT_ONLY_DEBUG__normal_stop+skip_terminate_sync",
+      "scene": "Flow",
+      "source": "live_camera",
+      "startupMode": "GODOT_ONLY_DEBUG",
+      "shutdownMode": "normal_stop+skip_terminate_sync"
+    },
+    {
+      "id": "flow__live_camera__GODOT_ONLY_DEBUG__normal_stop+skip_linux_pkill_main_py",
+      "scene": "Flow",
+      "source": "live_camera",
+      "startupMode": "GODOT_ONLY_DEBUG",
+      "shutdownMode": "normal_stop+skip_linux_pkill_main_py"
+    },
+    {
+      "id": "flow__live_camera__GODOT_ONLY_DEBUG__normal_stop+skip_terminate_sync+skip_linux_pkill_main_py",
+      "scene": "Flow",
+      "source": "live_camera",
+      "startupMode": "GODOT_ONLY_DEBUG",
+      "shutdownMode": "normal_stop+skip_terminate_sync+skip_linux_pkill_main_py"
     },
     {
       "id": "flow__prerecorded_video__TRACKING__normal_stop",
       "scene": "Flow",
       "source": "prerecorded_video",
       "startupMode": "TRACKING",
-      "skipSidecar": "normal_stop"
+      "shutdownMode": "normal_stop"
     },
     {
-      "id": "flow__prerecorded_video__TRACKING__skip_sidecar",
+      "id": "flow__prerecorded_video__TRACKING__heartbeat_only",
       "scene": "Flow",
       "source": "prerecorded_video",
       "startupMode": "TRACKING",
-      "skipSidecar": "skip_sidecar"
+      "shutdownMode": "heartbeat_only"
+    },
+    {
+      "id": "flow__prerecorded_video__TRACKING__normal_stop+skip_terminate_sync",
+      "scene": "Flow",
+      "source": "prerecorded_video",
+      "startupMode": "TRACKING",
+      "shutdownMode": "normal_stop+skip_terminate_sync"
+    },
+    {
+      "id": "flow__prerecorded_video__TRACKING__normal_stop+skip_linux_pkill_main_py",
+      "scene": "Flow",
+      "source": "prerecorded_video",
+      "startupMode": "TRACKING",
+      "shutdownMode": "normal_stop+skip_linux_pkill_main_py"
+    },
+    {
+      "id": "flow__prerecorded_video__TRACKING__normal_stop+skip_terminate_sync+skip_linux_pkill_main_py",
+      "scene": "Flow",
+      "source": "prerecorded_video",
+      "startupMode": "TRACKING",
+      "shutdownMode": "normal_stop+skip_terminate_sync+skip_linux_pkill_main_py"
     },
     {
       "id": "flow__prerecorded_video__PREVIEW_ONLY_DEBUG__normal_stop",
       "scene": "Flow",
       "source": "prerecorded_video",
       "startupMode": "PREVIEW_ONLY_DEBUG",
-      "skipSidecar": "normal_stop"
+      "shutdownMode": "normal_stop"
     },
     {
-      "id": "flow__prerecorded_video__PREVIEW_ONLY_DEBUG__skip_sidecar",
+      "id": "flow__prerecorded_video__PREVIEW_ONLY_DEBUG__heartbeat_only",
       "scene": "Flow",
       "source": "prerecorded_video",
       "startupMode": "PREVIEW_ONLY_DEBUG",
-      "skipSidecar": "skip_sidecar"
+      "shutdownMode": "heartbeat_only"
+    },
+    {
+      "id": "flow__prerecorded_video__PREVIEW_ONLY_DEBUG__normal_stop+skip_terminate_sync",
+      "scene": "Flow",
+      "source": "prerecorded_video",
+      "startupMode": "PREVIEW_ONLY_DEBUG",
+      "shutdownMode": "normal_stop+skip_terminate_sync"
+    },
+    {
+      "id": "flow__prerecorded_video__PREVIEW_ONLY_DEBUG__normal_stop+skip_linux_pkill_main_py",
+      "scene": "Flow",
+      "source": "prerecorded_video",
+      "startupMode": "PREVIEW_ONLY_DEBUG",
+      "shutdownMode": "normal_stop+skip_linux_pkill_main_py"
+    },
+    {
+      "id": "flow__prerecorded_video__PREVIEW_ONLY_DEBUG__normal_stop+skip_terminate_sync+skip_linux_pkill_main_py",
+      "scene": "Flow",
+      "source": "prerecorded_video",
+      "startupMode": "PREVIEW_ONLY_DEBUG",
+      "shutdownMode": "normal_stop+skip_terminate_sync+skip_linux_pkill_main_py"
     },
     {
       "id": "flow__prerecorded_video__GODOT_ONLY_DEBUG__normal_stop",
       "scene": "Flow",
       "source": "prerecorded_video",
       "startupMode": "GODOT_ONLY_DEBUG",
-      "skipSidecar": "normal_stop"
+      "shutdownMode": "normal_stop"
     },
     {
-      "id": "flow__prerecorded_video__GODOT_ONLY_DEBUG__skip_sidecar",
+      "id": "flow__prerecorded_video__GODOT_ONLY_DEBUG__heartbeat_only",
       "scene": "Flow",
       "source": "prerecorded_video",
       "startupMode": "GODOT_ONLY_DEBUG",
-      "skipSidecar": "skip_sidecar"
+      "shutdownMode": "heartbeat_only"
+    },
+    {
+      "id": "flow__prerecorded_video__GODOT_ONLY_DEBUG__normal_stop+skip_terminate_sync",
+      "scene": "Flow",
+      "source": "prerecorded_video",
+      "startupMode": "GODOT_ONLY_DEBUG",
+      "shutdownMode": "normal_stop+skip_terminate_sync"
+    },
+    {
+      "id": "flow__prerecorded_video__GODOT_ONLY_DEBUG__normal_stop+skip_linux_pkill_main_py",
+      "scene": "Flow",
+      "source": "prerecorded_video",
+      "startupMode": "GODOT_ONLY_DEBUG",
+      "shutdownMode": "normal_stop+skip_linux_pkill_main_py"
+    },
+    {
+      "id": "flow__prerecorded_video__GODOT_ONLY_DEBUG__normal_stop+skip_terminate_sync+skip_linux_pkill_main_py",
+      "scene": "Flow",
+      "source": "prerecorded_video",
+      "startupMode": "GODOT_ONLY_DEBUG",
+      "shutdownMode": "normal_stop+skip_terminate_sync+skip_linux_pkill_main_py"
     }
   ],
   "state": {
-    "version": 1,
+    "version": 2,
     "updatedAt": "2026-05-11T20:05:32.234Z",
     "rows": {
       "boxing__live_camera__TRACKING__normal_stop": {
@@ -182,11 +434,29 @@
         "badWindowOnly": false,
         "notes": "clean close"
       },
-      "boxing__live_camera__TRACKING__skip_sidecar": {
+      "boxing__live_camera__TRACKING__heartbeat_only": {
         "tested": true,
         "crashed": false,
         "badWindowOnly": false,
         "notes": "clean close"
+      },
+      "boxing__live_camera__TRACKING__normal_stop+skip_terminate_sync": {
+        "tested": false,
+        "crashed": false,
+        "badWindowOnly": false,
+        "notes": ""
+      },
+      "boxing__live_camera__TRACKING__normal_stop+skip_linux_pkill_main_py": {
+        "tested": false,
+        "crashed": false,
+        "badWindowOnly": false,
+        "notes": ""
+      },
+      "boxing__live_camera__TRACKING__normal_stop+skip_terminate_sync+skip_linux_pkill_main_py": {
+        "tested": false,
+        "crashed": false,
+        "badWindowOnly": false,
+        "notes": ""
       },
       "boxing__live_camera__PREVIEW_ONLY_DEBUG__normal_stop": {
         "tested": true,
@@ -194,11 +464,29 @@
         "badWindowOnly": false,
         "notes": "clean close"
       },
-      "boxing__live_camera__PREVIEW_ONLY_DEBUG__skip_sidecar": {
+      "boxing__live_camera__PREVIEW_ONLY_DEBUG__heartbeat_only": {
         "tested": true,
         "crashed": false,
         "badWindowOnly": true,
         "notes": "  ERROR: platform/linuxbsd/x11/display_server_x11.cpp:1310 - Unhandled XServer error: BadWindow (invalid Window parameter)\n  ERROR:    Major opcode of failed request: 25\n  ERROR:    Serial number of failed request: 0\n  ERROR:    Current serial number in output stream: 153394\n"
+      },
+      "boxing__live_camera__PREVIEW_ONLY_DEBUG__normal_stop+skip_terminate_sync": {
+        "tested": false,
+        "crashed": false,
+        "badWindowOnly": false,
+        "notes": ""
+      },
+      "boxing__live_camera__PREVIEW_ONLY_DEBUG__normal_stop+skip_linux_pkill_main_py": {
+        "tested": false,
+        "crashed": false,
+        "badWindowOnly": false,
+        "notes": ""
+      },
+      "boxing__live_camera__PREVIEW_ONLY_DEBUG__normal_stop+skip_terminate_sync+skip_linux_pkill_main_py": {
+        "tested": false,
+        "crashed": false,
+        "badWindowOnly": false,
+        "notes": ""
       },
       "boxing__live_camera__GODOT_ONLY_DEBUG__normal_stop": {
         "tested": true,
@@ -206,11 +494,29 @@
         "badWindowOnly": false,
         "notes": "clean close"
       },
-      "boxing__live_camera__GODOT_ONLY_DEBUG__skip_sidecar": {
+      "boxing__live_camera__GODOT_ONLY_DEBUG__heartbeat_only": {
         "tested": true,
         "crashed": false,
         "badWindowOnly": true,
         "notes": "  ERROR: platform/linuxbsd/x11/display_server_x11.cpp:1310 - Unhandled XServer error: BadWindow (invalid Window parameter)\n  ERROR:    Major opcode of failed request: 25\n  ERROR:    Serial number of failed request: 0\n  ERROR:    Current serial number in output stream: 183938\n"
+      },
+      "boxing__live_camera__GODOT_ONLY_DEBUG__normal_stop+skip_terminate_sync": {
+        "tested": false,
+        "crashed": false,
+        "badWindowOnly": false,
+        "notes": ""
+      },
+      "boxing__live_camera__GODOT_ONLY_DEBUG__normal_stop+skip_linux_pkill_main_py": {
+        "tested": false,
+        "crashed": false,
+        "badWindowOnly": false,
+        "notes": ""
+      },
+      "boxing__live_camera__GODOT_ONLY_DEBUG__normal_stop+skip_terminate_sync+skip_linux_pkill_main_py": {
+        "tested": false,
+        "crashed": false,
+        "badWindowOnly": false,
+        "notes": ""
       },
       "boxing__prerecorded_video__TRACKING__normal_stop": {
         "tested": true,
@@ -218,11 +524,29 @@
         "badWindowOnly": false,
         "notes": "crash on close. Clean close after restart and retest"
       },
-      "boxing__prerecorded_video__TRACKING__skip_sidecar": {
+      "boxing__prerecorded_video__TRACKING__heartbeat_only": {
         "tested": true,
         "crashed": false,
         "badWindowOnly": false,
         "notes": "clean close"
+      },
+      "boxing__prerecorded_video__TRACKING__normal_stop+skip_terminate_sync": {
+        "tested": false,
+        "crashed": false,
+        "badWindowOnly": false,
+        "notes": ""
+      },
+      "boxing__prerecorded_video__TRACKING__normal_stop+skip_linux_pkill_main_py": {
+        "tested": false,
+        "crashed": false,
+        "badWindowOnly": false,
+        "notes": ""
+      },
+      "boxing__prerecorded_video__TRACKING__normal_stop+skip_terminate_sync+skip_linux_pkill_main_py": {
+        "tested": false,
+        "crashed": false,
+        "badWindowOnly": false,
+        "notes": ""
       },
       "boxing__prerecorded_video__PREVIEW_ONLY_DEBUG__normal_stop": {
         "tested": true,
@@ -230,11 +554,29 @@
         "badWindowOnly": false,
         "notes": "clean close"
       },
-      "boxing__prerecorded_video__PREVIEW_ONLY_DEBUG__skip_sidecar": {
+      "boxing__prerecorded_video__PREVIEW_ONLY_DEBUG__heartbeat_only": {
         "tested": true,
         "crashed": false,
         "badWindowOnly": false,
         "notes": "clean close"
+      },
+      "boxing__prerecorded_video__PREVIEW_ONLY_DEBUG__normal_stop+skip_terminate_sync": {
+        "tested": false,
+        "crashed": false,
+        "badWindowOnly": false,
+        "notes": ""
+      },
+      "boxing__prerecorded_video__PREVIEW_ONLY_DEBUG__normal_stop+skip_linux_pkill_main_py": {
+        "tested": false,
+        "crashed": false,
+        "badWindowOnly": false,
+        "notes": ""
+      },
+      "boxing__prerecorded_video__PREVIEW_ONLY_DEBUG__normal_stop+skip_terminate_sync+skip_linux_pkill_main_py": {
+        "tested": false,
+        "crashed": false,
+        "badWindowOnly": false,
+        "notes": ""
       },
       "boxing__prerecorded_video__GODOT_ONLY_DEBUG__normal_stop": {
         "tested": true,
@@ -242,11 +584,29 @@
         "badWindowOnly": false,
         "notes": "clean close"
       },
-      "boxing__prerecorded_video__GODOT_ONLY_DEBUG__skip_sidecar": {
+      "boxing__prerecorded_video__GODOT_ONLY_DEBUG__heartbeat_only": {
         "tested": true,
         "crashed": false,
         "badWindowOnly": true,
         "notes": "  ERROR: platform/linuxbsd/x11/display_server_x11.cpp:1310 - Unhandled XServer error: BadWindow (invalid Window parameter)\n  ERROR:    Major opcode of failed request: 25\n  ERROR:    Serial number of failed request: 0\n  ERROR:    Current serial number in output stream: 85099\n"
+      },
+      "boxing__prerecorded_video__GODOT_ONLY_DEBUG__normal_stop+skip_terminate_sync": {
+        "tested": false,
+        "crashed": false,
+        "badWindowOnly": false,
+        "notes": ""
+      },
+      "boxing__prerecorded_video__GODOT_ONLY_DEBUG__normal_stop+skip_linux_pkill_main_py": {
+        "tested": false,
+        "crashed": false,
+        "badWindowOnly": false,
+        "notes": ""
+      },
+      "boxing__prerecorded_video__GODOT_ONLY_DEBUG__normal_stop+skip_terminate_sync+skip_linux_pkill_main_py": {
+        "tested": false,
+        "crashed": false,
+        "badWindowOnly": false,
+        "notes": ""
       },
       "flow__live_camera__TRACKING__normal_stop": {
         "tested": true,
@@ -254,11 +614,29 @@
         "badWindowOnly": true,
         "notes": "crash on close. Clean close after restart and retest. Retried test 6 times without a crash after restart. I did see the same display error once during my clean restarts."
       },
-      "flow__live_camera__TRACKING__skip_sidecar": {
+      "flow__live_camera__TRACKING__heartbeat_only": {
         "tested": true,
         "crashed": false,
         "badWindowOnly": false,
         "notes": "clean close"
+      },
+      "flow__live_camera__TRACKING__normal_stop+skip_terminate_sync": {
+        "tested": false,
+        "crashed": false,
+        "badWindowOnly": false,
+        "notes": ""
+      },
+      "flow__live_camera__TRACKING__normal_stop+skip_linux_pkill_main_py": {
+        "tested": false,
+        "crashed": false,
+        "badWindowOnly": false,
+        "notes": ""
+      },
+      "flow__live_camera__TRACKING__normal_stop+skip_terminate_sync+skip_linux_pkill_main_py": {
+        "tested": false,
+        "crashed": false,
+        "badWindowOnly": false,
+        "notes": ""
       },
       "flow__live_camera__PREVIEW_ONLY_DEBUG__normal_stop": {
         "tested": true,
@@ -266,11 +644,29 @@
         "badWindowOnly": true,
         "notes": "crash on close. Clean close after restart and retested 6 times. I did see the same display error once during my third clean restart."
       },
-      "flow__live_camera__PREVIEW_ONLY_DEBUG__skip_sidecar": {
+      "flow__live_camera__PREVIEW_ONLY_DEBUG__heartbeat_only": {
         "tested": true,
         "crashed": false,
         "badWindowOnly": true,
         "notes": "  ERROR: platform/linuxbsd/x11/display_server_x11.cpp:1310 - Unhandled XServer error: BadWindow (invalid Window parameter)\n  ERROR:    Major opcode of failed request: 25\n  ERROR:    Serial number of failed request: 0\n  ERROR:    Current serial number in output stream: 85099\n"
+      },
+      "flow__live_camera__PREVIEW_ONLY_DEBUG__normal_stop+skip_terminate_sync": {
+        "tested": false,
+        "crashed": false,
+        "badWindowOnly": false,
+        "notes": ""
+      },
+      "flow__live_camera__PREVIEW_ONLY_DEBUG__normal_stop+skip_linux_pkill_main_py": {
+        "tested": false,
+        "crashed": false,
+        "badWindowOnly": false,
+        "notes": ""
+      },
+      "flow__live_camera__PREVIEW_ONLY_DEBUG__normal_stop+skip_terminate_sync+skip_linux_pkill_main_py": {
+        "tested": false,
+        "crashed": false,
+        "badWindowOnly": false,
+        "notes": ""
       },
       "flow__live_camera__GODOT_ONLY_DEBUG__normal_stop": {
         "tested": true,
@@ -278,11 +674,29 @@
         "badWindowOnly": false,
         "notes": "clean close"
       },
-      "flow__live_camera__GODOT_ONLY_DEBUG__skip_sidecar": {
+      "flow__live_camera__GODOT_ONLY_DEBUG__heartbeat_only": {
         "tested": true,
         "crashed": false,
         "badWindowOnly": false,
         "notes": "clean close"
+      },
+      "flow__live_camera__GODOT_ONLY_DEBUG__normal_stop+skip_terminate_sync": {
+        "tested": false,
+        "crashed": false,
+        "badWindowOnly": false,
+        "notes": ""
+      },
+      "flow__live_camera__GODOT_ONLY_DEBUG__normal_stop+skip_linux_pkill_main_py": {
+        "tested": false,
+        "crashed": false,
+        "badWindowOnly": false,
+        "notes": ""
+      },
+      "flow__live_camera__GODOT_ONLY_DEBUG__normal_stop+skip_terminate_sync+skip_linux_pkill_main_py": {
+        "tested": false,
+        "crashed": false,
+        "badWindowOnly": false,
+        "notes": ""
       },
       "flow__prerecorded_video__TRACKING__normal_stop": {
         "tested": true,
@@ -290,11 +704,29 @@
         "badWindowOnly": false,
         "notes": "clean close"
       },
-      "flow__prerecorded_video__TRACKING__skip_sidecar": {
+      "flow__prerecorded_video__TRACKING__heartbeat_only": {
         "tested": true,
         "crashed": false,
         "badWindowOnly": false,
         "notes": "clean close"
+      },
+      "flow__prerecorded_video__TRACKING__normal_stop+skip_terminate_sync": {
+        "tested": false,
+        "crashed": false,
+        "badWindowOnly": false,
+        "notes": ""
+      },
+      "flow__prerecorded_video__TRACKING__normal_stop+skip_linux_pkill_main_py": {
+        "tested": false,
+        "crashed": false,
+        "badWindowOnly": false,
+        "notes": ""
+      },
+      "flow__prerecorded_video__TRACKING__normal_stop+skip_terminate_sync+skip_linux_pkill_main_py": {
+        "tested": false,
+        "crashed": false,
+        "badWindowOnly": false,
+        "notes": ""
       },
       "flow__prerecorded_video__PREVIEW_ONLY_DEBUG__normal_stop": {
         "tested": true,
@@ -302,11 +734,29 @@
         "badWindowOnly": false,
         "notes": "clean close"
       },
-      "flow__prerecorded_video__PREVIEW_ONLY_DEBUG__skip_sidecar": {
+      "flow__prerecorded_video__PREVIEW_ONLY_DEBUG__heartbeat_only": {
         "tested": true,
         "crashed": false,
         "badWindowOnly": false,
         "notes": "clean close"
+      },
+      "flow__prerecorded_video__PREVIEW_ONLY_DEBUG__normal_stop+skip_terminate_sync": {
+        "tested": false,
+        "crashed": false,
+        "badWindowOnly": false,
+        "notes": ""
+      },
+      "flow__prerecorded_video__PREVIEW_ONLY_DEBUG__normal_stop+skip_linux_pkill_main_py": {
+        "tested": false,
+        "crashed": false,
+        "badWindowOnly": false,
+        "notes": ""
+      },
+      "flow__prerecorded_video__PREVIEW_ONLY_DEBUG__normal_stop+skip_terminate_sync+skip_linux_pkill_main_py": {
+        "tested": false,
+        "crashed": false,
+        "badWindowOnly": false,
+        "notes": ""
       },
       "flow__prerecorded_video__GODOT_ONLY_DEBUG__normal_stop": {
         "tested": true,
@@ -314,11 +764,29 @@
         "badWindowOnly": true,
         "notes": "  ERROR: platform/linuxbsd/x11/display_server_x11.cpp:1310 - Unhandled XServer error: BadWindow (invalid Window parameter)\n  ERROR:    Major opcode of failed request: 25\n  ERROR:    Serial number of failed request: 0\n  ERROR:    Current serial number in output stream: 174238\n"
       },
-      "flow__prerecorded_video__GODOT_ONLY_DEBUG__skip_sidecar": {
+      "flow__prerecorded_video__GODOT_ONLY_DEBUG__heartbeat_only": {
         "tested": true,
         "crashed": false,
         "badWindowOnly": false,
         "notes": "clean close"
+      },
+      "flow__prerecorded_video__GODOT_ONLY_DEBUG__normal_stop+skip_terminate_sync": {
+        "tested": false,
+        "crashed": false,
+        "badWindowOnly": false,
+        "notes": ""
+      },
+      "flow__prerecorded_video__GODOT_ONLY_DEBUG__normal_stop+skip_linux_pkill_main_py": {
+        "tested": false,
+        "crashed": false,
+        "badWindowOnly": false,
+        "notes": ""
+      },
+      "flow__prerecorded_video__GODOT_ONLY_DEBUG__normal_stop+skip_terminate_sync+skip_linux_pkill_main_py": {
+        "tested": false,
+        "crashed": false,
+        "badWindowOnly": false,
+        "notes": ""
       }
     }
   }
