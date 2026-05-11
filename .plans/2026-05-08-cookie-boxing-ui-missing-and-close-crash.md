@@ -55,6 +55,7 @@ Follow-up research tightened that further: the screenshot is not the proving har
 | `REF-21` | Chip console warning snapshot showing packet-backlog and stream-thread cleanup warnings during the dirty second-half rerun | `/home/derrick/.openclaw/workspace/.temp/nerve-uploads/2026/05/09/image-0bb3a3de.png` |
 | `REF-22` | Derrick’s 2026-05-09 Chip feedback: eliminate per-update console spam, investigate new CSV import warning, trim/dedupe shutdown logging, and prepare for a Penpot-driven boxing proving-scene redesign that replaces text-heavy status with gesture icons and active-state buttons | current session |
 | `REF-23` | 2026-05-10 Boxing gesture detector UI mockup screenshot provided by Derrick for the next proving-scene redesign pass | `/home/derrick/.openclaw/workspace/.temp/nerve-uploads/2026/05/10/aerobeat-boxing-gesture-detector-0a43eb94.png` |
+| `REF-24` | 2026-05-10 Flow gesture detector UI mockup screenshot provided by Derrick for the next proving-scene redesign pass | `/home/derrick/.openclaw/workspace/.temp/nerve-uploads/2026/05/11/aerobeat-flow-gesture-detector-74025d53.png` |
 
 ---
 
@@ -2006,6 +2007,49 @@ Explicit limit: I still do **not** have a literal human-observed live window or 
 **Status:** ✅ Complete
 
 **Results:** Derrick’s live report demoted the earlier headless-confidence result, and the root cause turned out to be live-runtime timing rather than missing tile wiring or wrong styling: the centered `Guard` / `Squat` pills were still driven by state that could start and end within the same human-visible instant, so a real live run could flicker `guard_start/end` or `squat_start/end` quickly enough that the centered `Active` chip never stayed on-screen long enough to see even though the code path existed. The fix stayed Boxing-only in `.testbed/scripts/boxing_proving_harness.gd`: `guard_start` / `squat_start` now arm a short centered-pill minimum-visible latch (`650 ms`) while preserving the direct detector-state read, and `guard_end` / `squat_end` still clear the explicit override so persistent truth remains state-backed once the latch expires. This keeps the prerecorded camera-flip fix intact, preserves the accepted one-board/no-scroll/full-3x3 layout, and preserves the exact active fill color `#3ddcdc`. Validation passed with `~/.local/bin/godot --headless --path .testbed --check-only --script scripts/boxing_proving_harness.gd` plus a targeted runtime probe (`.temp/task84-pill-runtime-probe.gd`) that confirmed `live_flip=true`, `prerecorded_flip=false`, immediate `guard`/`squat` `start+end` pairs still leave the centered `Active` pills visible through the latch window, both active pill fills remain `3ddcdc`, and both pills clear again after the latch expires. Ready for Derrick to rerun live Boxing and verify the pills now visibly surface in the real runtime.
+
+### Task 85: Correct Boxing Active/Inactive pill design semantics to match the mockup
+
+**Bead ID:** `oc-1rtg`
+**SubAgent:** `primary` (for `coder` workflow role)
+**Role:** `coder`
+**References:** `REF-23`
+**Prompt:** Derrick corrected the intended pill design semantics for the Boxing proving scene: the centered state pills should always be visible, read `inactive` when disabled, and switch to a filled `active` state when enabled using the same active fill color as the numbered circles. Fix this design drift without regressing the now-correct prerecorded camera orientation, one-board layout, no-scroll 3x3 board fit, or Boxing-only scope.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- `.testbed/scenes/`
+- `.testbed/scripts/`
+
+**Files Created/Deleted/Modified:**
+- Boxing proving scene/harness/UI files required by the semantic pill correction
+
+**Status:** ✅ Complete
+
+**Results:** The prior Task 84 fix truthfully solved a visibility symptom, but it did so with the wrong semantics: a short `Guard` / `Squat` active-pill latch was added to keep the centered chips on-screen during fleeting live state transitions. Derrick clarified that this was design drift from the mockup intent. The correct behavior is not “sometimes-visible latched Active pills”; it is **always-visible state pills** that read `inactive` when off and `active` when on. This coder pass removed that latch/override behavior from `.testbed/scripts/boxing_proving_harness.gd`, made the centered `Guard` / `Squat` badges permanently visible for the `state_center` tiles, and changed their text semantics to lowercase `inactive` / `active` while preserving the exact active fill color `#3ddcdc` when enabled. Pulse-driven `L` / `R` behavior for Punch / Hook / Uppercut / Knee / Leg Lift / Side Step / Dodge stayed unchanged, and the fix remained Boxing-only.
+
+Validation passed with `git diff --check`, `~/.local/bin/godot --headless --path .testbed --check-only --script scripts/boxing_proving_harness.gd`, and a targeted runtime semantics probe at `.temp/task85-pill-semantics-probe.gd`. That probe confirmed: `live_flip=true`, `prerecorded_flip=false`, `Guard` / `Squat` pills are visible while inactive, inactive text reads `inactive`, active text reads `active`, active fill remains `#3ddcdc`, the event feed still records one visible row per Boxing event, and the full third board row still bottoms at `639 px` inside a `1280x720` viewport with no board scrolling. Ready for Derrick to rerun live; this should now match the intended mockup semantics rather than the prior latch-based workaround.
+
+### Task 86: Break down the Flow gesture detector mockup against chart-truth semantics
+
+**Bead ID:** `oc-ryk0`
+**SubAgent:** `primary` (for `research` workflow role)
+**Role:** `research`
+**References:** `REF-24`
+**Prompt:** Inspect Derrick’s Flow mockup screenshot and break it down against the chart-truth semantics now considered canonical for Flow: `placement` is the 13-value ring (`0..12`, UI-friendly `1..13`) and `direction` is the 12-value ring (`0..11`, UI-friendly `1..12`). Compare that to the current Flow proving scene and identify the concrete implementation mapping, the stale mediapipe-python drift to watch for, and any questions needed before implementation.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- `.testbed/scenes/`
+- `.testbed/scripts/`
+- Flow/chart/docs paths only for reading/notes
+
+**Files Created/Deleted/Modified:**
+- plan updates / analysis notes only unless a tiny reference note is required
+
+**Status:** ✅ Complete
+
+**Results:** Research pass completed against `REF-24` plus the current Flow proving/runtime sources. Main finding: the mockup is a chart-truth visualizer with four independent indexed circles (`left/right placement` as 13-slot rings, `left/right direction` as 12-slot rings), but the current mediapipe-python Flow stack still emits coarse semantic strings only — placement is `left|center|right` from `_flow_placement_name()` in `src/detectors/pose_detector_substrate.gd`, and direction is only `left|right|up|down` from `_flow_direction_name()`. The current `.testbed/scenes/flow_proving.tscn` / `.testbed/scripts/proving_harness.gd` surface is also still the older text-heavy debug harness: reusable pieces are the mirrored camera panel, event feed plumbing, provider signal hookups, and per-hand debug/meta tracking; replaceable pieces are the right-side scroll/text panels and the current string-based Flow candidate presentation. Practical implementation mapping recorded from the mockup: left side stays camera + numbered event feed; right side becomes a single translucent board with a 2x2 grid of ring widgets labeled `Left Bat Placement`, `Right Bat Placement`, `Left Bat Direction`, `Right Bat Direction`; placement rings show indices `1..13` with `13` centered and `1..12` around the perimeter clockwise starting at top-right; direction rings show indices `1..12` around the perimeter clockwise with no center slot. Live-fill expectation: exactly one filled marker per ring at a time when a value is known; placement should fill one of 13 slots (including center), direction should fill one of 12 perimeter slots only; unknown/unready state should leave all circles hollow rather than inventing a coarse bucket highlight. Smallest truthful implementation slice: keep current camera/event-feed shell, replace the right-side text stack with one placement ring widget for one hand first, and feed it from temporary mocked/indexed values or an adapter only after the backend can express real ring indices instead of the stale 3x4 vocabulary. Remaining questions for Derrick: whether ring numbering should be interpreted in mirrored screen space exactly as drawn in the mockup, whether event feed rows should continue logging both placement and direction as separate entries exactly in visible order, and whether partial backend truth should be shown at all before all four indexed surfaces are wired. This task did not change runtime code directly; it produced the implementation-oriented comparison needed before the Flow proving rewrite.
 
 ## Session Handoff / Current Stopping Point
 

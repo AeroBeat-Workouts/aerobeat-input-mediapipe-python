@@ -3,7 +3,6 @@ extends "res://scripts/proving_harness.gd"
 const BACKGROUND_TEXTURE_PATH := "res://assets/backgrounds/perfect-hue-may-08-2026-hd.png"
 const HEADER_ICON_PATH := "res://assets/icons/boxing-glove-1.svg"
 const TILE_PULSE_MS := 420
-const STATE_PILL_MIN_VISIBLE_MS := 650
 const MAX_BOXING_FEED_ROWS := 8
 const ACTIVE_PILL_FILL := Color8(0x3d, 0xdc, 0xdc, 0xff)
 const ACTIVE_PILL_TEXT := Color8(0x05, 0x22, 0x28, 0xff)
@@ -124,14 +123,6 @@ var _board_grid: GridContainer
 var _boxing_event_feed: Array[String] = []
 var _boxing_event_sequence := 0
 var _tile_refs := {}
-var _boxing_state_overrides := {
-	"guard": false,
-	"squat": false,
-}
-var _boxing_state_latch_until_ms := {
-	"guard": 0,
-	"squat": 0,
-}
 
 func _ready() -> void:
 	_resolve_boxing_shell_nodes()
@@ -158,15 +149,6 @@ func _refresh_debug_panels() -> void:
 
 func _record_event(event_name: String, payload: Dictionary) -> void:
 	if harness_mode == HarnessMode.BOXING:
-		match event_name:
-			"guard_start":
-				_note_boxing_state_start("guard")
-			"guard_end":
-				_note_boxing_state_end("guard")
-			"squat_start":
-				_note_boxing_state_start("squat")
-			"squat_end":
-				_note_boxing_state_end("squat")
 		if UI_EVENT_LABELS.has(event_name):
 			_boxing_event_sequence += 1
 			_boxing_event_feed.append("%04d: %s" % [_boxing_event_sequence, String(UI_EVENT_LABELS[event_name])])
@@ -293,7 +275,7 @@ func _create_tile(config: Dictionary) -> Dictionary:
 	badges.add_child(right_badge["panel"])
 
 	var mode := String(config.get("mode", "pulse_lr"))
-	center_badge["panel"].visible = false
+	center_badge["panel"].visible = mode == "state_center"
 	left_badge["panel"].visible = mode != "state_center"
 	right_badge["panel"].visible = mode != "state_center"
 
@@ -351,8 +333,8 @@ func _update_center_badge(tile: Dictionary, active: bool) -> void:
 	var badge: Dictionary = tile.get("center", {})
 	var panel := badge.get("panel") as PanelContainer
 	if panel != null:
-		panel.visible = active
-	_update_badge(badge, "Active", active)
+		panel.visible = true
+	_update_badge(badge, "active" if active else "inactive", active)
 
 func _update_badge(badge: Dictionary, text: String, active: bool) -> void:
 	var panel := badge.get("panel") as PanelContainer
@@ -408,23 +390,11 @@ func _compact_status_text(text: String) -> String:
 func _any_state_active(names_variant: Variant) -> bool:
 	var names: Array = names_variant if names_variant is Array else []
 	var gesture_states: Dictionary = _latest_state.get("gesture_states", {})
-	var now_ms := Time.get_ticks_msec()
 	for name_variant: Variant in names:
 		var state_name := String(name_variant)
 		if bool(gesture_states.get(state_name, false)):
 			return true
-		if bool(_boxing_state_overrides.get(state_name, false)):
-			return true
-		if int(_boxing_state_latch_until_ms.get(state_name, 0)) > now_ms:
-			return true
 	return false
-
-func _note_boxing_state_start(state_name: String) -> void:
-	_boxing_state_overrides[state_name] = true
-	_boxing_state_latch_until_ms[state_name] = Time.get_ticks_msec() + STATE_PILL_MIN_VISIBLE_MS
-
-func _note_boxing_state_end(state_name: String) -> void:
-	_boxing_state_overrides[state_name] = false
 
 func _any_recent_event(names_variant: Variant) -> bool:
 	var names: Array = names_variant if names_variant is Array else []
