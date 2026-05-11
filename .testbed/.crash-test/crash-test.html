@@ -362,8 +362,9 @@
             <button id="reset-state" class="bad">Reset all checklist state</button>
           </div>
           <p class="tiny">
-            Chrome/Chromium can keep a real writable handle to a JSON file in this same folder after you pick it once.
-            If file access is unavailable, the page still persists locally in browser storage.
+            Chrome/Chromium can keep a real writable handle to a JSON file in this same folder after you link it once.
+            This page never auto-loads adjacent files on startup under <code>file://</code>; local browser autosave stays the default,
+            and file sync only runs after explicit linking or when a previously linked handle already has permission.
           </p>
         </div>
 
@@ -412,6 +413,10 @@
   <script>
     const STORAGE_KEY = "aerobeat-crash-test-matrix-v1";
     const FILE_NAME = ".crash-test-state.json";
+    const IS_FILE_ORIGIN = window.location.protocol === "file:";
+    const CAN_PICK_EXISTING_FILE = typeof window.showOpenFilePicker === "function";
+    const CAN_CREATE_FILE = typeof window.showSaveFilePicker === "function";
+    const CAN_USE_FILE_SYNC = CAN_PICK_EXISTING_FILE || CAN_CREATE_FILE;
     const scenes = ["Boxing", "Flow"];
     const sources = [
       { id: "live_camera", label: "Live camera" },
@@ -500,7 +505,7 @@
       lastSaved.textContent = `${reason}: ${formatDate(state.updatedAt)}`;
       renderSummary();
       if (stateFileHandle) {
-        saveToLinkedFile(true).catch((error) => {
+        saveToLinkedFile(true, false).catch((error) => {
           console.warn("Auto-write to linked file failed", error);
           fileStatus.textContent = `Linked file write failed: ${error.message}`;
         });
@@ -621,41 +626,89 @@
       };
     }
 
-    async function saveToLinkedFile(silent = false) {
+    async function ensureLinkedFilePermission(mode = "readwrite", prompt = false) {
+      if (!stateFileHandle || typeof stateFileHandle.queryPermission !== "function") return Boolean(stateFileHandle);
+      const descriptor = { mode };
+      const current = await stateFileHandle.queryPermission(descriptor);
+      if (current === "granted") return true;
+      if (!prompt || typeof stateFileHandle.requestPermission !== "function") return false;
+      return (await stateFileHandle.requestPermission(descriptor)) === "granted";
+    }
+
+    async function saveToLinkedFile(silent = false, prompt = false) {
       if (!stateFileHandle) {
-        if (!silent) fileStatus.textContent = "No file linked yet. Pick or create .crash-test-state.json first.";
-        return;
+        if (!silent) fileStatus.textContent = "No file linked yet. Link or create .crash-test-state.json first.";
+        return false;
+      }
+      const permitted = await ensureLinkedFilePermission("readwrite", prompt);
+      if (!permitted) {
+        if (!silent) fileStatus.textContent = "Linked file is not writable yet. Re-link it or click Write current state to linked file.";
+        return false;
       }
       const writable = await stateFileHandle.createWritable();
       await writable.write(JSON.stringify(exportPayload(), null, 2));
       await writable.close();
       fileStatus.textContent = `Linked file synced: ${stateFileHandle.name}`;
       if (!silent) lastSaved.textContent = `State file written: ${formatDate(new Date().toISOString())}`;
+      return true;
     }
 
-    async function loadFromLinkedFile() {
+    async function loadFromLinkedFile(prompt = true) {
       if (!stateFileHandle) {
-        fileStatus.textContent = "No file linked yet. Pick or create .crash-test-state.json first.";
-        return;
+        fileStatus.textContent = "No file linked yet. Link or create .crash-test-state.json first.";
+        return false;
+      }
+      const permitted = await ensureLinkedFilePermission("read", prompt);
+      if (!permitted) {
+        fileStatus.textContent = "Linked file is not readable yet. Re-link it or choose the file again.";
+        return false;
       }
       const file = await stateFileHandle.getFile();
       const text = await file.text();
       if (!text.trim()) {
         fileStatus.textContent = `Linked file is empty: ${stateFileHandle.name}`;
-        return;
+        return false;
       }
       const parsed = JSON.parse(text);
       state = normalizeState(parsed.state || parsed);
       persistLocal("Loaded from linked file");
       render();
       fileStatus.textContent = `Loaded linked file: ${stateFileHandle.name}`;
+      return true;
     }
 
-    async function pickStateFile() {
-      if (!window.showSaveFilePicker) {
-        fileStatus.textContent = "This browser cannot hold a writable local file handle. Local autosave still works; use Export JSON instead.";
+    async function linkOrCreateStateFile() {
+      if (!CAN_USE_FILE_SYNC) {
+        fileStatus.textContent = "This browser cannot keep a local file handle here. Local autosave still works; use Export JSON instead.";
         return;
       }
+
+      if (CAN_PICK_EXISTING_FILE) {
+        try {
+          const [handle] = await window.showOpenFilePicker({
+            multiple: false,
+            types: [
+              {
+                description: "Crash test state JSON",
+                accept: { "application/json": [".json"] }
+              }
+            ]
+          });
+          if (handle) {
+            stateFileHandle = handle;
+            fileStatus.textContent = `Linked file: ${stateFileHandle.name}`;
+            return;
+          }
+        } catch (error) {
+          if (error && error.name !== "AbortError") throw error;
+        }
+      }
+
+      if (!CAN_CREATE_FILE) {
+        fileStatus.textContent = "No writable file picker is available here. Local autosave still works; use Export JSON instead.";
+        return;
+      }
+
       stateFileHandle = await window.showSaveFilePicker({
         suggestedName: FILE_NAME,
         types: [
@@ -666,7 +719,7 @@
         ]
       });
       fileStatus.textContent = `Linked file: ${stateFileHandle.name}`;
-      await saveToLinkedFile();
+      await saveToLinkedFile(false, true);
     }
 
     function downloadJson() {
@@ -705,19 +758,19 @@
     }
 
     document.getElementById("pick-file").addEventListener("click", () => {
-      pickStateFile().catch((error) => {
+      linkOrCreateStateFile().catch((error) => {
         fileStatus.textContent = `Link/create failed: ${error.message}`;
       });
     });
 
     document.getElementById("save-file").addEventListener("click", () => {
-      saveToLinkedFile().catch((error) => {
+      saveToLinkedFile(false, true).catch((error) => {
         fileStatus.textContent = `Save failed: ${error.message}`;
       });
     });
 
     document.getElementById("load-file").addEventListener("click", () => {
-      loadFromLinkedFile().catch((error) => {
+      loadFromLinkedFile(true).catch((error) => {
         fileStatus.textContent = `Reload failed: ${error.message}`;
       });
     });
@@ -733,6 +786,13 @@
     render();
     if (state.updatedAt) {
       lastSaved.textContent = `Restored local state: ${formatDate(state.updatedAt)}`;
+    }
+    if (IS_FILE_ORIGIN) {
+      fileStatus.textContent = CAN_USE_FILE_SYNC
+        ? "Running from file://. Startup stays local-only; link a JSON file manually if you want adjacent-file sync."
+        : "Running from file://. Local autosave is active; this browser does not expose local file handles here.";
+    } else if (!CAN_USE_FILE_SYNC) {
+      fileStatus.textContent = "No state file linked yet. Browser local autosave is active; use Export JSON if needed.";
     }
   </script>
 </body>

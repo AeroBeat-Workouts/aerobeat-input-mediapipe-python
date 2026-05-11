@@ -2347,6 +2347,26 @@ Persistence is intentionally two-layer and local-only: edits autosave immediatel
 
 Safe validation only: `git diff --check -- .testbed/.crash-test/crash-test.html` passed, and two Node-based offline smoke evaluations of the inline page script with a stub DOM verified that the page now boots cleanly without the initialization exception, produces all 24 expected matrix rows, exports 24 state entries, and still persists edited checklist state/notes into local storage through `persistLocal()` without throwing. No MediaPipe, proving runs, or risky GUI crash repros were used in this validation.
 
+### Task 101: Fix crash-test page file-origin unsafe load warning
+
+**Bead ID:** `oc-8mda`
+**SubAgent:** `primary` (for `coder` workflow role)
+**Role:** `coder`
+**References:** `REF-04`
+**Prompt:** Fix the remaining `file://`-origin load warning in `.testbed/.crash-test/crash-test.html`. Current user report: the page still logs `Unsafe attempt to load URL ... file:// ... file URLs are treated as unique security origins.` on initial load. Remove or guard the startup path that triggers this so the page behaves cleanly when opened directly from `file://`, while preserving local autosave and optional adjacent-file sync where browser APIs allow it.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- `.testbed/.crash-test/`
+
+**Files Created/Deleted/Modified:**
+- `.testbed/.crash-test/crash-test.html`
+- adjacent state/helpers only if required
+
+**Status:** ✅ Complete
+
+**Results:** Coder pass completed. The crash-test page now treats adjacent-file sync as explicit manual opt-in only and keeps startup strictly local-only under `file://`. The fix stayed scoped to `.testbed/.crash-test/crash-test.html`: added a file-origin/capability guard, replaced the single create-only picker flow with a link-or-create flow, added explicit permission checks for read/write handles, prevented background autosave from attempting linked-file writes unless permission is already granted, and updated the startup/status copy so the page clearly states that it will not auto-load adjacent files on boot. Local `localStorage` autosave behavior was preserved, while manual linked-file read/write still works when the browser grants File System Access permissions. Safe validation only: `git diff --check -- .testbed/.crash-test/crash-test.html` passed; a Node-based offline script-boot smoke test verified the page still initializes with `file://` semantics, restores local state text, renders the 24-row matrix summary, and shows the new local-only startup message instead of trying to touch adjacent files during boot.
+
 ## Session Handoff / Current Stopping Point
 
 - File-backed prerecorded proving is now a real supported proving path, not a stub:
