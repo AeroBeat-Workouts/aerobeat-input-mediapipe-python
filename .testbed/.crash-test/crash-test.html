@@ -434,7 +434,6 @@
     const lastSaved = document.getElementById("last-saved");
 
     let stateFileHandle = null;
-    let state = loadState();
 
     function buildRows() {
       const combos = [];
@@ -460,6 +459,7 @@
     }
 
     const combos = buildRows();
+    let state = loadState();
 
     function normalizeState(candidate) {
       const safe = candidate && typeof candidate === "object" ? candidate : {};

@@ -2325,6 +2325,28 @@ Safe validation completed without running MediaPipe/live/prerecorded proving pat
 
 Persistence is intentionally two-layer and local-only: edits autosave immediately into browser local storage for resilience on reload, and the page can also link/create and continuously sync a real adjacent JSON file via Chromium's File System Access API so Derrick can keep `.crash-test-state.json` beside the HTML in the same folder. A starter JSON file was committed so the expected adjacent-path target already exists. Safe validation only: confirmed the source-backed proving knobs in `.testbed/scripts/proving_harness.gd` (`startup_mode`, `prerecorded_video_source`, `skip_sidecar_stop_on_close_debug`) before building the matrix; verified both new files exist in `.testbed/.crash-test/`; and checked the generated HTML/JSON statically from shell without launching MediaPipe, proving scenes, or risky GUI repros.
 
+### Task 100: Fix crash-test checklist initialization/runtime bug
+
+**Bead ID:** `oc-w18a`
+**SubAgent:** `primary` (for `coder` workflow role)
+**Role:** `coder`
+**References:** `REF-04`
+**Prompt:** Fix the shipped local crash-test checklist page so it works when opened directly from `file://`. Current user report: opening `.testbed/.crash-test/crash-test.html` throws `ReferenceError: Cannot access 'combos' before initialization`, preventing the link/write/reload/export buttons from functioning. Land the smallest truthful fix, preserve the current checklist intent, and keep it local/offline-friendly.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- `.testbed/.crash-test/`
+
+**Files Created/Deleted/Modified:**
+- `.testbed/.crash-test/crash-test.html`
+- adjacent state/helpers only if required
+
+**Status:** ✅ Complete
+
+**Results:** Fixed the shipped `file://` runtime bug in `.testbed/.crash-test/crash-test.html` with the smallest truthful ordering change. Root cause: the script initialized `state` by calling `loadState()` before `const combos = buildRows();` had run, but `loadState()` immediately calls `normalizeState()`, and `normalizeState()` iterates `combos`. That triggered the reported `ReferenceError: Cannot access 'combos' before initialization` during page boot, which aborted the rest of the script before the button handlers and checklist UI could finish initializing. The fix was to keep the existing structure and simply move `let state = loadState();` to immediately after `const combos = buildRows();`, so the matrix definition exists before any state normalization/local restore runs.
+
+Safe validation only: `git diff --check -- .testbed/.crash-test/crash-test.html` passed, and two Node-based offline smoke evaluations of the inline page script with a stub DOM verified that the page now boots cleanly without the initialization exception, produces all 24 expected matrix rows, exports 24 state entries, and still persists edited checklist state/notes into local storage through `persistLocal()` without throwing. No MediaPipe, proving runs, or risky GUI crash repros were used in this validation.
+
 ## Session Handoff / Current Stopping Point
 
 - File-backed prerecorded proving is now a real supported proving path, not a stub:
