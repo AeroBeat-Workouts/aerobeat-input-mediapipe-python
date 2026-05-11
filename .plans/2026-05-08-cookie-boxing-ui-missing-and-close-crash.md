@@ -2303,6 +2303,28 @@ Safe validation completed without running MediaPipe/live/prerecorded proving pat
 
 **Results:** Pending.
 
+### Task 99: Build a local proving crash-test checklist webpage
+
+**Bead ID:** `oc-w0i1`
+**SubAgent:** `primary` (for `coder` workflow role)
+**Role:** `coder`
+**References:** `REF-04`
+**Prompt:** Build a local crash-test tracking webpage at `/.testbed/.crash-test/crash-test.html` for manually recording proving-scene crash reproduction progress. Include boolean checkboxes for each relevant proving test combination and persist the checkbox state locally in the same folder so Derrick does not lose progress between page reloads. Keep it standalone/offline-friendly and easy to update during repeated Cookie crash testing.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- `.testbed/.crash-test/`
+
+**Files Created/Deleted/Modified:**
+- `.testbed/.crash-test/crash-test.html`
+- `.testbed/.crash-test/.crash-test-state.json`
+
+**Status:** ✅ Complete
+
+**Results:** Built a standalone offline crash-matrix page at `.testbed/.crash-test/crash-test.html` plus an adjacent starter state file `.testbed/.crash-test/.crash-test-state.json`. The page uses the real proving controls from this repo rather than invented labels: scenes `Boxing` / `Flow`; sources `live camera` / `prerecorded video`; startup modes `TRACKING`, `PREVIEW_ONLY_DEBUG`, and `GODOT_ONLY_DEBUG`; and close-path toggle `skip_sidecar_stop_on_close_debug` on/off. That yields 24 explicit matrix rows (2 scenes × 2 sources × 3 startup modes × 2 skip-sidecar states). Every row exposes `tested`, `crashed`, `bad-window-only`, and freeform `notes`, with summary counters at the top for coverage/crash progress.
+
+Persistence is intentionally two-layer and local-only: edits autosave immediately into browser local storage for resilience on reload, and the page can also link/create and continuously sync a real adjacent JSON file via Chromium's File System Access API so Derrick can keep `.crash-test-state.json` beside the HTML in the same folder. A starter JSON file was committed so the expected adjacent-path target already exists. Safe validation only: confirmed the source-backed proving knobs in `.testbed/scripts/proving_harness.gd` (`startup_mode`, `prerecorded_video_source`, `skip_sidecar_stop_on_close_debug`) before building the matrix; verified both new files exist in `.testbed/.crash-test/`; and checked the generated HTML/JSON statically from shell without launching MediaPipe, proving scenes, or risky GUI repros.
+
 ## Session Handoff / Current Stopping Point
 
 - File-backed prerecorded proving is now a real supported proving path, not a stub:

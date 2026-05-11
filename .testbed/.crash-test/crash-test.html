@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AeroBeat Proving Crash Test Matrix</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b1220;
+      --panel: #111a2b;
+      --panel-2: #162238;
+      --line: #29415f;
+      --text: #e7eefc;
+      --muted: #9cb0cf;
+      --accent: #3ddcdc;
+      --warn: #ffb84d;
+      --bad: #ff6b7a;
+      --good: #66d98f;
+      --shadow: rgba(0, 0, 0, 0.35);
+      --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      --sans: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      background: linear-gradient(180deg, #09101c 0%, #0d1524 100%);
+      color: var(--text);
+    }
+
+    .shell {
+      max-width: 1800px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .hero, .panel {
+      background: rgba(17, 26, 43, 0.92);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: 0 18px 40px var(--shadow);
+    }
+
+    .hero {
+      padding: 20px 22px;
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 30px;
+      line-height: 1.15;
+    }
+
+    .sub, .muted {
+      color: var(--muted);
+    }
+
+    .sub {
+      margin: 0;
+      line-height: 1.5;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 360px minmax(0, 1fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .panel {
+      padding: 18px;
+    }
+
+    .controls {
+      position: sticky;
+      top: 18px;
+    }
+
+    .controls h2,
+    .matrix h2 {
+      margin: 0 0 12px;
+      font-size: 20px;
+    }
+
+    .control-group {
+      margin-bottom: 18px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid rgba(156, 176, 207, 0.16);
+    }
+
+    .control-group:last-child {
+      margin-bottom: 0;
+      padding-bottom: 0;
+      border-bottom: 0;
+    }
+
+    .button-row,
+    .button-stack {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .button-stack { flex-direction: column; }
+
+    button,
+    .file-label {
+      appearance: none;
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font: inherit;
+      cursor: pointer;
+      text-align: left;
+      transition: 120ms ease;
+    }
+
+    button:hover,
+    .file-label:hover {
+      border-color: var(--accent);
+      transform: translateY(-1px);
+    }
+
+    button.accent {
+      border-color: rgba(61, 220, 220, 0.55);
+      background: rgba(61, 220, 220, 0.12);
+    }
+
+    button.warn {
+      border-color: rgba(255, 184, 77, 0.5);
+      background: rgba(255, 184, 77, 0.12);
+    }
+
+    button.bad {
+      border-color: rgba(255, 107, 122, 0.5);
+      background: rgba(255, 107, 122, 0.12);
+    }
+
+    input[type="file"] { display: none; }
+
+    .status-box {
+      display: grid;
+      gap: 8px;
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      width: fit-content;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(61, 220, 220, 0.35);
+      background: rgba(61, 220, 220, 0.1);
+      color: var(--text);
+      font-size: 13px;
+    }
+
+    .legend {
+      display: grid;
+      gap: 8px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .legend strong {
+      color: var(--text);
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .stat {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(156, 176, 207, 0.14);
+      border-radius: 12px;
+      padding: 10px 12px;
+    }
+
+    .stat .label {
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .stat .value {
+      margin-top: 6px;
+      font-size: 24px;
+      font-weight: 700;
+    }
+
+    .table-wrap {
+      overflow: auto;
+      border-radius: 14px;
+      border: 1px solid rgba(156, 176, 207, 0.16);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 1350px;
+      background: rgba(7, 13, 23, 0.55);
+    }
+
+    thead th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: #132036;
+      color: #d9e6ff;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    th, td {
+      border-bottom: 1px solid rgba(156, 176, 207, 0.12);
+      padding: 10px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    tbody tr:nth-child(odd) {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    tbody tr.row-tested {
+      background: rgba(102, 217, 143, 0.08);
+    }
+
+    tbody tr.row-crashed {
+      background: rgba(255, 107, 122, 0.09);
+    }
+
+    tbody tr.row-bad-window {
+      box-shadow: inset 4px 0 0 rgba(255, 184, 77, 0.9);
+    }
+
+    .combo {
+      display: grid;
+      gap: 4px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .combo strong {
+      color: var(--text);
+      font-size: 14px;
+    }
+
+    .checkbox-cell {
+      width: 88px;
+      text-align: center;
+    }
+
+    .checkbox-wrap {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 38px;
+      min-width: 38px;
+      border-radius: 10px;
+      border: 1px solid rgba(156, 176, 207, 0.18);
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    input[type="checkbox"] {
+      width: 20px;
+      height: 20px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    .notes {
+      width: 100%;
+      min-height: 62px;
+      resize: vertical;
+      border-radius: 10px;
+      border: 1px solid rgba(156, 176, 207, 0.18);
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--text);
+      padding: 10px;
+      font: inherit;
+    }
+
+    .notes:focus {
+      outline: 1px solid var(--accent);
+      border-color: var(--accent);
+    }
+
+    .nowrap { white-space: nowrap; }
+
+    code {
+      font-family: var(--mono);
+      font-size: 0.95em;
+      background: rgba(255,255,255,0.06);
+      padding: 2px 5px;
+      border-radius: 6px;
+    }
+
+    .tiny {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    @media (max-width: 1200px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .controls {
+        position: static;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <section class="hero">
+      <h1>AeroBeat proving crash-test matrix</h1>
+      <p class="sub">
+        Offline local checklist for repeated Cookie/Chip crash testing. This matrix is wired to the real proving knobs in this repo:
+        <code>TRACKING</code>, <code>PREVIEW_ONLY_DEBUG</code>, <code>GODOT_ONLY_DEBUG</code>,
+        file-backed vs live source, and <code>skip_sidecar_stop_on_close_debug</code> on/off.
+      </p>
+    </section>
+
+    <div class="grid">
+      <aside class="panel controls">
+        <h2>State + controls</h2>
+
+        <div class="control-group status-box">
+          <span class="pill" id="storage-pill">Local autosave active</span>
+          <div><strong>Autosave:</strong> browser local storage on every edit</div>
+          <div><strong>Optional adjacent file:</strong> <code>.crash-test-state.json</code></div>
+          <div id="file-status" class="muted">No state file linked yet.</div>
+          <div id="last-saved" class="muted">No edits yet.</div>
+        </div>
+
+        <div class="control-group">
+          <div class="button-stack">
+            <button id="pick-file" class="accent">Link or create adjacent state file</button>
+            <button id="save-file">Write current state to linked file</button>
+            <button id="load-file">Reload state from linked file</button>
+            <button id="export-json">Export JSON snapshot</button>
+            <label class="file-label" for="import-json">Import JSON snapshot</label>
+            <input id="import-json" type="file" accept="application/json,.json" />
+            <button id="reset-state" class="bad">Reset all checklist state</button>
+          </div>
+          <p class="tiny">
+            Chrome/Chromium can keep a real writable handle to a JSON file in this same folder after you pick it once.
+            If file access is unavailable, the page still persists locally in browser storage.
+          </p>
+        </div>
+
+        <div class="control-group">
+          <div class="summary-grid" id="summary-grid"></div>
+        </div>
+
+        <div class="control-group legend">
+          <div><strong>Scenes:</strong> Boxing, Flow</div>
+          <div><strong>Sources:</strong> live camera, prerecorded video</div>
+          <div><strong>Startup modes:</strong> Tracking, Preview-only debug, Godot-only debug</div>
+          <div><strong>Close-path toggle:</strong> skip-sidecar on/off</div>
+          <div><strong>Row fields:</strong> tested, crashed, bad-window-only, notes</div>
+          <div class="tiny">
+            <strong>Note:</strong> <code>GODOT_ONLY_DEBUG</code> intentionally skips sidecar/camera/provider startup.
+            Source + skip-sidecar are still listed for matrix completeness so every close-path rung can be logged consistently.
+          </div>
+        </div>
+      </aside>
+
+      <main class="panel matrix">
+        <h2>Crash test rows</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th class="nowrap">#</th>
+                <th>Combination</th>
+                <th>Scene</th>
+                <th>Source</th>
+                <th>Startup mode</th>
+                <th>Skip sidecar stop on close</th>
+                <th class="checkbox-cell">Tested</th>
+                <th class="checkbox-cell">Crashed</th>
+                <th class="checkbox-cell">Bad window only</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = "aerobeat-crash-test-matrix-v1";
+    const FILE_NAME = ".crash-test-state.json";
+    const scenes = ["Boxing", "Flow"];
+    const sources = [
+      { id: "live_camera", label: "Live camera" },
+      { id: "prerecorded_video", label: "Prerecorded video" }
+    ];
+    const startupModes = [
+      { id: "TRACKING", label: "Tracking" },
+      { id: "PREVIEW_ONLY_DEBUG", label: "Preview-only debug" },
+      { id: "GODOT_ONLY_DEBUG", label: "Godot-only debug" }
+    ];
+    const skipSidecarModes = [
+      { id: "normal_stop", label: "Off" },
+      { id: "skip_sidecar", label: "On" }
+    ];
+
+    const rowsTbody = document.getElementById("rows");
+    const summaryGrid = document.getElementById("summary-grid");
+    const storagePill = document.getElementById("storage-pill");
+    const fileStatus = document.getElementById("file-status");
+    const lastSaved = document.getElementById("last-saved");
+
+    let stateFileHandle = null;
+    let state = loadState();
+
+    function buildRows() {
+      const combos = [];
+      let index = 1;
+      for (const scene of scenes) {
+        for (const source of sources) {
+          for (const startupMode of startupModes) {
+            for (const skipSidecar of skipSidecarModes) {
+              combos.push({
+                index,
+                id: `${scene.toLowerCase()}__${source.id}__${startupMode.id}__${skipSidecar.id}`,
+                scene,
+                source,
+                startupMode,
+                skipSidecar
+              });
+              index += 1;
+            }
+          }
+        }
+      }
+      return combos;
+    }
+
+    const combos = buildRows();
+
+    function normalizeState(candidate) {
+      const safe = candidate && typeof candidate === "object" ? candidate : {};
+      const next = {
+        version: 1,
+        updatedAt: safe.updatedAt || null,
+        rows: {}
+      };
+
+      for (const combo of combos) {
+        const prior = safe.rows && safe.rows[combo.id] ? safe.rows[combo.id] : {};
+        next.rows[combo.id] = {
+          tested: Boolean(prior.tested),
+          crashed: Boolean(prior.crashed),
+          badWindowOnly: Boolean(prior.badWindowOnly),
+          notes: typeof prior.notes === "string" ? prior.notes : ""
+        };
+      }
+
+      return next;
+    }
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return normalizeState({});
+        return normalizeState(JSON.parse(raw));
+      } catch (error) {
+        console.warn("Failed to load local state", error);
+        return normalizeState({});
+      }
+    }
+
+    function persistLocal(reason = "Updated") {
+      state.updatedAt = new Date().toISOString();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state, null, 2));
+      storagePill.textContent = "Local autosave active";
+      lastSaved.textContent = `${reason}: ${formatDate(state.updatedAt)}`;
+      renderSummary();
+      if (stateFileHandle) {
+        saveToLinkedFile(true).catch((error) => {
+          console.warn("Auto-write to linked file failed", error);
+          fileStatus.textContent = `Linked file write failed: ${error.message}`;
+        });
+      }
+    }
+
+    function formatDate(value) {
+      if (!value) return "Never";
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return String(value);
+      return date.toLocaleString();
+    }
+
+    function render() {
+      rowsTbody.innerHTML = "";
+
+      for (const combo of combos) {
+        const rowState = state.rows[combo.id];
+        const tr = document.createElement("tr");
+        if (rowState.tested) tr.classList.add("row-tested");
+        if (rowState.crashed) tr.classList.add("row-crashed");
+        if (rowState.badWindowOnly) tr.classList.add("row-bad-window");
+
+        tr.innerHTML = `
+          <td class="nowrap">${combo.index}</td>
+          <td>
+            <div class="combo">
+              <strong>${combo.scene} · ${combo.source.label}</strong>
+              <span>${combo.startupMode.label} · skip-sidecar ${combo.skipSidecar.label}</span>
+            </div>
+          </td>
+          <td>${combo.scene}</td>
+          <td>${combo.source.label}</td>
+          <td><code>${combo.startupMode.id}</code></td>
+          <td>${combo.skipSidecar.label}</td>
+          <td class="checkbox-cell">
+            <label class="checkbox-wrap"><input type="checkbox" data-id="${combo.id}" data-field="tested" ${rowState.tested ? "checked" : ""}></label>
+          </td>
+          <td class="checkbox-cell">
+            <label class="checkbox-wrap"><input type="checkbox" data-id="${combo.id}" data-field="crashed" ${rowState.crashed ? "checked" : ""}></label>
+          </td>
+          <td class="checkbox-cell">
+            <label class="checkbox-wrap"><input type="checkbox" data-id="${combo.id}" data-field="badWindowOnly" ${rowState.badWindowOnly ? "checked" : ""}></label>
+          </td>
+          <td>
+            <textarea class="notes" data-id="${combo.id}" data-field="notes" placeholder="What happened? error line? preview connected? close path clean?">${escapeHtml(rowState.notes)}</textarea>
+          </td>
+        `;
+        rowsTbody.appendChild(tr);
+      }
+
+      bindInputs();
+      renderSummary();
+    }
+
+    function bindInputs() {
+      rowsTbody.querySelectorAll('input[type="checkbox"]').forEach((input) => {
+        input.addEventListener("change", () => {
+          state.rows[input.dataset.id][input.dataset.field] = input.checked;
+          persistLocal("Checklist autosaved");
+          render();
+        });
+      });
+
+      rowsTbody.querySelectorAll("textarea").forEach((textarea) => {
+        textarea.addEventListener("input", () => {
+          state.rows[textarea.dataset.id][textarea.dataset.field] = textarea.value;
+          persistLocal("Notes autosaved");
+        });
+      });
+    }
+
+    function renderSummary() {
+      const rowValues = Object.values(state.rows);
+      const totals = {
+        total: rowValues.length,
+        tested: rowValues.filter((row) => row.tested).length,
+        crashed: rowValues.filter((row) => row.crashed).length,
+        badWindowOnly: rowValues.filter((row) => row.badWindowOnly).length
+      };
+      const remaining = totals.total - totals.tested;
+
+      const stats = [
+        ["Total rows", totals.total],
+        ["Tested", totals.tested],
+        ["Crashed", totals.crashed],
+        ["Bad window only", totals.badWindowOnly],
+        ["Remaining", remaining],
+        ["Coverage", `${Math.round((totals.tested / totals.total) * 100)}%`]
+      ];
+
+      summaryGrid.innerHTML = stats
+        .map(([label, value]) => `<div class="stat"><div class="label">${label}</div><div class="value">${value}</div></div>`)
+        .join("");
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;");
+    }
+
+    function exportPayload() {
+      return {
+        app: "aerobeat-crash-test-matrix",
+        version: 1,
+        generatedAt: new Date().toISOString(),
+        combos: combos.map(({ id, scene, source, startupMode, skipSidecar }) => ({
+          id,
+          scene,
+          source: source.id,
+          startupMode: startupMode.id,
+          skipSidecar: skipSidecar.id
+        })),
+        state
+      };
+    }
+
+    async function saveToLinkedFile(silent = false) {
+      if (!stateFileHandle) {
+        if (!silent) fileStatus.textContent = "No file linked yet. Pick or create .crash-test-state.json first.";
+        return;
+      }
+      const writable = await stateFileHandle.createWritable();
+      await writable.write(JSON.stringify(exportPayload(), null, 2));
+      await writable.close();
+      fileStatus.textContent = `Linked file synced: ${stateFileHandle.name}`;
+      if (!silent) lastSaved.textContent = `State file written: ${formatDate(new Date().toISOString())}`;
+    }
+
+    async function loadFromLinkedFile() {
+      if (!stateFileHandle) {
+        fileStatus.textContent = "No file linked yet. Pick or create .crash-test-state.json first.";
+        return;
+      }
+      const file = await stateFileHandle.getFile();
+      const text = await file.text();
+      if (!text.trim()) {
+        fileStatus.textContent = `Linked file is empty: ${stateFileHandle.name}`;
+        return;
+      }
+      const parsed = JSON.parse(text);
+      state = normalizeState(parsed.state || parsed);
+      persistLocal("Loaded from linked file");
+      render();
+      fileStatus.textContent = `Loaded linked file: ${stateFileHandle.name}`;
+    }
+
+    async function pickStateFile() {
+      if (!window.showSaveFilePicker) {
+        fileStatus.textContent = "This browser cannot hold a writable local file handle. Local autosave still works; use Export JSON instead.";
+        return;
+      }
+      stateFileHandle = await window.showSaveFilePicker({
+        suggestedName: FILE_NAME,
+        types: [
+          {
+            description: "Crash test state JSON",
+            accept: { "application/json": [".json"] }
+          }
+        ]
+      });
+      fileStatus.textContent = `Linked file: ${stateFileHandle.name}`;
+      await saveToLinkedFile();
+    }
+
+    function downloadJson() {
+      const payload = JSON.stringify(exportPayload(), null, 2);
+      const blob = new Blob([payload], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `${FILE_NAME.replace('.json', '')}-${new Date().toISOString().replaceAll(':', '-')}.json`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function importJsonFile(file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const parsed = JSON.parse(String(reader.result || "{}"));
+          state = normalizeState(parsed.state || parsed);
+          persistLocal("Imported JSON snapshot");
+          render();
+          fileStatus.textContent = `Imported snapshot: ${file.name}`;
+        } catch (error) {
+          fileStatus.textContent = `Import failed: ${error.message}`;
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function resetState() {
+      const confirmed = window.confirm("Reset all crash-test rows and notes? This clears browser-local state immediately.");
+      if (!confirmed) return;
+      state = normalizeState({});
+      persistLocal("State reset");
+      render();
+    }
+
+    document.getElementById("pick-file").addEventListener("click", () => {
+      pickStateFile().catch((error) => {
+        fileStatus.textContent = `Link/create failed: ${error.message}`;
+      });
+    });
+
+    document.getElementById("save-file").addEventListener("click", () => {
+      saveToLinkedFile().catch((error) => {
+        fileStatus.textContent = `Save failed: ${error.message}`;
+      });
+    });
+
+    document.getElementById("load-file").addEventListener("click", () => {
+      loadFromLinkedFile().catch((error) => {
+        fileStatus.textContent = `Reload failed: ${error.message}`;
+      });
+    });
+
+    document.getElementById("export-json").addEventListener("click", downloadJson);
+    document.getElementById("import-json").addEventListener("change", (event) => {
+      const [file] = event.target.files || [];
+      if (file) importJsonFile(file);
+      event.target.value = "";
+    });
+    document.getElementById("reset-state").addEventListener("click", resetState);
+
+    render();
+    if (state.updatedAt) {
+      lastSaved.textContent = `Restored local state: ${formatDate(state.updatedAt)}`;
+    }
+  </script>
+</body>
+</html>
