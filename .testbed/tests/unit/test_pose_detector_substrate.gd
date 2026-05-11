@@ -89,6 +89,17 @@ func test_detects_straight_hook_and_uppercut_events_truthfully() -> void:
 	}), 1600)
 	assert_eq(_event_names(uppercut_state.get("events", [])), ["uppercut_left"])
 
+func test_quantizes_flow_direction_to_twelve_chart_slots() -> void:
+	assert_eq(substrate._flow_ring_index_from_vector(Vector2(1.0, 0.0)), 2)
+	assert_eq(substrate._flow_ring_index_from_vector(Vector2(0.0, 1.0)), 11)
+	assert_eq(substrate._flow_ring_index_from_vector(Vector2(-1.0, 0.0)), 8)
+	assert_eq(substrate._flow_ring_index_from_vector(Vector2(0.0, -1.0)), 5)
+
+func test_quantizes_flow_placement_to_twelve_perimeter_slots_plus_center() -> void:
+	assert_eq(substrate._flow_placement_index(Vector2(0.52, 0.69), Vector2(0.50, 0.70), 0.20), 12)
+	assert_eq(substrate._flow_placement_index(Vector2(0.72, 0.70), Vector2(0.50, 0.70), 0.20), 2)
+	assert_eq(substrate._flow_placement_index(Vector2(0.50, 0.92), Vector2(0.50, 0.70), 0.20), 11)
+
 func test_detects_flow_swing_events_with_distinct_placement_and_direction() -> void:
 	_calibrate_stance()
 	substrate.process_landmarks(_make_pose_frame(), 1100)
@@ -103,8 +114,8 @@ func test_detects_flow_swing_events_with_distinct_placement_and_direction() -> v
 	var flow_events := _flow_events(swing_state.get("events", []))
 	assert_eq(flow_events.size(), 1)
 	assert_eq(flow_events[0]["name"], "swing_left")
-	assert_eq(flow_events[0]["placement"], "left")
-	assert_eq(flow_events[0]["direction"], "left")
+	assert_eq(flow_events[0]["placement"], 8)
+	assert_eq(flow_events[0]["direction"], 9)
 
 func test_exposes_flow_debug_candidates_and_last_emit_metadata() -> void:
 	_calibrate_stance()
@@ -123,11 +134,15 @@ func test_exposes_flow_debug_candidates_and_last_emit_metadata() -> void:
 	var swing_meta: Dictionary = left_flow.get("swing_meta", {})
 	var swing_analysis: Dictionary = left_flow.get("swing_analysis", {})
 	assert_false(bool(gesture_debug.get("ready", {}).get("swing_left", true)))
-	assert_eq(String(left_flow.get("placement_candidate", "")), "left")
-	assert_eq(String(left_flow.get("direction_candidate", "")), "left")
+	assert_eq(int(left_flow.get("placement_candidate", -1)), 8)
+	assert_eq(int(left_flow.get("placement_candidate_ui_label", 0)), 9)
+	assert_eq(int(left_flow.get("direction_candidate", -1)), 9)
+	assert_eq(int(left_flow.get("direction_candidate_ui_label", 0)), 10)
 	assert_true(int(left_flow.get("history_points", 0)) >= 3)
-	assert_eq(String(swing_meta.get("placement", "")), "left")
-	assert_eq(String(swing_meta.get("direction", "")), "left")
+	assert_eq(int(swing_meta.get("placement", -1)), 8)
+	assert_eq(int(swing_meta.get("placement_ui_label", 0)), 9)
+	assert_eq(int(swing_meta.get("direction", -1)), 9)
+	assert_eq(int(swing_meta.get("direction_ui_label", 0)), 10)
 	assert_true(int(swing_meta.get("duration_ms", 0)) >= 120)
 	assert_true(float(swing_analysis.get("arc_length", 0.0)) > 0.0)
 	assert_true(float(swing_analysis.get("avg_confidence", 0.0)) >= 0.62)
@@ -152,8 +167,8 @@ func test_detects_flow_trail_as_continuation_motion() -> void:
 	assert_true(bool(substrate.get_latest_state().get("gesture_states", {}).get("trail_right", false)))
 	assert_true(emitted_events.size() >= 2)
 	assert_eq(emitted_events[0]["name"], "trail_right")
-	assert_eq(emitted_events[0]["placement"], "right")
-	assert_eq(emitted_events[0]["direction"], "up")
+	assert_eq(emitted_events[0]["placement"], 2)
+	assert_eq(emitted_events[0]["direction"], 11)
 	assert_eq(emitted_events[emitted_events.size() - 1]["name"], "trail_right")
 
 func test_detects_guard_squat_lean_and_sidestep_state_events() -> void:
@@ -228,8 +243,8 @@ func _flow_events(events: Array) -> Array:
 			continue
 		flow_events.append({
 			"name": event_name,
-			"placement": String(event_data.get("placement", "")),
-			"direction": String(event_data.get("direction", "")),
+			"placement": int(event_data.get("placement", -1)),
+			"direction": int(event_data.get("direction", -1)),
 		})
 	return flow_events
 

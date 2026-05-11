@@ -2051,6 +2051,64 @@ Validation passed with `git diff --check`, `~/.local/bin/godot --headless --path
 
 **Results:** Research pass completed against `REF-24` plus the current Flow proving/runtime sources. Main finding: the mockup is a chart-truth visualizer with four independent indexed circles (`left/right placement` as 13-slot rings, `left/right direction` as 12-slot rings), but the current mediapipe-python Flow stack still emits coarse semantic strings only — placement is `left|center|right` from `_flow_placement_name()` in `src/detectors/pose_detector_substrate.gd`, and direction is only `left|right|up|down` from `_flow_direction_name()`. The current `.testbed/scenes/flow_proving.tscn` / `.testbed/scripts/proving_harness.gd` surface is also still the older text-heavy debug harness: reusable pieces are the mirrored camera panel, event feed plumbing, provider signal hookups, and per-hand debug/meta tracking; replaceable pieces are the right-side scroll/text panels and the current string-based Flow candidate presentation. Practical implementation mapping recorded from the mockup: left side stays camera + numbered event feed; right side becomes a single translucent board with a 2x2 grid of ring widgets labeled `Left Bat Placement`, `Right Bat Placement`, `Left Bat Direction`, `Right Bat Direction`; placement rings show indices `1..13` with `13` centered and `1..12` around the perimeter clockwise starting at top-right; direction rings show indices `1..12` around the perimeter clockwise with no center slot. Live-fill expectation: exactly one filled marker per ring at a time when a value is known; placement should fill one of 13 slots (including center), direction should fill one of 12 perimeter slots only; unknown/unready state should leave all circles hollow rather than inventing a coarse bucket highlight. Smallest truthful implementation slice: keep current camera/event-feed shell, replace the right-side text stack with one placement ring widget for one hand first, and feed it from temporary mocked/indexed values or an adapter only after the backend can express real ring indices instead of the stale 3x4 vocabulary. Remaining questions for Derrick: whether ring numbering should be interpreted in mirrored screen space exactly as drawn in the mockup, whether event feed rows should continue logging both placement and direction as separate entries exactly in visible order, and whether partial backend truth should be shown at all before all four indexed surfaces are wired. This task did not change runtime code directly; it produced the implementation-oriented comparison needed before the Flow proving rewrite.
 
+### Task 87: Align Flow mediapipe-python mechanics to the locked chart placement/direction contract
+
+**Bead ID:** `oc-bk5p`
+**SubAgent:** `primary` (for `coder` workflow role)
+**Role:** `coder`
+**References:** `REF-24`
+**Prompt:** Update the Flow mechanics in `aerobeat-input-mediapipe-python` so the proving/runtime path matches the locked chart/workout-package truth instead of the stale coarse buckets. Canonical truth: `placement` is a 13-value ring (`0..12`, UI-facing `1..13`) and `direction` is a 12-value ring (`0..11`, UI-facing `1..12`). Fix the detector/runtime surfaces that still collapse Flow to `left|center|right` and `left|right|up|down`, and make the proving path capable of driving the upcoming mockup truthfully.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- `src/`
+- `.testbed/scenes/`
+- `.testbed/scripts/`
+- test paths required to validate Flow semantics
+
+**Files Created/Deleted/Modified:**
+- Flow detector/runtime/proving/test files required by the contract alignment
+
+**Status:** ✅ Complete
+
+**Results:** Coder pass completed. The stale Flow detector/runtime surfaces were updated in `src/detectors/pose_detector_substrate.gd`, `src/providers/mediapipe_provider.gd`, `src/input_provider.gd`, `.testbed/scripts/proving_harness.gd`, and the repo-local Flow unit/provider/adapter tests. `PoseDetectorSubstrate` no longer collapses Flow into coarse `left|center|right` / `left|right|up|down` strings: it now quantizes motion direction onto the locked 12-slot chart ring (`0..11`, UI labels `1..12`) and quantizes placement onto the locked 13-slot ring (`0..12`, with canonical `12` = UI `13` center, and `0..11` as perimeter slots clockwise from top-right). Flow swing/trail events now emit integer `placement` / `direction` payloads through the detector, provider, and input adapter instead of semantic strings, and Flow debug metadata now also carries `placement_ui_label` / `direction_ui_label` so the proving path can surface both canonical and UI-facing values truthfully without inventing fake UI semantics. The proving harness was updated to display these values explicitly as indexed debug output (for example `8[u9]`, `11[u12]`, `12[u13] center`) in candidate/emitted rows and last-event summaries, which keeps the current observability shell truthful while the dedicated 4-ring mockup UI still remains future work. Added/updated tests now cover direct ring quantization helpers, substrate swing/trail event payloads, provider signal re-emission, and input adapter re-emission for the indexed Flow contract. Validation completed locally with `python3 -m py_compile python_mediapipe/*.py`; full GUT suite `56/56`; `godot --headless --path .testbed --quit-after 2` (passes with the pre-existing `ObjectDB instances leaked at exit` warning still present); and a focused headless flow proving scene instantiation smoke (`godot --headless --path .testbed -s /tmp/flow_scene_smoke.gd`) which loaded `flow_proving.tscn` and printed `FLOW_SCENE_OK name=FlowProving` before normal shutdown. Coder commit: `43b5fef` (`Align flow mechanics to indexed chart truth`).
+
+### Task 88: QA Flow chart-truth mechanics alignment in the proving scene
+
+**Bead ID:** `oc-h5r8`
+**SubAgent:** `primary` (for `qa` workflow role)
+**Role:** `qa`
+**References:** `REF-24`
+**Prompt:** Independently verify that the Flow proving/runtime path now emits and surfaces chart-truth placement/direction semantics strongly enough to support the upcoming 4-section mockup UI: placement on the 13-value ring and direction on the 12-value ring, without regressing the current proving scene shell or inventing fake mappings.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+
+**Files Created/Deleted/Modified:**
+- plan updates / verification notes only unless a truthful docs correction is required
+
+**Status:** ⏳ Pending
+
+**Results:** Pending.
+
+### Task 89: Audit Flow chart-truth mechanics alignment before UI redesign
+
+**Bead ID:** `oc-fgrt`
+**SubAgent:** `primary` (for `auditor` workflow role)
+**Role:** `auditor`
+**References:** `REF-24`
+**Prompt:** Audit the Flow mechanics alignment branch against the locked chart/workout-package semantics and confirm whether the backend is now truthful enough for the Flow mockup UI implementation slice to begin.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+
+**Files Created/Deleted/Modified:**
+- plan updates / audit notes only
+
+**Status:** ⏳ Pending
+
+**Results:** Pending.
+
 ## Session Handoff / Current Stopping Point
 
 - File-backed prerecorded proving is now a real supported proving path, not a stub:

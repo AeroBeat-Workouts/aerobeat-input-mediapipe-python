@@ -28,7 +28,12 @@ const FLOW_TRAIL_MIN_ARC_RATIO := 0.95
 const FLOW_TRAIL_MIN_TRAVEL_RATIO := 0.34
 const FLOW_TRAIL_MIN_SPEED_RATIO := 1.05
 const FLOW_TRAIL_EMIT_INTERVAL_MS := 90
-const FLOW_PLACEMENT_SIDE_THRESHOLD := 0.45
+const FLOW_DIRECTION_RING_COUNT := 12
+const FLOW_PLACEMENT_RING_COUNT := 13
+const FLOW_PLACEMENT_CENTER_INDEX := FLOW_PLACEMENT_RING_COUNT - 1
+const FLOW_PLACEMENT_CENTER_RADIUS_RATIO := 0.45
+const FLOW_RING_SECTOR_DEGREES := 360.0 / float(FLOW_DIRECTION_RING_COUNT)
+const FLOW_RING_START_ANGLE_DEGREES := 60.0
 
 var _config = null
 var _smoother: LandmarkSmoother = LandmarkSmoother.new()
@@ -468,31 +473,35 @@ func _build_gesture_debug_state() -> Dictionary:
 	}
 
 func _build_flow_debug_state() -> Dictionary:
-	var shoulder_width := maxf(float(_baseline.get("shoulder_width", _latest_state.get("metrics", {}).get("measurements", {}).get("shoulder_width", 0.0))), 0.000001)
+	var measurements: Dictionary = _latest_state.get("metrics", {}).get("measurements", {})
+	var shoulder_width := maxf(float(_baseline.get("shoulder_width", measurements.get("shoulder_width", 0.0))), 0.000001)
+	var shoulder_center_vec: Vector3 = measurements.get("shoulder_center", Vector3(float(_baseline.get("shoulder_center_x", 0.0)), 0.0, 0.0))
+	var shoulder_center := Vector2(shoulder_center_vec.x, shoulder_center_vec.y)
 	return {
-		"left": _build_flow_side_debug("left", shoulder_width),
-		"right": _build_flow_side_debug("right", shoulder_width),
+		"left": _build_flow_side_debug("left", shoulder_width, shoulder_center),
+		"right": _build_flow_side_debug("right", shoulder_width, shoulder_center),
 	}
 
-func _build_flow_side_debug(side: String, shoulder_width: float) -> Dictionary:
+func _build_flow_side_debug(side: String, shoulder_width: float, shoulder_center: Vector2) -> Dictionary:
 	var history: Array = _get_flow_history("%s_hand" % side)
-	var current_analysis := _analyze_flow_motion(side, shoulder_width, FLOW_HISTORY_MAX_MS)
-	var swing_analysis := _analyze_flow_motion(side, shoulder_width, FLOW_SWING_WINDOW_MAX_MS)
+	var current_analysis := _analyze_flow_motion(side, shoulder_width, shoulder_center, FLOW_HISTORY_MAX_MS)
+	var swing_analysis := _analyze_flow_motion(side, shoulder_width, shoulder_center, FLOW_SWING_WINDOW_MAX_MS)
 	var trail_meta: Dictionary = _get_flow_meta("trail_%s" % side)
 	var swing_meta: Dictionary = _get_flow_meta("swing_%s" % side)
 	var latest_sample: Dictionary = history[history.size() - 1] if history.size() > 0 else {}
-	var center_x := float(_baseline.get("shoulder_center_x", current_analysis.get("avg_x", swing_analysis.get("avg_x", 0.0))))
-	var placement_candidate: StringName = StringName(current_analysis.get("placement", swing_analysis.get("placement", StringName())))
+	var placement_candidate := int(current_analysis.get("placement", swing_analysis.get("placement", -1)))
 	var avg_x := float(current_analysis.get("avg_x", swing_analysis.get("avg_x", 0.0)))
-	var center_offset_ratio := PoseMetrics.normalized_ratio(avg_x - center_x, shoulder_width) if placement_candidate != StringName() else 0.0
+	var center_offset_ratio := PoseMetrics.normalized_ratio(avg_x - shoulder_center.x, shoulder_width) if placement_candidate >= 0 else 0.0
 	return {
 		"history_points": history.size(),
 		"history_duration_ms": _flow_history_duration_ms(history),
 		"latest_position": latest_sample.get("position", Vector2.ZERO),
 		"latest_confidence": float(latest_sample.get("confidence", 0.0)),
 		"placement_candidate": placement_candidate,
-		"direction_candidate": StringName(current_analysis.get("direction", swing_analysis.get("direction", StringName()))),
-		"center_x": center_x,
+		"placement_candidate_ui_label": int(current_analysis.get("placement_ui_label", swing_analysis.get("placement_ui_label", 0))),
+		"direction_candidate": int(current_analysis.get("direction", swing_analysis.get("direction", -1))),
+		"direction_candidate_ui_label": int(current_analysis.get("direction_ui_label", swing_analysis.get("direction_ui_label", 0))),
+		"center_x": shoulder_center.x,
 		"avg_x": avg_x,
 		"center_offset_ratio": center_offset_ratio,
 		"current_analysis": current_analysis.duplicate(true),
@@ -574,6 +583,8 @@ func _detect_intent_events(landmarks_by_id: Dictionary, metrics: Dictionary, tim
 	if not bool(_baseline.get("is_calibrated", false)):
 		return events
 	var shoulder_width := maxf(float(measurements.get("shoulder_width", float(_baseline.get("shoulder_width", 0.0)))), 0.000001)
+	var shoulder_center_vec: Vector3 = measurements.get("shoulder_center", Vector3(float(_baseline.get("shoulder_center_x", 0.0)), 0.0, 0.0))
+	var shoulder_center := Vector2(shoulder_center_vec.x, shoulder_center_vec.y)
 	var torso_height := maxf(float(measurements.get("torso_height", float(_baseline.get("torso_height", 0.0)))), 0.000001)
 	var left_shoulder := PoseMetrics.get_landmark(landmarks_by_id, PoseLandmarkIds.LEFT_SHOULDER)
 	var right_shoulder := PoseMetrics.get_landmark(landmarks_by_id, PoseLandmarkIds.RIGHT_SHOULDER)
@@ -607,11 +618,11 @@ func _detect_intent_events(landmarks_by_id: Dictionary, metrics: Dictionary, tim
 		_process_uppercut(events, "left", left_elbow, left_wrist, float(measurements.get("left_elbow_bend_deg", 0.0)), left_hand_velocity, shoulder_width)
 		_process_uppercut(events, "right", right_elbow, right_wrist, float(measurements.get("right_elbow_bend_deg", 0.0)), right_hand_velocity, shoulder_width)
 	if not _has_any_event(events, ["punch_left", "hook_left", "uppercut_left"]):
-		_process_flow_trail(events, "left", left_hand_velocity, shoulder_width, timestamp_ms)
-		_process_flow_swing(events, "left", left_hand_velocity, shoulder_width, timestamp_ms)
+		_process_flow_trail(events, "left", left_hand_velocity, shoulder_width, shoulder_center, timestamp_ms)
+		_process_flow_swing(events, "left", left_hand_velocity, shoulder_width, shoulder_center, timestamp_ms)
 	if not _has_any_event(events, ["punch_right", "hook_right", "uppercut_right"]):
-		_process_flow_trail(events, "right", right_hand_velocity, shoulder_width, timestamp_ms)
-		_process_flow_swing(events, "right", right_hand_velocity, shoulder_width, timestamp_ms)
+		_process_flow_trail(events, "right", right_hand_velocity, shoulder_width, shoulder_center, timestamp_ms)
+		_process_flow_swing(events, "right", right_hand_velocity, shoulder_width, shoulder_center, timestamp_ms)
 	return events
 
 func _process_straight_punch(events: Array, side: String, shoulder: Dictionary, elbow: Dictionary, wrist: Dictionary, elbow_bend_deg: float, arm_extension: float, hand_velocity: Vector3, shoulder_width: float) -> void:
@@ -683,7 +694,7 @@ func _process_uppercut(events: Array, side: String, elbow: Dictionary, wrist: Di
 	_emit_power_event(events, event_name, clampf(0.45 + hand_velocity.y / maxf(shoulder_width * 5.0, 0.000001), 0.0, 1.0))
 	_set_ready(event_name, false)
 
-func _process_flow_swing(events: Array, side: String, hand_velocity: Vector3, shoulder_width: float, timestamp_ms: int) -> void:
+func _process_flow_swing(events: Array, side: String, hand_velocity: Vector3, shoulder_width: float, shoulder_center: Vector2, timestamp_ms: int) -> void:
 	var event_name := "swing_%s" % side
 	if hand_velocity.length() <= shoulder_width * 0.90:
 		_set_ready(event_name, true)
@@ -691,7 +702,7 @@ func _process_flow_swing(events: Array, side: String, hand_velocity: Vector3, sh
 		return
 	if _get_state("trail_%s" % side):
 		return
-	var analysis := _analyze_flow_motion(side, shoulder_width, FLOW_SWING_WINDOW_MAX_MS)
+	var analysis := _analyze_flow_motion(side, shoulder_width, shoulder_center, FLOW_SWING_WINDOW_MAX_MS)
 	if analysis.is_empty():
 		return
 	var duration_ms := int(analysis.get("duration_ms", 0))
@@ -707,13 +718,18 @@ func _process_flow_swing(events: Array, side: String, hand_velocity: Vector3, sh
 		return
 	if hand_velocity.length() < shoulder_width * FLOW_SWING_MIN_SPEED_RATIO:
 		return
-	var direction := StringName(analysis.get("direction", StringName()))
-	if direction == StringName():
+	var direction := int(analysis.get("direction", -1))
+	if direction < 0:
+		return
+	var placement := int(analysis.get("placement", -1))
+	if placement < 0:
 		return
 	var flow_meta := _get_flow_meta(event_name)
 	flow_meta["last_emit_ms"] = timestamp_ms
-	flow_meta["placement"] = StringName(analysis.get("placement", &"center"))
+	flow_meta["placement"] = placement
+	flow_meta["placement_ui_label"] = int(analysis.get("placement_ui_label", 0))
 	flow_meta["direction"] = direction
+	flow_meta["direction_ui_label"] = int(analysis.get("direction_ui_label", 0))
 	flow_meta["duration_ms"] = int(analysis.get("duration_ms", 0))
 	flow_meta["arc_length"] = float(analysis.get("arc_length", 0.0))
 	flow_meta["net_distance"] = float(analysis.get("net_distance", 0.0))
@@ -721,13 +737,13 @@ func _process_flow_swing(events: Array, side: String, hand_velocity: Vector3, sh
 	flow_meta["lane_spread"] = float(analysis.get("lane_spread", 0.0))
 	flow_meta["avg_confidence"] = float(analysis.get("avg_confidence", 0.0))
 	_set_flow_meta(event_name, flow_meta)
-	_emit_flow_event(events, event_name, StringName(analysis.get("placement", &"center")), direction)
+	_emit_flow_event(events, event_name, placement, direction)
 	_set_ready(event_name, false)
 
-func _process_flow_trail(events: Array, side: String, hand_velocity: Vector3, shoulder_width: float, timestamp_ms: int) -> void:
+func _process_flow_trail(events: Array, side: String, hand_velocity: Vector3, shoulder_width: float, shoulder_center: Vector2, timestamp_ms: int) -> void:
 	var state_name := "trail_%s" % side
 	var trail_meta: Dictionary = _get_flow_meta(state_name)
-	var analysis := _analyze_flow_motion(side, shoulder_width, FLOW_HISTORY_MAX_MS)
+	var analysis := _analyze_flow_motion(side, shoulder_width, shoulder_center, FLOW_HISTORY_MAX_MS)
 	var active := _get_state(state_name)
 	if analysis.is_empty():
 		if active:
@@ -744,17 +760,22 @@ func _process_flow_trail(events: Array, side: String, hand_velocity: Vector3, sh
 		if active and (hand_velocity.length() <= shoulder_width * 0.75 or float(analysis.get("directional_consistency", 0.0)) < 0.55):
 			_gesture_state["states"][state_name] = false
 		return
-	var direction := StringName(analysis.get("direction", StringName()))
-	if direction == StringName():
+	var direction := int(analysis.get("direction", -1))
+	if direction < 0:
+		return
+	var placement := int(analysis.get("placement", -1))
+	if placement < 0:
 		return
 	if not active:
 		_gesture_state["states"][state_name] = true
 	var last_emit_ms := int(trail_meta.get("last_emit_ms", 0))
-	if active and timestamp_ms - last_emit_ms < FLOW_TRAIL_EMIT_INTERVAL_MS and StringName(trail_meta.get("direction", StringName())) == direction and StringName(trail_meta.get("placement", StringName())) == StringName(analysis.get("placement", &"center")):
+	if active and timestamp_ms - last_emit_ms < FLOW_TRAIL_EMIT_INTERVAL_MS and int(trail_meta.get("direction", -1)) == direction and int(trail_meta.get("placement", -1)) == placement:
 		return
 	trail_meta["last_emit_ms"] = timestamp_ms
-	trail_meta["placement"] = StringName(analysis.get("placement", &"center"))
+	trail_meta["placement"] = placement
+	trail_meta["placement_ui_label"] = int(analysis.get("placement_ui_label", 0))
 	trail_meta["direction"] = direction
+	trail_meta["direction_ui_label"] = int(analysis.get("direction_ui_label", 0))
 	trail_meta["duration_ms"] = int(analysis.get("duration_ms", 0))
 	trail_meta["arc_length"] = float(analysis.get("arc_length", 0.0))
 	trail_meta["net_distance"] = float(analysis.get("net_distance", 0.0))
@@ -762,7 +783,7 @@ func _process_flow_trail(events: Array, side: String, hand_velocity: Vector3, sh
 	trail_meta["lane_spread"] = float(analysis.get("lane_spread", 0.0))
 	trail_meta["avg_confidence"] = float(analysis.get("avg_confidence", 0.0))
 	_set_flow_meta(state_name, trail_meta)
-	_emit_flow_event(events, state_name, StringName(analysis.get("placement", &"center")), direction)
+	_emit_flow_event(events, state_name, placement, direction)
 
 func _update_flow_hand_history(side: String, wrist: Dictionary, confidence: float, timestamp_ms: int) -> void:
 	var history_name := "%s_hand" % side
@@ -780,7 +801,7 @@ func _update_flow_hand_history(side: String, wrist: Dictionary, confidence: floa
 		history.remove_at(0)
 	_set_flow_history(history_name, history)
 
-func _analyze_flow_motion(side: String, shoulder_width: float, max_window_ms: int) -> Dictionary:
+func _analyze_flow_motion(side: String, shoulder_width: float, shoulder_center: Vector2, max_window_ms: int) -> Dictionary:
 	var history: Array = _get_flow_history("%s_hand" % side)
 	if history.size() < 3:
 		return {}
@@ -803,12 +824,12 @@ func _analyze_flow_motion(side: String, shoulder_width: float, max_window_ms: in
 	var direction_sum := Vector2.ZERO
 	var min_x := first_pos.x
 	var max_x := first_pos.x
-	var avg_x_total := 0.0
+	var avg_position_total := Vector2.ZERO
 	for idx in range(samples.size()):
 		var sample: Dictionary = samples[idx]
 		var position: Vector2 = sample.get("position", Vector2.ZERO)
 		confidence_total += float(sample.get("confidence", 0.0))
-		avg_x_total += position.x
+		avg_position_total += position
 		min_x = minf(min_x, position.x)
 		max_x = maxf(max_x, position.x)
 		if idx == 0:
@@ -821,10 +842,13 @@ func _analyze_flow_motion(side: String, shoulder_width: float, max_window_ms: in
 		if segment_length > 0.000001:
 			direction_sum += delta.normalized() * segment_length
 	var net_delta := last_pos - first_pos
-	var direction_name := _flow_direction_name(net_delta)
-	if direction_name == StringName():
+	var direction_index := _flow_ring_index_from_vector(net_delta)
+	if direction_index < 0:
 		return {}
-	var avg_x := avg_x_total / float(samples.size())
+	var avg_position := avg_position_total / float(samples.size())
+	var placement_index := _flow_placement_index(avg_position, shoulder_center, shoulder_width)
+	if placement_index < 0:
+		return {}
 	return {
 		"duration_ms": maxi(int(last.get("timestamp_ms", 0)) - int(first.get("timestamp_ms", 0)), 0),
 		"sample_count": samples.size(),
@@ -833,32 +857,33 @@ func _analyze_flow_motion(side: String, shoulder_width: float, max_window_ms: in
 		"net_delta": net_delta,
 		"avg_confidence": confidence_total / float(samples.size()),
 		"directional_consistency": direction_sum.length() / maxf(arc_length, 0.000001),
-		"placement": _flow_placement_name(avg_x, shoulder_width),
-		"direction": direction_name,
+		"placement": placement_index,
+		"placement_ui_label": placement_index + 1,
+		"direction": direction_index,
+		"direction_ui_label": direction_index + 1,
 		"lane_spread": max_x - min_x,
-		"avg_x": avg_x,
+		"avg_position": avg_position,
+		"avg_x": avg_position.x,
+		"avg_y": avg_position.y,
 		"min_x": min_x,
 		"max_x": max_x,
 		"latest_position": last_pos,
 	}
 
-func _flow_direction_name(net_delta: Vector2) -> StringName:
-	if net_delta.length() <= 0.000001:
-		return StringName()
-	if absf(net_delta.x) >= absf(net_delta.y):
-		return &"right" if net_delta.x > 0.0 else &"left"
-	return &"up" if net_delta.y > 0.0 else &"down"
+func _flow_ring_index_from_vector(vector: Vector2) -> int:
+	if vector.length() <= 0.000001:
+		return -1
+	var angle_deg := rad_to_deg(atan2(vector.y, vector.x))
+	var shifted_deg := fposmod(FLOW_RING_START_ANGLE_DEGREES + FLOW_RING_SECTOR_DEGREES * 0.5 - angle_deg, 360.0)
+	return int(floor(shifted_deg / FLOW_RING_SECTOR_DEGREES)) % FLOW_DIRECTION_RING_COUNT
 
-func _flow_placement_name(avg_x: float, shoulder_width: float) -> StringName:
-	var center_x := float(_baseline.get("shoulder_center_x", avg_x))
-	var offset := PoseMetrics.normalized_ratio(avg_x - center_x, maxf(shoulder_width, 0.000001))
-	if offset <= -FLOW_PLACEMENT_SIDE_THRESHOLD:
-		return &"left"
-	if offset >= FLOW_PLACEMENT_SIDE_THRESHOLD:
-		return &"right"
-	return &"center"
+func _flow_placement_index(avg_position: Vector2, shoulder_center: Vector2, shoulder_width: float) -> int:
+	var offset := avg_position - shoulder_center
+	if offset.length() <= maxf(shoulder_width, 0.000001) * FLOW_PLACEMENT_CENTER_RADIUS_RATIO:
+		return FLOW_PLACEMENT_CENTER_INDEX
+	return _flow_ring_index_from_vector(offset)
 
-func _emit_flow_event(events: Array, event_name: String, placement: StringName, direction: StringName) -> void:
+func _emit_flow_event(events: Array, event_name: String, placement: int, direction: int) -> void:
 	events.append({
 		"name": StringName(event_name),
 		"placement": placement,

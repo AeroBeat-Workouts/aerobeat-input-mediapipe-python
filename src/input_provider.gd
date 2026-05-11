@@ -17,10 +17,10 @@ extends "res://addons/aerobeat-input-core/src/interfaces/boxing_input.gd"
 
 const PROVIDER_ID := "mediapipe_python"
 
-signal swing_left(placement: StringName, direction: StringName)
-signal swing_right(placement: StringName, direction: StringName)
-signal trail_left(placement: StringName, direction: StringName)
-signal trail_right(placement: StringName, direction: StringName)
+signal swing_left(placement: int, direction: int)
+signal swing_right(placement: int, direction: int)
+signal trail_left(placement: int, direction: int)
+signal trail_right(placement: int, direction: int)
 
 var _provider = null
 var _config = null
@@ -248,16 +248,16 @@ func _on_provider_hook_left(power: float) -> void:
 func _on_provider_hook_right(power: float) -> void:
 	hook_right.emit(power)
 
-func _on_provider_swing_left(placement: StringName, direction: StringName) -> void:
+func _on_provider_swing_left(placement: int, direction: int) -> void:
 	swing_left.emit(placement, direction)
 
-func _on_provider_swing_right(placement: StringName, direction: StringName) -> void:
+func _on_provider_swing_right(placement: int, direction: int) -> void:
 	swing_right.emit(placement, direction)
 
-func _on_provider_trail_left(placement: StringName, direction: StringName) -> void:
+func _on_provider_trail_left(placement: int, direction: int) -> void:
 	trail_left.emit(placement, direction)
 
-func _on_provider_trail_right(placement: StringName, direction: StringName) -> void:
+func _on_provider_trail_right(placement: int, direction: int) -> void:
 	trail_right.emit(placement, direction)
 
 func _on_provider_guard_start() -> void:

@@ -105,11 +105,11 @@ func test_flow_detector_events_emit_provider_signals_with_payload() -> void:
 		provider._process_primary_landmarks(_make_pose_frame(), false, true, 1000 + idx * 16)
 	var swing_calls: Array = []
 	var trail_calls: Array = []
-	provider.swing_left.connect(func(placement: StringName, direction: StringName) -> void:
-		swing_calls.append([String(placement), String(direction)])
+	provider.swing_left.connect(func(placement: int, direction: int) -> void:
+		swing_calls.append([placement, direction])
 	)
-	provider.trail_right.connect(func(placement: StringName, direction: StringName) -> void:
-		trail_calls.append([String(placement), String(direction)])
+	provider.trail_right.connect(func(placement: int, direction: int) -> void:
+		trail_calls.append([placement, direction])
 	)
 	provider._process_primary_landmarks(_make_pose_frame(), false, true, 1100)
 	provider._process_primary_landmarks(_make_pose_frame({
@@ -120,7 +120,7 @@ func test_flow_detector_events_emit_provider_signals_with_payload() -> void:
 		PoseLandmarkIds.LEFT_ELBOW: {"x": 0.21, "y": 0.30},
 		PoseLandmarkIds.LEFT_WRIST: {"x": 0.08, "y": 0.30},
 	}), false, true, 1260)
-	assert_eq(swing_calls, [["left", "left"]])
+	assert_eq(swing_calls, [[7, 9]])
 	provider._process_primary_landmarks(_make_pose_frame(), false, true, 2000)
 	provider._process_primary_landmarks(_make_pose_frame({
 		PoseLandmarkIds.RIGHT_ELBOW: {"x": 0.66, "y": 0.36},
@@ -143,7 +143,7 @@ func test_flow_detector_events_emit_provider_signals_with_payload() -> void:
 		PoseLandmarkIds.RIGHT_WRIST: {"x": 0.72, "y": 0.00},
 	}), false, true, 2500)
 	assert_true(trail_calls.size() >= 2)
-	assert_eq(trail_calls[0], ["right", "up"])
+	assert_eq(trail_calls[0], [2, 11])
 
 func test_detector_substrate_populates_velocity_measurements_and_events() -> void:
 	for idx in range(5):

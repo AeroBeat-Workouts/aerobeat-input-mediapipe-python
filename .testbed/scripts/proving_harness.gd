@@ -306,7 +306,7 @@ func _connect_power_signal(signal_name: String) -> void:
 func _connect_flow_signal(signal_name: String) -> void:
 	if provider == null or not provider.has_signal(signal_name):
 		return
-	provider.connect(signal_name, func(placement: StringName, direction: StringName) -> void:
+	provider.connect(signal_name, func(placement: int, direction: int) -> void:
 		_last_flow_events[signal_name] = {
 			"placement": placement,
 			"direction": direction,
@@ -904,8 +904,8 @@ func _format_flow_event_row(event_name: String, hand_debug: Dictionary, ready_ma
 		status,
 		_event_count(event_name),
 		_last_seen_text(event_name),
-		String(meta.get("placement", &"-")),
-		String(meta.get("direction", &"-")),
+		_fmt_flow_index(meta.get("placement", -1), meta.get("placement_ui_label", 0), true),
+		_fmt_flow_index(meta.get("direction", -1), meta.get("direction_ui_label", 0), false),
 		_fmt_flow_candidate(hand_debug),
 		_fmt_flow_direction_candidate(hand_debug),
 		int(analysis.get("duration_ms", 0)),
@@ -941,8 +941,8 @@ func _format_flow_analysis_line(label: String, analysis_variant: Variant) -> Str
 		_fmt_float(analysis.get("directional_consistency", 0.0)),
 		_fmt_float(analysis.get("lane_spread", 0.0)),
 		_fmt_float(analysis.get("avg_confidence", 0.0)),
-		String(analysis.get("placement", &"-")),
-		String(analysis.get("direction", &"-")),
+		_fmt_flow_index(analysis.get("placement", -1), analysis.get("placement_ui_label", 0), true),
+		_fmt_flow_index(analysis.get("direction", -1), analysis.get("direction_ui_label", 0), false),
 	]
 
 func _format_flow_sanity_line(side: String, hand_debug: Dictionary) -> String:
@@ -956,12 +956,20 @@ func _format_flow_sanity_line(side: String, hand_debug: Dictionary) -> String:
 	]
 
 func _fmt_flow_candidate(hand_debug: Dictionary) -> String:
-	var candidate := String(hand_debug.get("placement_candidate", StringName()))
-	return candidate if candidate != "" else "-"
+	return _fmt_flow_index(hand_debug.get("placement_candidate", -1), hand_debug.get("placement_candidate_ui_label", 0), true)
 
 func _fmt_flow_direction_candidate(hand_debug: Dictionary) -> String:
-	var candidate := String(hand_debug.get("direction_candidate", StringName()))
-	return candidate if candidate != "" else "-"
+	return _fmt_flow_index(hand_debug.get("direction_candidate", -1), hand_debug.get("direction_candidate_ui_label", 0), false)
+
+func _fmt_flow_index(value_variant: Variant, ui_label_variant: Variant, is_placement: bool) -> String:
+	var value := int(value_variant)
+	if value < 0:
+		return "-"
+	var ui_label := int(ui_label_variant)
+	var suffix := ""
+	if is_placement and value == 12:
+		suffix = " center"
+	return "%d[u%d]%s" % [value, ui_label, suffix]
 
 func _build_events_text() -> String:
 	var lines := ["Live events", "==========="]
@@ -1010,7 +1018,7 @@ func _describe_last_flow_event(event_name: String) -> String:
 	if event_data.is_empty():
 		return "none"
 	var age_ms := Time.get_ticks_msec() - int(event_data.get("timestamp_ms", 0))
-	return "%s / %s (%dms ago)" % [String(event_data.get("placement", &"center")), String(event_data.get("direction", StringName())), age_ms]
+	return "%s / %s (%dms ago)" % [_fmt_flow_index(event_data.get("placement", -1), int(event_data.get("placement", -1)) + 1, true), _fmt_flow_index(event_data.get("direction", -1), int(event_data.get("direction", -1)) + 1, false), age_ms]
 
 func _trail_duration_ms(trail: Array) -> int:
 	if trail.size() < 2:

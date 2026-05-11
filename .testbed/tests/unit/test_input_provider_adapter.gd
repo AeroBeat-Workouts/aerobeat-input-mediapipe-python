@@ -16,11 +16,11 @@ func test_input_provider_adapter_reemits_flow_signals_from_provider() -> void:
 	var adapter = add_child_autoqfree(InputProviderAdapterScript.new())
 	adapter._ensure_provider()
 	var flow_calls: Array = []
-	adapter.swing_left.connect(func(placement: StringName, direction: StringName) -> void:
-		flow_calls.append([String(placement), String(direction)])
+	adapter.swing_left.connect(func(placement: int, direction: int) -> void:
+		flow_calls.append([placement, direction])
 	)
-	adapter._provider.swing_left.emit(&"left", &"up")
-	assert_eq(flow_calls, [["left", "up"]])
+	adapter._provider.swing_left.emit(12, 5)
+	assert_eq(flow_calls, [[12, 5]])
 
 func test_input_provider_adapter_reemits_boxing_signals_from_provider() -> void:
 	var adapter = add_child_autoqfree(InputProviderAdapterScript.new())
