@@ -120,11 +120,14 @@ Commit/push status: pending at plan-update time; final commit hash will be added
 - `.testbed/scripts/` only if a shared header helper truly needs a small change
 
 **Files Created/Deleted/Modified:**
-- Boxing proving scene/header layout files required by the fix
+- `.testbed/scenes/boxing_proving.tscn`
+- `.testbed/scripts/proving_harness.gd`
+- `.testbed/scripts/boxing_proving_harness.gd`
+- `.testbed/scripts/capture_fixture_proving.gd`
 
-**Status:** ⏳ Pending
+**Status:** ✅ Complete
 
-**Results:** Pending.
+**Results:** Reworked the Boxing header to follow the Flow shell direction: removed the root-positioned `HeaderIcon`, added `HeaderRow` under `Margin/VSplit/Header`, and placed both `HeaderIcon` and `TitleLabel` inside that horizontal row so the icon no longer sits on top of the title text (`REF-04`, `REF-05`). Kept the shared impact limited to node lookup resilience by switching title/icon lookups to `find_child(...)` where the new nested header structure required it (`REF-06`). Safe validation run: a focused Python assertion pass on `.testbed/scenes/boxing_proving.tscn` verified that `HeaderIcon` is no longer rooted at `.` and now lives under `Margin/VSplit/Header/HeaderRow`, plus `git diff --check` passed. Attempted headless Godot `--check-only` script validation, but this checkout resolves testbed preloads through an installed `res://addons/aerobeat-input-mediapipe-python/...` path that does not exist in the repo-only layout, so that parse path was not a truthful validation route for this slice.
 
 ---
 
@@ -145,9 +148,13 @@ Commit/push status: pending at plan-update time; final commit hash will be added
 **Files Created/Deleted/Modified:**
 - exact camera/preview/layout files required by the fix
 
-**Status:** ⏳ Pending
+**Status:** ✅ Complete
 
-**Results:** Pending.
+**Results:** Updated `.testbed/scripts/proving_harness.gd` so the runtime `MediaPipeCameraView` inherits the placeholder `CameraDisplay` layout contract (custom minimum size, layout mode, size flags, expand + stretch modes). This keeps live and prerecorded previews constrained to the intended panel bounds while preserving aspect ratio, preventing the TextureRect from expanding and squashing adjacent UI.
+
+Exact validation run:
+- `/home/derrick/.local/bin/godot --headless --path .testbed --script res://scripts/proving_harness.gd --check-only`
+- `git diff --check`
 
 ---
 

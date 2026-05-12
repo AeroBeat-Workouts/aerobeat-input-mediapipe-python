@@ -633,12 +633,21 @@ func _start_camera_feed() -> void:
 	camera_view.name = "CameraView"
 	camera_view.stream_url = "http://127.0.0.1:4243/camera"
 	camera_view.debug_logging = steady_state_console_debug
-	camera_view.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
-	camera_view.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	camera_view.flip_horizontal = _should_flip_horizontal_preview()
 	camera_view.show_overlay = false
 
 	var previous_display := camera_display
+	if previous_display:
+		camera_view.custom_minimum_size = previous_display.custom_minimum_size
+		camera_view.layout_mode = previous_display.layout_mode
+		camera_view.size_flags_horizontal = previous_display.size_flags_horizontal
+		camera_view.size_flags_vertical = previous_display.size_flags_vertical
+		camera_view.size_flags_stretch_ratio = previous_display.size_flags_stretch_ratio
+		camera_view.expand_mode = previous_display.expand_mode
+		camera_view.stretch_mode = previous_display.stretch_mode
+	else:
+		camera_view.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		camera_view.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	previous_display.replace_by(camera_view)
 	camera_display = camera_view
 	if landmark_drawer:
