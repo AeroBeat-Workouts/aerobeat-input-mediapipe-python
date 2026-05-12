@@ -42,16 +42,6 @@ grow_horizontal = 2
 grow_vertical = 2
 color = Color(0.05, 0.12, 0.22, 0.24)
 
-[node name="HeaderIcon" type="TextureRect" parent="." unique_id=946012489]
-custom_minimum_size = Vector2(34, 34)
-layout_mode = 0
-offset_left = 22.0
-offset_top = 22.0
-offset_right = 56.0
-offset_bottom = 56.0
-expand_mode = 1
-stretch_mode = 5
-
 [node name="Margin" type="MarginContainer" parent="." unique_id=567614309]
 layout_mode = 1
 anchors_preset = 15
@@ -73,9 +63,23 @@ layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 2
 
-[node name="TitleLabel" type="Label" parent="Margin/VSplit/Header" unique_id=594719029]
+[node name="HeaderRow" type="HBoxContainer" parent="Margin/VSplit/Header" unique_id=143640001]
 layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 10
+alignment = 1
+
+[node name="HeaderIcon" type="TextureRect" parent="Margin/VSplit/Header/HeaderRow" unique_id=946012489]
+custom_minimum_size = Vector2(34, 34)
+layout_mode = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="TitleLabel" type="Label" parent="Margin/VSplit/Header/HeaderRow" unique_id=594719029]
+layout_mode = 2
+size_flags_horizontal = 3
 text = "BOXING GESTURE DETECTION"
+vertical_alignment = 1
 
 [node name="StatusLabel" type="Label" parent="Margin/VSplit/Header" unique_id=751002113]
 layout_mode = 2

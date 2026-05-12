@@ -107,7 +107,7 @@ enum StartupMode {
 
 @onready var status_label: Label = get_node_or_null("Margin/VSplit/Header/StatusLabel") as Label
 @onready var live_status_label: RichTextLabel = get_node_or_null("Margin/VSplit/Header/LiveStatusLabel") as RichTextLabel
-@onready var title_label: Label = get_node_or_null("Margin/VSplit/Header/TitleLabel") as Label
+@onready var title_label: Label = find_child("TitleLabel", true, false) as Label
 @onready var notes_label: Label = get_node_or_null("Margin/VSplit/Header/NotesLabel") as Label
 @onready var camera_display: TextureRect = get_node_or_null("Margin/VSplit/Content/LeftColumn/CameraPanel/CameraDisplay") as TextureRect
 @onready var landmark_drawer: Control = find_child("LandmarkDrawer", true, false) as Control

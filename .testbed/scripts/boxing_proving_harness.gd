@@ -167,7 +167,7 @@ func _update_status(text: String, color: Color) -> void:
 
 func _resolve_boxing_shell_nodes() -> void:
 	_background_rect = get_node_or_null("Background") as TextureRect
-	_header_icon = get_node_or_null("HeaderIcon") as TextureRect
+	_header_icon = find_child("HeaderIcon", true, false) as TextureRect
 	_board_panel = get_node_or_null("Margin/VSplit/Content/RightPanelScroll/RightColumn/BoardPanel") as PanelContainer
 	_board_grid = get_node_or_null("Margin/VSplit/Content/RightPanelScroll/RightColumn/BoardPanel/BoardMargin/BoardGrid") as GridContainer
 

@@ -90,7 +90,7 @@ func _collect_harness_report(elapsed_ms: int, screenshot_path: String) -> Dictio
 
 	var status_label := _scene_root.get_node_or_null("Margin/VSplit/Header/StatusLabel") as Label
 	var live_status_label := _scene_root.get_node_or_null("Margin/VSplit/Header/LiveStatusLabel") as RichTextLabel
-	var title_label := _scene_root.get_node_or_null("Margin/VSplit/Header/TitleLabel") as Label
+	var title_label := _scene_root.find_child("TitleLabel", true, false) as Label
 	var notes_label := _scene_root.get_node_or_null("Margin/VSplit/Header/NotesLabel") as Label
 	var quick_stats_label := _scene_root.get_node_or_null("Margin/VSplit/Content/LeftColumn/QuickStatsPanel/QuickStats") as RichTextLabel
 	var summary_label := _scene_root.get_node_or_null("Margin/VSplit/Content/RightPanelScroll/RightColumn/SummaryPanel/Summary") as RichTextLabel
