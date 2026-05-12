@@ -1,7 +1,7 @@
 {
   "app": "aerobeat-crash-test-matrix",
   "version": 2,
-  "generatedAt": "2026-05-12T01:03:36.624Z",
+  "generatedAt": "2026-05-12T11:49:45.187Z",
   "combos": [
     {
       "id": "boxing__live_camera__TRACKING__normal_stop",
@@ -426,7 +426,7 @@
   ],
   "state": {
     "version": 2,
-    "updatedAt": "2026-05-12T00:59:47.474Z",
+    "updatedAt": "2026-05-12T11:44:04.205Z",
     "rows": {
       "boxing__live_camera__TRACKING__normal_stop": {
         "tested": true,
@@ -441,22 +441,22 @@
         "notes": "clean close"
       },
       "boxing__live_camera__TRACKING__normal_stop+skip_terminate_sync": {
-        "tested": false,
+        "tested": true,
         "crashed": false,
         "badWindowOnly": false,
-        "notes": ""
+        "notes": "clean close"
       },
       "boxing__live_camera__TRACKING__normal_stop+skip_linux_pkill_main_py": {
-        "tested": false,
+        "tested": true,
         "crashed": false,
         "badWindowOnly": false,
-        "notes": ""
+        "notes": "clean close"
       },
       "boxing__live_camera__TRACKING__normal_stop+skip_terminate_sync+skip_linux_pkill_main_py": {
-        "tested": false,
+        "tested": true,
         "crashed": false,
         "badWindowOnly": false,
-        "notes": ""
+        "notes": "clean close"
       },
       "boxing__live_camera__PREVIEW_ONLY_DEBUG__normal_stop": {
         "tested": true,
@@ -471,22 +471,22 @@
         "notes": "  ERROR: platform/linuxbsd/x11/display_server_x11.cpp:1310 - Unhandled XServer error: BadWindow (invalid Window parameter)\n  ERROR:    Major opcode of failed request: 25\n  ERROR:    Serial number of failed request: 0\n  ERROR:    Current serial number in output stream: 153394\n"
       },
       "boxing__live_camera__PREVIEW_ONLY_DEBUG__normal_stop+skip_terminate_sync": {
-        "tested": false,
+        "tested": true,
         "crashed": false,
-        "badWindowOnly": false,
-        "notes": ""
+        "badWindowOnly": true,
+        "notes": "  ERROR: platform/linuxbsd/x11/display_server_x11.cpp:1310 - Unhandled XServer error: BadWindow (invalid Window parameter)\n  ERROR:    Major opcode of failed request: 25\n  ERROR:    Serial number of failed request: 0\n  ERROR:    Current serial number in output stream: 140391\n"
       },
       "boxing__live_camera__PREVIEW_ONLY_DEBUG__normal_stop+skip_linux_pkill_main_py": {
-        "tested": false,
+        "tested": true,
         "crashed": false,
         "badWindowOnly": false,
-        "notes": ""
+        "notes": "clean close"
       },
       "boxing__live_camera__PREVIEW_ONLY_DEBUG__normal_stop+skip_terminate_sync+skip_linux_pkill_main_py": {
-        "tested": false,
+        "tested": true,
         "crashed": false,
         "badWindowOnly": false,
-        "notes": ""
+        "notes": "clean close"
       },
       "boxing__live_camera__GODOT_ONLY_DEBUG__normal_stop": {
         "tested": true,
@@ -501,22 +501,22 @@
         "notes": "  ERROR: platform/linuxbsd/x11/display_server_x11.cpp:1310 - Unhandled XServer error: BadWindow (invalid Window parameter)\n  ERROR:    Major opcode of failed request: 25\n  ERROR:    Serial number of failed request: 0\n  ERROR:    Current serial number in output stream: 183938\n"
       },
       "boxing__live_camera__GODOT_ONLY_DEBUG__normal_stop+skip_terminate_sync": {
-        "tested": false,
+        "tested": true,
         "crashed": false,
         "badWindowOnly": false,
-        "notes": ""
+        "notes": "clean close"
       },
       "boxing__live_camera__GODOT_ONLY_DEBUG__normal_stop+skip_linux_pkill_main_py": {
-        "tested": false,
+        "tested": true,
         "crashed": false,
-        "badWindowOnly": false,
-        "notes": ""
+        "badWindowOnly": true,
+        "notes": "  ERROR: platform/linuxbsd/x11/display_server_x11.cpp:1310 - Unhandled XServer error: BadWindow (invalid Window parameter)\n  ERROR:    Major opcode of failed request: 25\n  ERROR:    Serial number of failed request: 0\n  ERROR:    Current serial number in output stream: 276314"
       },
       "boxing__live_camera__GODOT_ONLY_DEBUG__normal_stop+skip_terminate_sync+skip_linux_pkill_main_py": {
-        "tested": false,
+        "tested": true,
         "crashed": false,
-        "badWindowOnly": false,
-        "notes": ""
+        "badWindowOnly": true,
+        "notes": "  ERROR: platform/linuxbsd/x11/display_server_x11.cpp:1310 - Unhandled XServer error: BadWindow (invalid Window parameter)\n  ERROR:    Major opcode of failed request: 25\n  ERROR:    Serial number of failed request: 0\n  ERROR:    Current serial number in output stream: 291336"
       },
       "boxing__prerecorded_video__TRACKING__normal_stop": {
         "tested": true,
@@ -651,22 +651,22 @@
         "notes": "  ERROR: platform/linuxbsd/x11/display_server_x11.cpp:1310 - Unhandled XServer error: BadWindow (invalid Window parameter)\n  ERROR:    Major opcode of failed request: 25\n  ERROR:    Serial number of failed request: 0\n  ERROR:    Current serial number in output stream: 85099\n"
       },
       "flow__live_camera__PREVIEW_ONLY_DEBUG__normal_stop+skip_terminate_sync": {
-        "tested": false,
+        "tested": true,
         "crashed": false,
         "badWindowOnly": false,
-        "notes": ""
+        "notes": "clean close"
       },
       "flow__live_camera__PREVIEW_ONLY_DEBUG__normal_stop+skip_linux_pkill_main_py": {
-        "tested": false,
+        "tested": true,
         "crashed": false,
         "badWindowOnly": false,
-        "notes": ""
+        "notes": "clean close"
       },
       "flow__live_camera__PREVIEW_ONLY_DEBUG__normal_stop+skip_terminate_sync+skip_linux_pkill_main_py": {
-        "tested": false,
+        "tested": true,
         "crashed": false,
-        "badWindowOnly": false,
-        "notes": ""
+        "badWindowOnly": true,
+        "notes": "  ERROR: platform/linuxbsd/x11/display_server_x11.cpp:1310 - Unhandled XServer error: BadWindow (invalid Window parameter)\n  ERROR:    Major opcode of failed request: 25\n  ERROR:    Serial number of failed request: 0\n  ERROR:    Current serial number in output stream: 812767"
       },
       "flow__live_camera__GODOT_ONLY_DEBUG__normal_stop": {
         "tested": true,
@@ -681,22 +681,22 @@
         "notes": "clean close"
       },
       "flow__live_camera__GODOT_ONLY_DEBUG__normal_stop+skip_terminate_sync": {
-        "tested": false,
+        "tested": true,
         "crashed": false,
         "badWindowOnly": false,
-        "notes": ""
+        "notes": "clean close"
       },
       "flow__live_camera__GODOT_ONLY_DEBUG__normal_stop+skip_linux_pkill_main_py": {
-        "tested": false,
+        "tested": true,
         "crashed": false,
         "badWindowOnly": false,
-        "notes": ""
+        "notes": "clean close"
       },
       "flow__live_camera__GODOT_ONLY_DEBUG__normal_stop+skip_terminate_sync+skip_linux_pkill_main_py": {
-        "tested": false,
+        "tested": true,
         "crashed": false,
         "badWindowOnly": false,
-        "notes": ""
+        "notes": "clean close"
       },
       "flow__prerecorded_video__TRACKING__normal_stop": {
         "tested": true,
