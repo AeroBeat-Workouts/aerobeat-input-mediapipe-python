@@ -2822,6 +2822,45 @@ Use this section as the operator-facing checklist for the next focused reruns. T
 
 **Results:** Scoped layout/readability fix completed in `.testbed/.crash-test/crash-test.html`. The focused shutdown-ladder table now has a dedicated `.ladder-table` class with a narrower `min-width` (`1220px` instead of inheriting the global `1350px` table minimum), the `Effective shutdown mode` header/cells now use an `effective-mode-column` width cap (`16ch`), and the effective-mode `<code>` content now wraps cleanly via `white-space: normal` plus `overflow-wrap: anywhere` instead of forcing the ladder table overly wide. This preserves the focused ladder content and behavior while giving the columns to the left more room. Safe validation passed with `python3` string-assert checks against the updated HTML structure/CSS plus `git diff --check`. Landed in commit `1ea1ac7` (`Tighten crash test ladder mode column`) and pushed to `origin/main`; bead closure completed after the push.
 
+### Task 111: Audit recent crash-hunt commits for unintended control-path behavior changes
+
+**Bead ID:** `oc-sksc`
+**SubAgent:** `primary` (for `research` workflow role)
+**Role:** `research`
+**References:** `REF-18`, `REF-20`
+**Prompt:** Claim bead `oc-sksc` with `bd update oc-sksc --status in_progress --json`. Audit the recent crash-hunt commits after the completed 60-row matrix to determine whether any actual runtime/shutdown behavior changed on the default control path beyond wrapping new branches behind debug/isolation flags. Derrick’s current control case is Flow + TRACKING + show landmarks + show trails + no shutdown booleans enabled, and he has not yet reproduced the Zorin GUI crash in repeated reruns. Inspect the exact recent commits and answer whether the no-flags control path is behaviorally unchanged, or whether any unconditional code-path changes could plausibly affect crash frequency. Update the active plan with truthful findings, keep scope to diff/audit only, and close the bead with a concise reason when complete.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- source files only for reading
+
+**Files Created/Deleted/Modified:**
+- plan updates / audit notes only
+
+**Status:** ✅ Complete
+
+**Results:** Audited the post-matrix crash-hunt commits and separated runtime-impacting changes from tracker/plan churn. `d0058ca`, `1ea1ac7`, `0de0d23`, `fddfaa3`, and `b559ce2` are tracker/plan/state-file updates only, with no runtime or shutdown-path effect on Derrick’s Flow + `TRACKING` + landmarks/trails-on control run. `87be0df` and adjacent runtime commits only add new debug/isolation branches for `skip_sidecar_terminate_kill_escalation_on_close_debug` / `skip_linux_video0_fuser_cleanup_on_close_debug` plus stop-mode labeling; with all shutdown booleans left false, the control path still takes the same launcher `terminate_sync(... allow_kill_escalation=true)` and Linux cleanup branches as before. The one meaningful unconditional close-path change lives earlier in `2f40d25`/`fb037e7`: Linux `normal_stop` teardown now always runs the extra broad `pkill -9 -f main.py` plus `/dev/video0` `fuser -k -9` cleanup in addition to launcher terminate + targeted `python_mediapipe/main.py` kill. That could plausibly affect crash frequency, but it predates the completed 60-row matrix and was already part of the control path during Derrick’s current reruns. Net: post-matrix commits did not change the no-flags control path; current non-repros are not explained by a fresh hidden control-path change in those commits.
+
+### Task 112: Match focused shutdown-ladder Notes column width to original matrix usability
+
+**Bead ID:** `oc-v3ve`
+**SubAgent:** `primary` (for `coder` workflow role)
+**Role:** `coder`
+**References:** `REF-04`
+**Prompt:** Claim bead `oc-v3ve` with `bd update oc-v3ve --status in_progress --json`. Fix the new focused shutdown-ladder section in `.testbed/.crash-test/crash-test.html` so the `Notes` column has usable width comparable to the original completed-matrix section. Current user screenshot shows the focused ladder notes textarea is effectively unusable because the table layout squeezes it far narrower than the original tracker. Keep scope tightly limited to the focused ladder layout/usability, preserve the recent effective-mode wrapping improvement, update the active plan with results, run safe validation, commit/push, and close the bead with a concise reason when complete.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- `.testbed/.crash-test/`
+
+**Files Created/Deleted/Modified:**
+- `.testbed/.crash-test/crash-test.html`
+- `.plans/2026-05-08-cookie-boxing-ui-missing-and-close-crash.md`
+
+**Status:** ✅ Complete
+
+**Results:** Focused ladder Notes usability fix completed in `.testbed/.crash-test/crash-test.html` without touching the original 60-row matrix table. The ladder table now uses `table-layout: fixed` and explicit ladder-only column sizing so the wide explanatory columns stop stealing all remaining space from Notes: added `.rung-column` (`19ch`), kept the wrapped `.effective-mode-column` (`16ch`), added `.inspector-column` (`22ch`), `.isolates-column` (`24ch`), and a ladder-only `.notes-column` sized to `30%` / `30ch`. The ladder header and row markup now tag those columns explicitly, and inspector-setting `<code>` entries now share the same wrap-safe treatment as the effective-mode column so the earlier wrapping improvement stays intact while Notes gets a predictable wide remainder column again. Safe validation passed with a `python3` HTML string-assert check confirming the new ladder-only layout hooks/classes plus `git diff --check -- .testbed/.crash-test/crash-test.html .plans/2026-05-08-cookie-boxing-ui-missing-and-close-crash.md`. Commit/push details to follow in this task result after landing.
+
 ## Final Results
 
 **Status:** ⚠️ Partial

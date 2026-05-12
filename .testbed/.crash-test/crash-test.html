@@ -232,6 +232,11 @@
 
     .ladder-table {
       min-width: 1220px;
+      table-layout: fixed;
+    }
+
+    .ladder-table .rung-column {
+      width: 19ch;
     }
 
     .ladder-table .effective-mode-column {
@@ -239,7 +244,21 @@
       max-width: 16ch;
     }
 
-    .ladder-table .effective-mode-cell code {
+    .ladder-table .inspector-column {
+      width: 22ch;
+    }
+
+    .ladder-table .isolates-column {
+      width: 24ch;
+    }
+
+    .ladder-table .notes-column {
+      width: 30%;
+      min-width: 30ch;
+    }
+
+    .ladder-table .effective-mode-cell code,
+    .ladder-table .inspector-settings code {
       display: inline-block;
       max-width: 100%;
       white-space: normal;
@@ -459,14 +478,14 @@
               <thead>
                 <tr>
                   <th class="nowrap">#</th>
-                  <th>Rung</th>
+                  <th class="rung-column">Rung</th>
                   <th class="effective-mode-column">Effective shutdown mode</th>
-                  <th>Inspector settings to flip</th>
-                  <th>What this isolates</th>
+                  <th class="inspector-column">Inspector settings to flip</th>
+                  <th class="isolates-column">What this isolates</th>
                   <th class="checkbox-cell">Tested</th>
                   <th class="checkbox-cell">Crashed</th>
                   <th class="checkbox-cell">Bad window only</th>
-                  <th>Notes</th>
+                  <th class="notes-column">Notes</th>
                 </tr>
               </thead>
               <tbody id="shutdown-ladder-rows"></tbody>
@@ -770,16 +789,16 @@
 
         tr.innerHTML = `
           <td class="nowrap">${rung.index}</td>
-          <td>
+          <td class="rung-column">
             <div class="combo">
               <strong>${rung.label}</strong>
             </div>
           </td>
           <td class="effective-mode-cell effective-mode-column"><code>${rung.effectiveMode}</code></td>
-          <td>
-            <div class="combo">${rung.inspectorSettings.map((setting) => `<span><code>${setting}</code></span>`).join("")}</div>
+          <td class="inspector-column">
+            <div class="combo inspector-settings">${rung.inspectorSettings.map((setting) => `<span><code>${setting}</code></span>`).join("")}</div>
           </td>
-          <td class="tiny">${rung.isolates}</td>
+          <td class="tiny isolates-column">${rung.isolates}</td>
           <td class="checkbox-cell">
             <label class="checkbox-wrap"><input type="checkbox" data-section="focusedShutdownRows" data-id="${rung.id}" data-field="tested" ${rowState.tested ? "checked" : ""}></label>
           </td>
@@ -789,7 +808,7 @@
           <td class="checkbox-cell">
             <label class="checkbox-wrap"><input type="checkbox" data-section="focusedShutdownRows" data-id="${rung.id}" data-field="badWindowOnly" ${rowState.badWindowOnly ? "checked" : ""}></label>
           </td>
-          <td>
+          <td class="notes-column">
             <textarea class="notes" data-section="focusedShutdownRows" data-id="${rung.id}" data-field="notes" placeholder="What happened on this rung? crash? dirty rerun? cleanup evidence?">${escapeHtml(rowState.notes)}</textarea>
           </td>
         `;
