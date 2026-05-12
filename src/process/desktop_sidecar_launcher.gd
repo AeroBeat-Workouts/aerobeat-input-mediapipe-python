@@ -251,8 +251,9 @@ static func terminate(context: Node, info: Dictionary, termination_timeout_ms: i
 			result["notes"] = PackedStringArray(["No platform-aware launch strategy was recorded for this sidecar process."])
 			return result
 
-static func terminate_sync(info: Dictionary) -> Dictionary:
+static func terminate_sync(info: Dictionary, options: Dictionary = {}) -> Dictionary:
 	var pid := int(info.get("pid", -1))
+	var allow_kill_escalation := bool(options.get("allow_kill_escalation", true))
 	var result: Dictionary = {
 		"stopped": false,
 		"strategy": String(info.get("strategy", "")),
@@ -270,21 +271,21 @@ static func terminate_sync(info: Dictionary) -> Dictionary:
 			var output: Array = []
 			OS.execute("/bin/kill", PackedStringArray(["-TERM", "-" + str(group_id)]), output, true)
 			OS.delay_msec(300)
-			if is_process_alive(info):
+			if allow_kill_escalation and is_process_alive(info):
 				OS.execute("/bin/kill", PackedStringArray(["-KILL", "-" + str(group_id)]), output, true)
 				OS.delay_msec(100)
 		"macos-direct-pid":
 			var mac_output: Array = []
 			OS.execute("/bin/kill", PackedStringArray(["-TERM", str(pid)]), mac_output, true)
 			OS.delay_msec(300)
-			if is_process_alive(info):
+			if allow_kill_escalation and is_process_alive(info):
 				OS.execute("/bin/kill", PackedStringArray(["-KILL", str(pid)]), mac_output, true)
 				OS.delay_msec(100)
 		"windows-direct-pid":
 			var windows_output: Array = []
 			OS.execute("taskkill", PackedStringArray(["/PID", str(pid), "/T"]), windows_output, true)
 			OS.delay_msec(300)
-			if is_process_alive(info):
+			if allow_kill_escalation and is_process_alive(info):
 				OS.execute("taskkill", PackedStringArray(["/PID", str(pid), "/T", "/F"]), windows_output, true)
 				OS.delay_msec(100)
 

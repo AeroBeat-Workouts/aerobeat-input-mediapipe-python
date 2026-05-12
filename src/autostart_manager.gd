@@ -35,7 +35,9 @@ signal mediapipe_not_found
 @export var debug_logging: bool = false
 @export var skip_sidecar_stop_on_close_debug: bool = false
 @export var skip_sidecar_terminate_sync_on_close_debug: bool = false
+@export var skip_sidecar_terminate_kill_escalation_on_close_debug: bool = false
 @export var skip_linux_pkill_main_py_on_close_debug: bool = false
+@export var skip_linux_video0_fuser_cleanup_on_close_debug: bool = false
 
 var python_path: String = ""
 var server_pid: int = -1
@@ -176,8 +178,12 @@ func _get_close_path_stop_mode_label() -> String:
 	var parts: PackedStringArray = ["normal_stop"]
 	if skip_sidecar_terminate_sync_on_close_debug:
 		parts.append("skip_terminate_sync")
+	elif skip_sidecar_terminate_kill_escalation_on_close_debug:
+		parts.append("skip_terminate_kill_escalation")
 	if OS.get_name() == "Linux" and skip_linux_pkill_main_py_on_close_debug:
 		parts.append("skip_linux_pkill_main_py")
+	if OS.get_name() == "Linux" and skip_linux_video0_fuser_cleanup_on_close_debug:
+		parts.append("skip_linux_video0_fuser")
 	return "+".join(parts)
 
 func _run_linux_cleanup_patterns() -> void:
@@ -189,8 +195,11 @@ func _run_linux_cleanup_patterns() -> void:
 		OS.delay_msec(100)
 		OS.execute("pkill", ["-9", "-f", "main.py"], output, false)
 		OS.delay_msec(100)
-	OS.execute("fuser", ["-k", "-9", "/dev/video0"], output, false)
-	OS.delay_msec(100)
+	if skip_linux_video0_fuser_cleanup_on_close_debug:
+		_debug_log("Close-path debug enabled: skipping Linux /dev/video0 fuser cleanup")
+	else:
+		OS.execute("fuser", ["-k", "-9", "/dev/video0"], output, false)
+		OS.delay_msec(100)
 
 func _cleanup_server_state() -> void:
 	if _heartbeat_udp:
@@ -494,7 +503,11 @@ func _stop_sync() -> void:
 	if skip_sidecar_terminate_sync_on_close_debug:
 		_debug_log("Close-path debug enabled: skipping DesktopSidecarLauncher.terminate_sync(_launch_info)")
 	else:
-		_desktop_sidecar_launcher().terminate_sync(_launch_info)
+		if skip_sidecar_terminate_kill_escalation_on_close_debug:
+			_debug_log("Close-path debug enabled: launcher stop will send TERM only and skip forced KILL escalation")
+		_desktop_sidecar_launcher().terminate_sync(_launch_info, {
+			"allow_kill_escalation": not skip_sidecar_terminate_kill_escalation_on_close_debug,
+		})
 	if OS.get_name() == "Linux":
 		_run_linux_cleanup_patterns()
 	_cleanup_server_state()

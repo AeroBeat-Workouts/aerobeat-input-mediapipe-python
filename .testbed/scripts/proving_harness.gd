@@ -101,7 +101,9 @@ enum StartupMode {
 @export var shutdown_console_debug := false
 @export var skip_sidecar_stop_on_close_debug := false
 @export var skip_sidecar_terminate_sync_on_close_debug := false
+@export var skip_sidecar_terminate_kill_escalation_on_close_debug := false
 @export var skip_linux_pkill_main_py_on_close_debug := false
+@export var skip_linux_video0_fuser_cleanup_on_close_debug := false
 
 @onready var status_label: Label = get_node_or_null("Margin/VSplit/Header/StatusLabel") as Label
 @onready var live_status_label: RichTextLabel = get_node_or_null("Margin/VSplit/Header/LiveStatusLabel") as RichTextLabel
@@ -183,10 +185,15 @@ func _setup_auto_start() -> void:
 	auto_start_manager.debug_logging = steady_state_console_debug or shutdown_console_debug
 	auto_start_manager.skip_sidecar_stop_on_close_debug = skip_sidecar_stop_on_close_debug
 	auto_start_manager.skip_sidecar_terminate_sync_on_close_debug = skip_sidecar_terminate_sync_on_close_debug
+	auto_start_manager.skip_sidecar_terminate_kill_escalation_on_close_debug = skip_sidecar_terminate_kill_escalation_on_close_debug
 	auto_start_manager.skip_linux_pkill_main_py_on_close_debug = skip_linux_pkill_main_py_on_close_debug
+	auto_start_manager.skip_linux_video0_fuser_cleanup_on_close_debug = skip_linux_video0_fuser_cleanup_on_close_debug
 	if skip_sidecar_stop_on_close_debug:
 		print("[ProvingHarness][%s] Close-path isolation enabled: AutoStartManager will skip normal sidecar stop on close/scene teardown; heartbeat timeout should stop it after exit" % _mode_name())
-	elif skip_sidecar_terminate_sync_on_close_debug or skip_linux_pkill_main_py_on_close_debug:
+	elif skip_sidecar_terminate_sync_on_close_debug \
+		or skip_sidecar_terminate_kill_escalation_on_close_debug \
+		or skip_linux_pkill_main_py_on_close_debug \
+		or skip_linux_video0_fuser_cleanup_on_close_debug:
 		print("[ProvingHarness][%s] Narrow close-path debug enabled: stop_mode=%s" % [_mode_name(), _get_close_path_stop_mode_label()])
 
 	auto_start_manager.server_started.connect(_on_server_started)
@@ -1355,8 +1362,12 @@ func _get_close_path_stop_mode_label() -> String:
 	var parts: PackedStringArray = ["normal_stop"]
 	if skip_sidecar_terminate_sync_on_close_debug:
 		parts.append("skip_terminate_sync")
+	elif skip_sidecar_terminate_kill_escalation_on_close_debug:
+		parts.append("skip_terminate_kill_escalation")
 	if skip_linux_pkill_main_py_on_close_debug:
 		parts.append("skip_linux_pkill_main_py")
+	if skip_linux_video0_fuser_cleanup_on_close_debug:
+		parts.append("skip_linux_video0_fuser")
 	return "+".join(parts)
 
 func _log_shutdown_summary_once(reason: String) -> void:

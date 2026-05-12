@@ -2367,6 +2367,116 @@ Safe validation only: `git diff --check -- .testbed/.crash-test/crash-test.html`
 
 **Results:** Coder pass completed. The crash-test page now treats adjacent-file sync as explicit manual opt-in only and keeps startup strictly local-only under `file://`. The fix stayed scoped to `.testbed/.crash-test/crash-test.html`: added a file-origin/capability guard, replaced the single create-only picker flow with a link-or-create flow, added explicit permission checks for read/write handles, prevented background autosave from attempting linked-file writes unless permission is already granted, and updated the startup/status copy so the page clearly states that it will not auto-load adjacent files on boot. Local `localStorage` autosave behavior was preserved, while manual linked-file read/write still works when the browser grants File System Access permissions. Safe validation only: `git diff --check -- .testbed/.crash-test/crash-test.html` passed; a Node-based offline script-boot smoke test verified the page still initializes with `file://` semantics, restores local state text, renders the 24-row matrix summary, and shows the new local-only startup message instead of trying to touch adjacent files during boot.
 
+### Task 102: Research the next deeper `normal_stop` teardown split for live crash reruns
+
+**Bead ID:** `oc-s0a4`
+**SubAgent:** `primary` (for `research` workflow role)
+**Role:** `research`
+**References:** `REF-18`, `REF-20`
+**Prompt:** Claim bead `oc-s0a4` with `bd update oc-s0a4 --status in_progress --json`, then inspect the current `normal_stop` teardown implementation in `src/autostart_manager.gd`, `src/desktop_sidecar_launcher.gd`, and any directly-related proving harness toggle surface. Design the smallest next series of live crash tests Derrick can run to further reduce the pool of suspect shutdown calls. The goal is not a wider matrix; it is a deeper split inside `normal_stop` itself. Propose the exact next toggle ladder, identify which calls/ordering edges each test isolates, and update the active plan with truthful findings. Close the bead with a concise reason when done.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- `src/`
+- `.testbed/scripts/` only if tiny reference instrumentation is required
+
+**Files Created/Deleted/Modified:**
+- plan updates only unless a tiny truth-revealing probe is required
+
+**Status:** ✅ Complete
+
+**Results:** Research completed and bead `oc-s0a4` should close. Current `normal_stop` is still too coarse in one critical place: the proving-harness surface can already skip the whole close path (`heartbeat_only`), skip launcher stop (`skip_terminate_sync`), or skip the repo-side sidecar `pkill` pair (`skip_linux_pkill_main_py`), but the hottest remaining suspect cluster inside plain `normal_stop` is still bundled as `DesktopSidecarLauncher.terminate_sync(_launch_info)` **TERM wait 300ms -> optional process-group KILL -> then** Linux cleanup `pkill -9 -f python_mediapipe/main.py` -> `pkill -9 -f main.py` -> `fuser -k -9 /dev/video0`. In `src/autostart_manager.gd`, `_stop_sync()` always does `_stop_heartbeat()` -> `OS.delay_msec(200)` before that bundled stop cluster, then `_cleanup_server_state()`. In `src/process/desktop_sidecar_launcher.gd`, `terminate_sync()` itself still bundles graceful TERM and forced KILL together, so today’s `skip_terminate_sync` toggle removes **both** phases at once and cannot answer whether the crash needs the forced escalation specifically. Likewise `skip_linux_pkill_main_py` truthfully removes the two sidecar-targeting `pkill` patterns, but it still leaves `fuser -k -9 /dev/video0` coupled into the same post-launcher cleanup rung.
+
+Smallest next live ladder: keep the matrix fixed and only split the plain `normal_stop` row on the hottest already-proven surface first: **Flow + live_camera + PREVIEW_ONLY_DEBUG**, with **Flow + live_camera + TRACKING** only as secondary confirmation if needed. Proposed next rungs, in order: **(1)** baseline `normal_stop` to confirm the current hot repro is still alive; **(2)** `normal_stop + TERM-only launcher stop` (keep `terminate_sync` entry, but disable its KILL escalation) to isolate whether the crash already happens on graceful process-group terminate versus only when forced KILL is introduced; **(3)** `normal_stop + skip launcher KILL escalation + keep existing Linux cleanup` to prove whether launcher escalation alone is sufficient while preserving downstream cleanup ordering; **(4)** `normal_stop + keep launcher TERM/KILL exactly as-is + skip repo-side pkill pair` (existing narrow pkill rung) to re-check whether the secondary sidecar kill wave is actually required on the hottest Flow surface; **(5)** if needed after that, split the remaining Linux cleanup one more step so `fuser -k -9 /dev/video0` can be isolated from the sidecar-targeting `pkill` pair instead of staying bundled with “repo Linux cleanup.”
+
+What each rung isolates: rung 2 isolates **TERM vs TERM+KILL inside launcher-managed stop**; rung 3 isolates whether **forced process-group KILL** is the destabilizer while everything after launcher stop stays unchanged; rung 4 isolates **launcher-managed stop vs repo-owned sidecar `pkill` cleanup**; rung 5 isolates **repo-side sidecar kills vs `/dev/video0` `fuser` cleanup**. This is smaller and sharper than widening scenes/sources/startup modes again because the completed 60-row matrix already proved the remaining failure family lives in shared `normal_stop`, not in proving playback broadly. One additional concrete follow-on task was identified beyond the already-planned Task 103/104/105 chain: if the next source split still leaves ambiguity, add a later tiny toggle that separates `fuser -k -9 /dev/video0` from the sidecar-targeting `pkill` pair, because those are still coupled today under `_run_linux_cleanup_patterns()`.
+
+### Task 103: Implement finer-grained `normal_stop` isolation toggles for the next live rerun ladder
+
+**Bead ID:** `oc-9343`
+**SubAgent:** `primary` (for `coder` workflow role)
+**Role:** `coder`
+**References:** `REF-18`, `REF-20`
+**Prompt:** Claim bead `oc-9343` with `bd update oc-9343 --status in_progress --json` after `oc-s0a4` is complete. Implement the smallest truthful source changes needed so Derrick can run the newly designed deeper `normal_stop` test ladder from the proving scene without shell hacks. Focus on splitting the shared normal shutdown path more finely — likely TERM-only vs forced escalation, and launcher stop vs repo-level Linux cleanup timing — while keeping the current repro surfaces intact. Update the active plan with exactly what changed, run all relevant repo-local validation you can, commit/push before handoff, and close the bead with a concise reason when done.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- `src/`
+- `.testbed/scripts/`
+- `.testbed/.crash-test/` only if the new ladder needs a truthful tracker update
+
+**Files Created/Deleted/Modified:**
+- `src/autostart_manager.gd`
+- `src/process/desktop_sidecar_launcher.gd`
+- `.testbed/scripts/proving_harness.gd`
+- `.plans/2026-05-08-cookie-boxing-ui-missing-and-close-crash.md`
+
+**Status:** ✅ Complete
+
+**Results:** Coder pass completed for bead `oc-9343`. The shutdown split stayed tight to the owning close-path surfaces and added two new Inspector-driveable knobs on top of the already-landed broad/narrow skips. In `.testbed/scripts/proving_harness.gd` and `src/autostart_manager.gd`, the new export `skip_sidecar_terminate_kill_escalation_on_close_debug` now keeps launcher-managed stop active but tells `DesktopSidecarLauncher.terminate_sync(...)` to send only its initial `TERM` and skip the later forced `KILL` escalation. In the same files, the new export `skip_linux_video0_fuser_cleanup_on_close_debug` now skips only the repo-owned `fuser -k -9 /dev/video0` cleanup while preserving the rest of normal stop. `src/process/desktop_sidecar_launcher.gd` was updated narrowly so `terminate_sync(info, options)` accepts `allow_kill_escalation` without changing the default behavior for existing callers.
+
+This means Derrick can now drive all of the intended next teardown branches from the proving-scene Inspector without shell hacks: plain `normal_stop`; `normal_stop+skip_terminate_kill_escalation` (launcher TERM-only while later Linux cleanup stays intact); `normal_stop+skip_terminate_kill_escalation+skip_linux_pkill_main_py+skip_linux_video0_fuser` (pure launcher TERM-only branch); existing `normal_stop+skip_linux_pkill_main_py`; and, if needed, `normal_stop+skip_linux_video0_fuser` or `normal_stop+skip_linux_pkill_main_py+skip_linux_video0_fuser` to split the repo Linux cleanup one level deeper. I intentionally did **not** widen `.testbed/.crash-test/crash-test.html` for this coder pass, because the tracker was just stabilized as the readable 60-row high-level matrix and adding every deeper teardown combination there right now would bloat that surface more than it would clarify the next focused live ladder.
+
+Terminal-safe validation only: `~/.local/bin/godot --headless --path .testbed --check-only --script scripts/proving_harness.gd`; `~/.local/bin/godot --headless --path .testbed --import --quit-after 1000`; and `git diff --check` all passed. No risky proving-scene close-path repros were run in this coder pass.
+
+### Task 104: QA the narrowed `normal_stop` crash-test ladder readiness
+
+**Bead ID:** `oc-hv0f`
+**SubAgent:** `primary` (for `qa` workflow role)
+**Role:** `qa`
+**References:** `REF-18`, `REF-20`
+**Prompt:** Claim bead `oc-hv0f` with `bd update oc-hv0f --status in_progress --json` after `oc-9343` is complete. Independently verify in the strongest safe validation scope available that the new narrower `normal_stop` ladder is actually understandable and ready for Derrick’s live reruns. QA should explicitly confirm which exact shutdown calls each rung isolates, what still remains coupled, and whether the operator flow is clear enough to avoid dirty/ambiguous reruns. Update the plan truthfully and close the bead with a concise reason when done.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+
+**Files Created/Deleted/Modified:**
+- plan updates / verification notes only unless a truthful docs correction is required
+
+**Status:** ⏳ Pending
+
+**Results:** Pending.
+
+### Task 105: Audit the narrowed `normal_stop` crash ladder before Derrick’s next live reruns
+
+**Bead ID:** `oc-0v45`
+**SubAgent:** `primary` (for `auditor` workflow role)
+**Role:** `auditor`
+**References:** `REF-18`, `REF-20`
+**Prompt:** Claim bead `oc-0v45` with `bd update oc-0v45 --status in_progress --json` after `oc-hv0f` is complete. Audit the final diff, validation evidence, and plan updates for the new `normal_stop` split. Confirm whether the next live tests really reduce the pool of suspect shutdown calls, what exact suspects remain after this source split, and whether the branch is ready for Derrick’s live reruns. Update the plan with a truthful pass/fail conclusion and close the bead if it passes.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+
+**Files Created/Deleted/Modified:**
+- plan updates / audit notes only
+
+**Status:** ⏳ Pending
+
+**Results:** Pending.
+
+### Task 106: If needed, split Linux `/dev/video0` cleanup from sidecar-targeting `pkill` cleanup
+
+**Bead ID:** `Folded into oc-9343`
+**SubAgent:** `primary` (for `coder` workflow role)
+**Role:** `coder`
+**References:** `REF-18`, `REF-20`
+**Prompt:** If the next `normal_stop` reruns still leave ambiguity after launcher TERM/KILL and repo-side `pkill` have been split, implement the smallest additional debug toggle so `/dev/video0` cleanup via `fuser -k -9 /dev/video0` can be isolated from the sidecar-targeting `pkill -9 -f python_mediapipe/main.py` / `pkill -9 -f main.py` pair. Keep scope narrow and only land this if the earlier split still leaves multiple Linux cleanup suspects bundled together.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- `src/`
+- `.testbed/scripts/` only if a tiny Inspector-facing toggle surface is required
+
+**Files Created/Deleted/Modified:**
+- `src/autostart_manager.gd`
+- `.testbed/scripts/proving_harness.gd`
+- `.plans/2026-05-08-cookie-boxing-ui-missing-and-close-crash.md`
+
+**Status:** ✅ Complete
+
+**Results:** This turned out to be practical and still small enough to land immediately as part of Task 103 rather than leaving it as another follow-up bead. The new Inspector-facing toggle `skip_linux_video0_fuser_cleanup_on_close_debug` now separates `/dev/video0` cleanup from the sidecar-targeting `pkill` pair, so future live reruns can distinguish “skip only repo sidecar pkill” from “skip only camera-device fuser cleanup” and from “skip both Linux cleanup branches.” No separate tracker expansion was done for this deeper ladder yet, by design.
+
 ## Session Handoff / Current Stopping Point
 
 - File-backed prerecorded proving is now a real supported proving path, not a stub:
@@ -2401,29 +2511,106 @@ Safe validation only: `git diff --check -- .testbed/.crash-test/crash-test.html`
 - Separate product/UI branch remains queued:
   - wait for Derrick’s Penpot slice, then redesign the Boxing proving scene to replace text-heavy status with gesture icons and active-state/highlight buttons
 
-## Tonight's Stopping Point — 2026-05-11
+## Morning Continuation — 2026-05-12
 
-- The shutdown-isolation work is now landed and source-audited:
-  - `2f40d25` — `Add narrow shutdown isolation toggles`
-  - `fb037e7` — `Fix Linux pkill isolation toggle`
-- The local crash tracker is now expanded and source-audited to represent the real shutdown ladder:
-  - `0830980` — `Expand crash-test tracker shutdown modes`
-- Tracker truth now supports these shutdown modes explicitly:
-  - `normal_stop`
-  - `heartbeat_only`
-  - `normal_stop+skip_terminate_sync`
-  - `normal_stop+skip_linux_pkill_main_py`
-  - `normal_stop+skip_terminate_sync+skip_linux_pkill_main_py`
-- Important manual-testing caveat remains explicit:
-  - `boxing_proving.tscn` still bakes `skip_sidecar_stop_on_close_debug = true`
-  - for any Boxing narrow-mode test, Derrick must first turn that broad bypass back off in the root Inspector or the effective mode remains `heartbeat_only`
-- Derrick began the new shutdown-mode matrix tonight on Chip and completed the prerecorded half of the next ladder with **no crashes on any prerecorded-video runs**.
-- Live-camera rows are intentionally deferred to tomorrow from Cookie’s terminal, where Derrick will continue the new shutdown-mode matrix and wrap up this crash-hunt pass.
-- Best current next step:
-  1. resume on Cookie’s terminal tomorrow
-  2. continue the **live-camera** rows for the new shutdown modes first
-  3. use the expanded tracker page as the truth log rather than ad-hoc notes
-  4. only revisit Boxing after Flow/live-camera results if the signal is still ambiguous or scene comparison is needed
+- Derrick finished the full expanded shutdown-mode matrix and committed the updated tracker state in `fddfaa3` (`Update .crash-test-state.json`).
+- Tracker truth is now complete at **60 / 60 tested rows** across:
+  - scenes: `Boxing`, `Flow`
+  - sources: `live_camera`, `prerecorded_video`
+  - startup modes: `TRACKING`, `PREVIEW_ONLY_DEBUG`, `GODOT_ONLY_DEBUG`
+  - shutdown modes:
+    - `normal_stop`
+    - `heartbeat_only`
+    - `normal_stop+skip_terminate_sync`
+    - `normal_stop+skip_linux_pkill_main_py`
+    - `normal_stop+skip_terminate_sync+skip_linux_pkill_main_py`
+- High-signal matrix outcome:
+  - only **3 / 60** rows recorded a full Zorin/X11 crash
+  - all 3 crash rows were on plain **`normal_stop`**
+  - **0 crashes** were recorded on `heartbeat_only`
+  - **0 crashes** were recorded on any row with `skip_terminate_sync`
+  - **0 crashes** were recorded on any row with `skip_linux_pkill_main_py`
+- The 3 recorded crash rows are now:
+  - `boxing__prerecorded_video__TRACKING__normal_stop`
+  - `flow__live_camera__TRACKING__normal_stop`
+  - `flow__live_camera__PREVIEW_ONLY_DEBUG__normal_stop`
+- `BadWindow` remains a noisy but weaker symptom family:
+  - 11 rows recorded `badWindowOnly=true` without a full desktop crash
+  - this further weakens any theory that `BadWindow` alone is the root cause rather than a correlated shutdown artifact
+- New strongest diagnosis from the completed matrix:
+  - the bug is now much more tightly localized to the **plain normal shutdown path** rather than proving playback broadly
+  - the crash does **not** currently appear to require live camera specifically, because one recorded crash still exists on Boxing prerecorded `TRACKING` with plain `normal_stop`
+  - the crash also does **not** currently require provider/tracking specifically, because Flow live-camera `PREVIEW_ONLY_DEBUG` still crashed on plain `normal_stop`
+  - the most suspicious remaining branch is therefore the shared normal close-time stop sequence, especially the pieces already isolated in source:
+    1. `terminate_sync(_launch_info)`
+    2. Linux cleanup kill path around `pkill -9 -f python_mediapipe/main.py`
+- Scene/source heat read from the completed matrix:
+  - Boxing + live camera: `0` crashes, `5` BadWindow-only rows
+  - Boxing + prerecorded: `1` crash, `1` BadWindow-only row
+  - Flow + live camera: `2` crashes, `4` BadWindow-only rows
+  - Flow + prerecorded: `0` crashes, `1` BadWindow-only row
+- Best current next step after this completed matrix:
+  1. stop widening the matrix; it already gave the key signal
+  2. treat the remaining bug as a **normal-stop teardown bug**, not a generic proving-scene bug
+  3. instrument or split `normal_stop` one level deeper so we can distinguish `terminate_sync(...)` from the Linux `pkill` cleanup phase
+  4. prefer **Flow live-camera** as the hottest repro surface for the next focused isolation pass, with `Flow + live_camera + PREVIEW_ONLY_DEBUG + normal_stop` and `Flow + live_camera + TRACKING + normal_stop` as the best comparison rows
+  5. keep the existing caveat for Boxing narrow-mode runs: `skip_sidecar_stop_on_close_debug` must be turned back off first or the test silently becomes `heartbeat_only`
+  6. next work should no longer add more matrix dimensions; it should split the internals of `normal_stop` itself into smaller teardown branches
+
+### Proposed next isolation ladder inside `normal_stop`
+
+- **Target repro surface first:**
+  - primary: `Flow + live_camera + PREVIEW_ONLY_DEBUG + normal_stop`
+  - secondary confirmation: `Flow + live_camera + TRACKING + normal_stop`
+- **Why this surface:**
+  - it already proved a crash can happen without full tracking/provider being required
+  - it keeps the scene on the hottest live-camera path while reducing unrelated detector activity
+
+#### Narrow teardown branches to add next
+
+1. **TERM-only stop branch**
+   - keep the initial graceful stop attempt inside `terminate_sync(...)`
+   - skip forced escalation / hard kill if the process does not exit quickly
+   - question answered: does the crash require the hard termination step, or does it already happen during graceful terminate?
+
+2. **No repo-level Linux `pkill` branch**
+   - keep `terminate_sync(...)`
+   - skip only the later repo-owned `pkill -9 -f python_mediapipe/main.py` cleanup phase
+   - question answered: is the crash specifically tied to the secondary Linux cleanup kill rather than the launcher-managed stop?
+
+3. **Delayed Linux cleanup branch**
+   - keep normal `terminate_sync(...)`
+   - delay the Linux `pkill` cleanup for a short bounded window after the main stop path
+   - question answered: is this a timing/order-sensitive X11/session race between launcher shutdown and Linux cleanup?
+
+4. **No escalation branch inside `terminate_sync(...)` plus no delayed cleanup change**
+   - keep normal order
+   - remove only the forced escalation/hard-kill portion inside launcher stop
+   - question answered: does the mere existence of launcher KILL escalation destabilize the session even before repo cleanup runs?
+
+5. **If needed: split repo Linux cleanup more finely**
+   - separate any broad `pkill` variants or follow-on Linux cleanup steps instead of treating them as one lump
+   - question answered: if `pkill` is implicated, which exact cleanup primitive is the offender?
+
+#### Exact source hotspots to split next
+
+- `src/autostart_manager.gd`
+  - normal close-path entrypoints
+  - current toggle routing / `_should_skip_close_path_stop()` logic
+  - Linux cleanup path that currently groups the repo-level kill behavior
+- `src/desktop_sidecar_launcher.gd`
+  - `terminate_sync(_launch_info)`
+  - any graceful-terminate timeout/escalation behavior
+  - any process-group kill or forced cleanup behavior inside launcher-managed shutdown
+- `.testbed/scripts/proving_harness.gd`
+  - export surface for any new temporary debug/isolation toggles needed to drive the new teardown ladder from the Inspector without shell-only hacks
+
+#### Truth criteria for the next pass
+
+- A branch is only meaningful if playback/repro surface is otherwise clean.
+- Reject the run if unrelated provider drift, packet-backlog spam, or stale-runtime contamination reappears.
+- Keep `BadWindow` logged, but classify success/failure primarily by whether the Zorin/X11 desktop session actually resets.
+- Preserve the current matrix file as the high-level summary; record the finer-grained teardown split separately so the main matrix does not become unreadable.
 
 ## Final Results
 
@@ -2439,6 +2626,7 @@ Safe validation only: `git diff --check -- .testbed/.crash-test/crash-test.html`
   - quiet-by-default proving/camera/autostart logging
   - runtime-tree `.gdignore` shields to stop Godot CSV import noise
   - harness event/snapshot spam reduced to concise startup/exit signal
+- A completed 60-row shutdown-mode crash matrix that now sharply localizes the surviving Zorin/X11 crash to the plain `normal_stop` teardown family.
 
 **Reference Check:**
 - `REF-04` / `REF-06`: satisfied for the proving-harness/source-owned feature and cleanup work.
@@ -2451,11 +2639,15 @@ Safe validation only: `git diff --check -- .testbed/.crash-test/crash-test.html`
 - `c247339` - `Harden preview-only audit and camera thread teardown`
 - `d811c09` - `Quiet proving harness logging by default`
 - `71c3716` - `Quiet proving harness event logging`
+- `0830980` - `Expand crash-test tracker shutdown modes`
+- `fddfaa3` - `Update .crash-test-state.json`
 
 **Lessons Learned:**
 - Treat prerecorded proving playback as a first-class product feature, not just a debugging convenience.
 - Dirty repro surfaces are worse than slow repro surfaces; when crash hunting, reject contaminated runs instead of over-interpreting them.
 - The strongest crash-isolation progress still comes from changing one teardown variable while keeping playback constant.
+- The completed shutdown matrix now strongly suggests the bug lives in the shared `normal_stop` teardown path, not in proving playback broadly.
+- `BadWindow` can accompany clean closes, so it should be tracked as a useful symptom but not treated as a sufficient crash classifier by itself.
 - For GUI-sensitive branches, Derrick’s direct observation remains the ground truth; subagent/source/headless work should sharpen the next human repro, not replace it.
 
 ---
