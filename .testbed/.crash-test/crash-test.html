@@ -86,6 +86,21 @@
       font-size: 20px;
     }
 
+    .matrix-section + .matrix-section {
+      margin-top: 24px;
+    }
+
+    .section-copy {
+      margin: 0 0 12px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .matrix h3 {
+      margin: 0 0 10px;
+      font-size: 18px;
+    }
+
     .control-group {
       margin-bottom: 18px;
       padding-bottom: 16px;
@@ -383,6 +398,7 @@
           <div><strong>Startup modes:</strong> Tracking, Preview-only debug, Godot-only debug</div>
           <div><strong>Shutdown mode axis:</strong> normal stop, heartbeat-only override, and the two narrow normal-stop skips</div>
           <div><strong>Row fields:</strong> tested, crashed, bad-window-only, notes</div>
+          <div><strong>Separate focused ladder:</strong> a second section below the finished 60-row matrix tracks the deeper <code>normal_stop</code> reruns without muddying the completed sweep.</div>
           <div class="tiny">
             <strong>Note:</strong> <code>GODOT_ONLY_DEBUG</code> intentionally skips sidecar/camera/provider startup.
             Source + shutdown mode are still listed for matrix completeness so every close-path rung can be logged consistently.
@@ -391,33 +407,62 @@
       </aside>
 
       <main class="panel matrix">
-        <h2>Crash test rows</h2>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th class="nowrap">#</th>
-                <th>Combination</th>
-                <th>Scene</th>
-                <th>Source</th>
-                <th>Startup mode</th>
-                <th>Shutdown mode</th>
-                <th class="checkbox-cell">Tested</th>
-                <th class="checkbox-cell">Crashed</th>
-                <th class="checkbox-cell">Bad window only</th>
-                <th>Notes</th>
-              </tr>
-            </thead>
-            <tbody id="rows"></tbody>
-          </table>
-        </div>
+        <section class="matrix-section">
+          <h2>Crash test rows</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th class="nowrap">#</th>
+                  <th>Combination</th>
+                  <th>Scene</th>
+                  <th>Source</th>
+                  <th>Startup mode</th>
+                  <th>Shutdown mode</th>
+                  <th class="checkbox-cell">Tested</th>
+                  <th class="checkbox-cell">Crashed</th>
+                  <th class="checkbox-cell">Bad window only</th>
+                  <th>Notes</th>
+                </tr>
+              </thead>
+              <tbody id="rows"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="matrix-section">
+          <h3>Focused deeper <code>normal_stop</code> shutdown ladder</h3>
+          <p class="section-copy">
+            Separate rerun tracker for the new close-path ladder. Use this after the 60-row sweep so the operator can log the deeper
+            <code>normal_stop</code> shutdown branches without rewriting the finished matrix results.
+          </p>
+          <div class="summary-grid" id="ladder-summary-grid"></div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th class="nowrap">#</th>
+                  <th>Rung</th>
+                  <th>Effective shutdown mode</th>
+                  <th>Inspector settings to flip</th>
+                  <th>What this isolates</th>
+                  <th class="checkbox-cell">Tested</th>
+                  <th class="checkbox-cell">Crashed</th>
+                  <th class="checkbox-cell">Bad window only</th>
+                  <th>Notes</th>
+                </tr>
+              </thead>
+              <tbody id="shutdown-ladder-rows"></tbody>
+            </table>
+          </div>
+        </section>
       </main>
     </div>
   </div>
 
   <script>
-    const STORAGE_KEY = "aerobeat-crash-test-matrix-v2";
-    const LEGACY_STORAGE_KEYS = ["aerobeat-crash-test-matrix-v1"];
+    const STORAGE_KEY = "aerobeat-crash-test-matrix-v3";
+    const LEGACY_STORAGE_KEYS = ["aerobeat-crash-test-matrix-v2", "aerobeat-crash-test-matrix-v1"];
     const FILE_NAME = ".crash-test-state.json";
     const IS_FILE_ORIGIN = window.location.protocol === "file:";
     const CAN_PICK_EXISTING_FILE = typeof window.showOpenFilePicker === "function";
@@ -440,13 +485,101 @@
       { id: "normal_stop+skip_linux_pkill_main_py", label: "Normal stop + skip Linux pkill main.py" },
       { id: "normal_stop+skip_terminate_sync+skip_linux_pkill_main_py", label: "Normal stop + skip terminate_sync + skip Linux pkill main.py" }
     ];
+    const focusedShutdownLadder = [
+      {
+        index: 1,
+        id: "baseline_normal_stop",
+        label: "Rung A — Baseline plain normal_stop",
+        effectiveMode: "normal_stop",
+        inspectorSettings: [
+          "skip_sidecar_stop_on_close_debug = false",
+          "skip_sidecar_terminate_sync_on_close_debug = false",
+          "skip_sidecar_terminate_kill_escalation_on_close_debug = false",
+          "skip_linux_pkill_main_py_on_close_debug = false",
+          "skip_linux_video0_fuser_cleanup_on_close_debug = false"
+        ],
+        isolates: "Control row for the deeper ladder. Confirms the current hot repro on the narrowed surface before any deeper teardown isolation."
+      },
+      {
+        index: 2,
+        id: "launcher_term_only_linux_cleanup_intact",
+        label: "Rung B — Launcher TERM-only, Linux cleanup still intact",
+        effectiveMode: "normal_stop+skip_terminate_kill_escalation",
+        inspectorSettings: [
+          "skip_sidecar_stop_on_close_debug = false",
+          "skip_sidecar_terminate_sync_on_close_debug = false",
+          "skip_sidecar_terminate_kill_escalation_on_close_debug = true",
+          "skip_linux_pkill_main_py_on_close_debug = false",
+          "skip_linux_video0_fuser_cleanup_on_close_debug = false"
+        ],
+        isolates: "Launcher TERM versus launcher TERM+KILL while repo Linux cleanup still runs normally."
+      },
+      {
+        index: 3,
+        id: "pure_launcher_term_only",
+        label: "Rung C — Pure launcher TERM-only",
+        effectiveMode: "normal_stop+skip_terminate_kill_escalation+skip_linux_pkill_main_py+skip_linux_video0_fuser",
+        inspectorSettings: [
+          "skip_sidecar_stop_on_close_debug = false",
+          "skip_sidecar_terminate_sync_on_close_debug = false",
+          "skip_sidecar_terminate_kill_escalation_on_close_debug = true",
+          "skip_linux_pkill_main_py_on_close_debug = true",
+          "skip_linux_video0_fuser_cleanup_on_close_debug = true"
+        ],
+        isolates: "Pure launcher TERM path with no forced KILL and no repo Linux cleanup afterward."
+      },
+      {
+        index: 4,
+        id: "skip_only_sidecar_pkill_pair",
+        label: "Rung D — Skip only repo-side sidecar pkill pair",
+        effectiveMode: "normal_stop+skip_linux_pkill_main_py",
+        inspectorSettings: [
+          "skip_sidecar_stop_on_close_debug = false",
+          "skip_sidecar_terminate_sync_on_close_debug = false",
+          "skip_sidecar_terminate_kill_escalation_on_close_debug = false",
+          "skip_linux_pkill_main_py_on_close_debug = true",
+          "skip_linux_video0_fuser_cleanup_on_close_debug = false"
+        ],
+        isolates: "Repo-owned sidecar pkill cleanup versus the rest of normal stop."
+      },
+      {
+        index: 5,
+        id: "skip_only_video0_fuser_cleanup",
+        label: "Rung E — Skip only /dev/video0 cleanup",
+        effectiveMode: "normal_stop+skip_linux_video0_fuser",
+        inspectorSettings: [
+          "skip_sidecar_stop_on_close_debug = false",
+          "skip_sidecar_terminate_sync_on_close_debug = false",
+          "skip_sidecar_terminate_kill_escalation_on_close_debug = false",
+          "skip_linux_pkill_main_py_on_close_debug = false",
+          "skip_linux_video0_fuser_cleanup_on_close_debug = true"
+        ],
+        isolates: "Camera-device fuser cleanup versus the rest of normal stop."
+      },
+      {
+        index: 6,
+        id: "skip_both_linux_cleanup_branches",
+        label: "Optional Rung F — Skip both repo Linux cleanup branches",
+        effectiveMode: "normal_stop+skip_linux_pkill_main_py+skip_linux_video0_fuser",
+        inspectorSettings: [
+          "skip_sidecar_stop_on_close_debug = false",
+          "skip_sidecar_terminate_sync_on_close_debug = false",
+          "skip_sidecar_terminate_kill_escalation_on_close_debug = false",
+          "skip_linux_pkill_main_py_on_close_debug = true",
+          "skip_linux_video0_fuser_cleanup_on_close_debug = true"
+        ],
+        isolates: "Launcher-managed stop alone, with all repo-side Linux cleanup removed. Useful fallback if the earlier rows stay ambiguous."
+      }
+    ];
     const legacyShutdownModeMap = {
       normal_stop: "normal_stop",
       skip_sidecar: "heartbeat_only"
     };
 
     const rowsTbody = document.getElementById("rows");
+    const ladderRowsTbody = document.getElementById("shutdown-ladder-rows");
     const summaryGrid = document.getElementById("summary-grid");
+    const ladderSummaryGrid = document.getElementById("ladder-summary-grid");
     const storagePill = document.getElementById("storage-pill");
     const fileStatus = document.getElementById("file-status");
     const lastSaved = document.getElementById("last-saved");
@@ -491,26 +624,39 @@
       return rows[buildComboId(combo.scene, combo.source.id, combo.startupMode.id, legacyModeId)] || {};
     }
 
+    function normalizeRowState(prior) {
+      return {
+        tested: Boolean(prior && prior.tested),
+        crashed: Boolean(prior && prior.crashed),
+        badWindowOnly: Boolean(prior && prior.badWindowOnly),
+        notes: typeof prior?.notes === "string" ? prior.notes : ""
+      };
+    }
+
     const combos = buildRows();
     let state = loadState();
 
     function normalizeState(candidate) {
       const safe = candidate && typeof candidate === "object" ? candidate : {};
-      const safeRows = safe.rows && typeof safe.rows === "object" ? safe.rows : {};
+      const safeMatrixRows = safe.matrixRows && typeof safe.matrixRows === "object"
+        ? safe.matrixRows
+        : (safe.rows && typeof safe.rows === "object" ? safe.rows : {});
+      const safeFocusedRows = safe.focusedShutdownRows && typeof safe.focusedShutdownRows === "object"
+        ? safe.focusedShutdownRows
+        : {};
       const next = {
-        version: 2,
+        version: 3,
         updatedAt: safe.updatedAt || null,
-        rows: {}
+        matrixRows: {},
+        focusedShutdownRows: {}
       };
 
       for (const combo of combos) {
-        const prior = getPriorRow(safeRows, combo);
-        next.rows[combo.id] = {
-          tested: Boolean(prior.tested),
-          crashed: Boolean(prior.crashed),
-          badWindowOnly: Boolean(prior.badWindowOnly),
-          notes: typeof prior.notes === "string" ? prior.notes : ""
-        };
+        next.matrixRows[combo.id] = normalizeRowState(getPriorRow(safeMatrixRows, combo));
+      }
+
+      for (const rung of focusedShutdownLadder) {
+        next.focusedShutdownRows[rung.id] = normalizeRowState(safeFocusedRows[rung.id] || {});
       }
 
       return next;
@@ -556,7 +702,7 @@
       rowsTbody.innerHTML = "";
 
       for (const combo of combos) {
-        const rowState = state.rows[combo.id];
+        const rowState = state.matrixRows[combo.id];
         const tr = document.createElement("tr");
         if (rowState.tested) tr.classList.add("row-tested");
         if (rowState.crashed) tr.classList.add("row-crashed");
@@ -575,44 +721,86 @@
           <td><code>${combo.startupMode.id}</code></td>
           <td>${combo.shutdownMode.label}</td>
           <td class="checkbox-cell">
-            <label class="checkbox-wrap"><input type="checkbox" data-id="${combo.id}" data-field="tested" ${rowState.tested ? "checked" : ""}></label>
+            <label class="checkbox-wrap"><input type="checkbox" data-section="matrixRows" data-id="${combo.id}" data-field="tested" ${rowState.tested ? "checked" : ""}></label>
           </td>
           <td class="checkbox-cell">
-            <label class="checkbox-wrap"><input type="checkbox" data-id="${combo.id}" data-field="crashed" ${rowState.crashed ? "checked" : ""}></label>
+            <label class="checkbox-wrap"><input type="checkbox" data-section="matrixRows" data-id="${combo.id}" data-field="crashed" ${rowState.crashed ? "checked" : ""}></label>
           </td>
           <td class="checkbox-cell">
-            <label class="checkbox-wrap"><input type="checkbox" data-id="${combo.id}" data-field="badWindowOnly" ${rowState.badWindowOnly ? "checked" : ""}></label>
+            <label class="checkbox-wrap"><input type="checkbox" data-section="matrixRows" data-id="${combo.id}" data-field="badWindowOnly" ${rowState.badWindowOnly ? "checked" : ""}></label>
           </td>
           <td>
-            <textarea class="notes" data-id="${combo.id}" data-field="notes" placeholder="What happened? error line? preview connected? close path clean?">${escapeHtml(rowState.notes)}</textarea>
+            <textarea class="notes" data-section="matrixRows" data-id="${combo.id}" data-field="notes" placeholder="What happened? error line? preview connected? close path clean?">${escapeHtml(rowState.notes)}</textarea>
           </td>
         `;
         rowsTbody.appendChild(tr);
       }
 
+      renderFocusedShutdownLadder();
       bindInputs();
       renderSummary();
     }
 
-    function bindInputs() {
-      rowsTbody.querySelectorAll('input[type="checkbox"]').forEach((input) => {
-        input.addEventListener("change", () => {
-          state.rows[input.dataset.id][input.dataset.field] = input.checked;
-          persistLocal("Checklist autosaved");
-          render();
-        });
-      });
+    function renderFocusedShutdownLadder() {
+      ladderRowsTbody.innerHTML = "";
 
-      rowsTbody.querySelectorAll("textarea").forEach((textarea) => {
-        textarea.addEventListener("input", () => {
-          state.rows[textarea.dataset.id][textarea.dataset.field] = textarea.value;
-          persistLocal("Notes autosaved");
+      for (const rung of focusedShutdownLadder) {
+        const rowState = state.focusedShutdownRows[rung.id];
+        const tr = document.createElement("tr");
+        if (rowState.tested) tr.classList.add("row-tested");
+        if (rowState.crashed) tr.classList.add("row-crashed");
+        if (rowState.badWindowOnly) tr.classList.add("row-bad-window");
+
+        tr.innerHTML = `
+          <td class="nowrap">${rung.index}</td>
+          <td>
+            <div class="combo">
+              <strong>${rung.label}</strong>
+            </div>
+          </td>
+          <td><code>${rung.effectiveMode}</code></td>
+          <td>
+            <div class="combo">${rung.inspectorSettings.map((setting) => `<span><code>${setting}</code></span>`).join("")}</div>
+          </td>
+          <td class="tiny">${rung.isolates}</td>
+          <td class="checkbox-cell">
+            <label class="checkbox-wrap"><input type="checkbox" data-section="focusedShutdownRows" data-id="${rung.id}" data-field="tested" ${rowState.tested ? "checked" : ""}></label>
+          </td>
+          <td class="checkbox-cell">
+            <label class="checkbox-wrap"><input type="checkbox" data-section="focusedShutdownRows" data-id="${rung.id}" data-field="crashed" ${rowState.crashed ? "checked" : ""}></label>
+          </td>
+          <td class="checkbox-cell">
+            <label class="checkbox-wrap"><input type="checkbox" data-section="focusedShutdownRows" data-id="${rung.id}" data-field="badWindowOnly" ${rowState.badWindowOnly ? "checked" : ""}></label>
+          </td>
+          <td>
+            <textarea class="notes" data-section="focusedShutdownRows" data-id="${rung.id}" data-field="notes" placeholder="What happened on this rung? crash? dirty rerun? cleanup evidence?">${escapeHtml(rowState.notes)}</textarea>
+          </td>
+        `;
+        ladderRowsTbody.appendChild(tr);
+      }
+    }
+
+    function bindInputs() {
+      [rowsTbody, ladderRowsTbody].forEach((tbody) => {
+        tbody.querySelectorAll('input[type="checkbox"]').forEach((input) => {
+          input.addEventListener("change", () => {
+            state[input.dataset.section][input.dataset.id][input.dataset.field] = input.checked;
+            persistLocal("Checklist autosaved");
+            render();
+          });
+        });
+
+        tbody.querySelectorAll("textarea").forEach((textarea) => {
+          textarea.addEventListener("input", () => {
+            state[textarea.dataset.section][textarea.dataset.id][textarea.dataset.field] = textarea.value;
+            persistLocal("Notes autosaved");
+          });
         });
       });
     }
 
-    function renderSummary() {
-      const rowValues = Object.values(state.rows);
+    function buildStats(rowMap, totalLabel) {
+      const rowValues = Object.values(rowMap);
       const totals = {
         total: rowValues.length,
         tested: rowValues.filter((row) => row.tested).length,
@@ -620,19 +808,27 @@
         badWindowOnly: rowValues.filter((row) => row.badWindowOnly).length
       };
       const remaining = totals.total - totals.tested;
+      const coverage = totals.total ? `${Math.round((totals.tested / totals.total) * 100)}%` : "0%";
 
-      const stats = [
-        ["Total rows", totals.total],
+      return [
+        [totalLabel, totals.total],
         ["Tested", totals.tested],
         ["Crashed", totals.crashed],
         ["Bad window only", totals.badWindowOnly],
         ["Remaining", remaining],
-        ["Coverage", `${Math.round((totals.tested / totals.total) * 100)}%`]
+        ["Coverage", coverage]
       ];
+    }
 
-      summaryGrid.innerHTML = stats
+    function renderStats(target, stats) {
+      target.innerHTML = stats
         .map(([label, value]) => `<div class="stat"><div class="label">${label}</div><div class="value">${value}</div></div>`)
         .join("");
+    }
+
+    function renderSummary() {
+      renderStats(summaryGrid, buildStats(state.matrixRows, "Matrix rows"));
+      renderStats(ladderSummaryGrid, buildStats(state.focusedShutdownRows, "Focused rungs"));
     }
 
     function escapeHtml(value) {
@@ -646,14 +842,22 @@
     function exportPayload() {
       return {
         app: "aerobeat-crash-test-matrix",
-        version: 2,
+        version: 3,
         generatedAt: new Date().toISOString(),
-        combos: combos.map(({ id, scene, source, startupMode, shutdownMode }) => ({
+        matrixCombos: combos.map(({ id, scene, source, startupMode, shutdownMode }) => ({
           id,
           scene,
           source: source.id,
           startupMode: startupMode.id,
           shutdownMode: shutdownMode.id
+        })),
+        focusedShutdownLadder: focusedShutdownLadder.map(({ id, index, label, effectiveMode, inspectorSettings, isolates }) => ({
+          id,
+          index,
+          label,
+          effectiveMode,
+          inspectorSettings,
+          isolates
         })),
         state
       };

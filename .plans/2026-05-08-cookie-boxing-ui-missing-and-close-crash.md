@@ -2612,6 +2612,196 @@ Terminal-safe validation only: `~/.local/bin/godot --headless --path .testbed --
 - Keep `BadWindow` logged, but classify success/failure primarily by whether the Zorin/X11 desktop session actually resets.
 - Preserve the current matrix file as the high-level summary; record the finer-grained teardown split separately so the main matrix does not become unreadable.
 
+## Next Live `normal_stop` Narrowing Tests
+
+Use this section as the operator-facing checklist for the next focused reruns. These are **not** new matrix rows; they are a deeper split of the hottest remaining `normal_stop` failure family.
+
+### Shared prerequisites for every rung
+
+- Preferred surface:
+  - `Flow`
+  - `live_camera`
+  - `PREVIEW_ONLY_DEBUG`
+- Secondary confirmation surface only if the first ladder remains ambiguous:
+  - `Flow`
+  - `live_camera`
+  - `TRACKING`
+- Before every narrow rerun, explicitly confirm on the proving-scene root:
+  - `skip_sidecar_stop_on_close_debug = false`
+- Leave the existing broad `skip_sidecar_terminate_sync_on_close_debug = false` unless the rung explicitly says otherwise.
+- Treat the rerun as **invalid/dirty** if provider drift, packet backlog, stale process state, or unrelated runtime contamination appears.
+
+### Rung A — Baseline plain `normal_stop`
+
+**Purpose:** confirm the current hot repro still reproduces on the narrowed surface before reading any deeper teardown branch.
+
+**Inspector settings:**
+- `skip_sidecar_stop_on_close_debug = false`
+- `skip_sidecar_terminate_sync_on_close_debug = false`
+- `skip_sidecar_terminate_kill_escalation_on_close_debug = false`
+- `skip_linux_pkill_main_py_on_close_debug = false`
+- `skip_linux_video0_fuser_cleanup_on_close_debug = false`
+
+**Effective mode:** `normal_stop`
+
+**What this isolates:** nothing new yet; this is the control row for the deeper ladder.
+
+**Result:** ⏳ Pending
+
+**Notes:**
+
+### Rung B — Launcher TERM-only, Linux cleanup still intact
+
+**Purpose:** determine whether the crash requires launcher KILL escalation, or whether it already happens during graceful launcher TERM while later Linux cleanup remains unchanged.
+
+**Inspector settings:**
+- `skip_sidecar_stop_on_close_debug = false`
+- `skip_sidecar_terminate_sync_on_close_debug = false`
+- `skip_sidecar_terminate_kill_escalation_on_close_debug = true`
+- `skip_linux_pkill_main_py_on_close_debug = false`
+- `skip_linux_video0_fuser_cleanup_on_close_debug = false`
+
+**Effective mode:** `normal_stop+skip_terminate_kill_escalation`
+
+**What this isolates:** launcher `TERM` versus launcher `TERM+KILL` while repo Linux cleanup still runs normally.
+
+**Result:** ⏳ Pending
+
+**Notes:**
+
+### Rung C — Pure launcher TERM-only
+
+**Purpose:** determine whether the crash can still happen when the close path is reduced to launcher TERM alone, with both launcher KILL escalation and repo Linux cleanup removed.
+
+**Inspector settings:**
+- `skip_sidecar_stop_on_close_debug = false`
+- `skip_sidecar_terminate_sync_on_close_debug = false`
+- `skip_sidecar_terminate_kill_escalation_on_close_debug = true`
+- `skip_linux_pkill_main_py_on_close_debug = true`
+- `skip_linux_video0_fuser_cleanup_on_close_debug = true`
+
+**Effective mode:** `normal_stop+skip_terminate_kill_escalation+skip_linux_pkill_main_py+skip_linux_video0_fuser`
+
+**What this isolates:** pure launcher TERM path with no forced KILL and no repo Linux cleanup afterward.
+
+**Result:** ⏳ Pending
+
+**Notes:**
+
+### Rung D — Keep launcher unchanged, skip only repo-side sidecar `pkill` pair
+
+**Purpose:** determine whether the post-launcher sidecar-targeting `pkill` cleanup is the destabilizer while launcher TERM/KILL behavior stays unchanged.
+
+**Inspector settings:**
+- `skip_sidecar_stop_on_close_debug = false`
+- `skip_sidecar_terminate_sync_on_close_debug = false`
+- `skip_sidecar_terminate_kill_escalation_on_close_debug = false`
+- `skip_linux_pkill_main_py_on_close_debug = true`
+- `skip_linux_video0_fuser_cleanup_on_close_debug = false`
+
+**Effective mode:** `normal_stop+skip_linux_pkill_main_py`
+
+**What this isolates:** repo-owned sidecar `pkill` cleanup versus the rest of normal stop.
+
+**Result:** ⏳ Pending
+
+**Notes:**
+
+### Rung E — Keep launcher unchanged, skip only `/dev/video0` cleanup
+
+**Purpose:** determine whether camera-device cleanup via `fuser -k -9 /dev/video0` is the destabilizer while launcher TERM/KILL and sidecar `pkill` cleanup stay unchanged.
+
+**Inspector settings:**
+- `skip_sidecar_stop_on_close_debug = false`
+- `skip_sidecar_terminate_sync_on_close_debug = false`
+- `skip_sidecar_terminate_kill_escalation_on_close_debug = false`
+- `skip_linux_pkill_main_py_on_close_debug = false`
+- `skip_linux_video0_fuser_cleanup_on_close_debug = true`
+
+**Effective mode:** `normal_stop+skip_linux_video0_fuser`
+
+**What this isolates:** camera-device `fuser` cleanup versus the rest of normal stop.
+
+**Result:** ⏳ Pending
+
+**Notes:**
+
+### Optional Rung F — Launcher unchanged, skip both repo Linux cleanup branches
+
+**Purpose:** useful fallback if the earlier rows still leave ambiguity. This tests normal launcher TERM/KILL behavior with all repo-side Linux cleanup removed.
+
+**Inspector settings:**
+- `skip_sidecar_stop_on_close_debug = false`
+- `skip_sidecar_terminate_sync_on_close_debug = false`
+- `skip_sidecar_terminate_kill_escalation_on_close_debug = false`
+- `skip_linux_pkill_main_py_on_close_debug = true`
+- `skip_linux_video0_fuser_cleanup_on_close_debug = true`
+
+**Effective mode:** `normal_stop+skip_linux_pkill_main_py+skip_linux_video0_fuser`
+
+**What this isolates:** launcher-managed stop alone, with repo Linux cleanup entirely removed.
+
+**Result:** ⏳ Pending
+
+**Notes:**
+
+### Task 107: Add a separate deeper `normal_stop` shutdown-ladder section to the crash-test webpage
+
+**Bead ID:** `oc-uj8h`
+**SubAgent:** `primary` (for `coder` workflow role)
+**Role:** `coder`
+**References:** `REF-04`
+**Prompt:** Claim bead `oc-uj8h` with `bd update oc-uj8h --status in_progress --json`. Update `.testbed/.crash-test/crash-test.html` so Derrick can track the new deeper `normal_stop` shutdown-ladder reruns in the same page and save them into the adjacent JSON just like the finished 60-test matrix. Prefer a **new separate section** rather than mutating the finished matrix rows, unless a truthful implementation clearly supports both without confusion. The new section should cover the focused rungs we just designed (baseline normal_stop, TERM-only with Linux cleanup intact, pure launcher TERM-only, skip only sidecar pkill, skip only `/dev/video0` fuser, optional skip-both-Linux-cleanup rung), preserve local autosave + optional adjacent-file save behavior, and keep the JSON structure readable. Update the active plan with exact results, run safe validation, commit/push, and close the bead with a concise reason when done.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- `.testbed/.crash-test/`
+
+**Files Created/Deleted/Modified:**
+- `.testbed/.crash-test/crash-test.html`
+- `.testbed/.crash-test/.crash-test-state.json`
+- `.plans/2026-05-08-cookie-boxing-ui-missing-and-close-crash.md`
+
+**Status:** ✅ Complete
+
+**Results:** Added a new separate `Focused deeper normal_stop shutdown ladder` section beneath the finished 60-row matrix instead of mutating the existing matrix rows. The page now renders two independent trackers: the original 60-row matrix and a 6-rung focused shutdown ladder covering baseline `normal_stop`, launcher TERM-only with Linux cleanup intact, pure launcher TERM-only, skip-only sidecar `pkill`, skip-only `/dev/video0` `fuser`, and the optional skip-both-Linux-cleanup rung. Local autosave and optional linked-file save/load were preserved by splitting the saved state into `state.matrixRows` and `state.focusedShutdownRows`, while the adjacent JSON payload now keeps the definitions readable with top-level `matrixCombos` and `focusedShutdownLadder` arrays. Safe validation passed with `node` embedded-script syntax evaluation, `node` JSON structure checks confirming 60 matrix rows + 6 focused rows, and `git diff --check`. Browser-side render automation was not revalidated because the local browser tool path timed out at the gateway boundary during this pass.
+
+### Task 108: QA the deeper `normal_stop` shutdown-ladder webpage section
+
+**Bead ID:** `oc-f5w8`
+**SubAgent:** `primary` (for `qa` workflow role)
+**Role:** `qa`
+**References:** `REF-04`
+**Prompt:** Claim bead `oc-f5w8` with `bd update oc-f5w8 --status in_progress --json` after `oc-uj8h` is complete. Independently verify that the crash-test page now has a clear separate section for the deeper `normal_stop` reruns, that the operator flow is unambiguous, and that local autosave / optional adjacent JSON save still work cleanly for both the original 60-test matrix and the new section.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+
+**Files Created/Deleted/Modified:**
+- plan updates / QA notes only unless a truthful docs correction is required
+
+**Status:** ⏳ Pending
+
+**Results:** Pending.
+
+### Task 109: Audit the deeper `normal_stop` shutdown-ladder webpage section
+
+**Bead ID:** `oc-rwbg`
+**SubAgent:** `primary` (for `auditor` workflow role)
+**Role:** `auditor`
+**References:** `REF-04`
+**Prompt:** Claim bead `oc-rwbg` with `bd update oc-rwbg --status in_progress --json` after `oc-f5w8` is complete. Audit the crash-test webpage changes and confirm the new section truthfully tracks the narrower `normal_stop` reruns without muddying the finished 60-test matrix.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+
+**Files Created/Deleted/Modified:**
+- plan updates / audit notes only
+
+**Status:** ⏳ Pending
+
+**Results:** Pending.
+
 ## Final Results
 
 **Status:** ⚠️ Partial
