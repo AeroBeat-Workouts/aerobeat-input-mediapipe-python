@@ -172,9 +172,30 @@ Exact validation run:
 **Files Created/Deleted/Modified:**
 - plan updates / QA notes only unless a truthful docs correction is required
 
-**Status:** ⏳ Pending
+**Status:** ✅ Complete
 
-**Results:** Pending.
+**Results:** QA completed. Overall verdict: this clean-base slice passes strongly enough at the **source / static-validation level** to unblock deeper functionality work, but it still needs Derrick’s **direct runtime truth pass** before anyone claims the live experience is fully proven.
+
+Exact QA findings by scope:
+
+1. **Sidecar lifecycle semantics are materially safer/clearer in source (`REF-01`, `REF-02`, `REF-07`).** `src/process/desktop_sidecar_launcher.gd` now generates and records an explicit per-launch `sidecar_identity`, appends it to argv on Linux/macOS/Windows, and keeps Linux process-group launch as the primary lifecycle surface. `src/autostart_manager.gd` no longer does the earlier broad Linux prelaunch kill sweep, no longer contains the dangerous generic `pkill -f main.py` cleanup, and no longer contains `/dev/video0` `fuser` cleanup. The remaining Linux fallback kill is explicitly narrowed to `pkill -9 -f -- --sidecar-identity=<token>`, which is materially safer because it targets this repo-owned launch identity instead of broad filenames/device users.
+
+2. **Platform handling is now source-truthful instead of accidentally implying parity (`REF-01`, `REF-02`).** The launcher’s macOS and Windows notes explicitly describe those lanes as direct-PID scaffolding with identity markers and say they remain unvalidated on this Linux host. That is the right truth boundary for this slice: Linux is the only path with source evidence of richer launch/stop orchestration; macOS/Windows are intentionally scaffolded, not proven equivalent.
+
+3. **Boxing header overlap is gone in scene structure (`REF-04`, `REF-06`).** `.testbed/scenes/boxing_proving.tscn` now places `HeaderIcon` and `TitleLabel` under `Margin/VSplit/Header/HeaderRow` instead of leaving the icon positioned independently at the root. Source-wise, that removes the earlier structural cause of the title/icon overlap.
+
+4. **Preview surface fit is constrained in source/layout (`REF-03`, `REF-04`, `REF-06`).** The placeholder `CameraDisplay` in the Boxing scene still uses keep-aspect-centered stretch (`stretch_mode = 5`) with a bounded minimum size, and `.testbed/scripts/proving_harness.gd` now copies that placeholder layout contract onto the runtime `MediaPipeCameraView` (`custom_minimum_size`, layout mode, size flags, expand mode, stretch mode) before replacing the placeholder. Combined with `src/camera_view.gd`’s aspect-aware display math, this is strong source evidence that the preview should preserve aspect ratio inside the panel without crushing neighboring UI.
+
+5. **Source-proven vs live-runtime truth line is clear.** Source/static proof is strong for the structural fixes above, but live runtime is still not claimed here. This QA pass did **not** prove on-host behavior for: real sidecar start/stop under Godot, heartbeat-only exit timing, Linux fallback cleanup only hitting the intended process under actual failure conditions, macOS/Windows lifecycle behavior on native hosts, or visual confirmation that the camera panel behaves correctly with live/prerecorded frames in a real rendered window. Those remain Derrick runtime checks.
+
+Exact validation run during QA:
+- `python3 -m py_compile python_mediapipe/args.py python_mediapipe/main.py`
+- `/home/derrick/.local/bin/godot --headless --path .testbed --script res://scripts/proving_harness.gd --check-only`
+- `git diff --check`
+- focused Python scene assertion pass confirming `HeaderRow`, nested `HeaderIcon`/`TitleLabel`, keep-aspect camera display, and bounded camera minimum size in `.testbed/scenes/boxing_proving.tscn`
+- focused Python source assertion pass confirming explicit `--sidecar-identity` plumbing/logging, removal of broad `main.py` cleanup, removal of `fuser`, and runtime camera-view layout inheritance
+
+QA conclusion: **Pass for clean-base source readiness.** I would let deeper functionality work resume from this base, with the explicit caveat that Derrick should still do one direct runtime pass to confirm live start/stop behavior and rendered UI behavior before anyone overstates completion.
 
 ---
 
@@ -192,24 +213,40 @@ Exact validation run:
 **Files Created/Deleted/Modified:**
 - plan updates / audit notes only
 
-**Status:** ⏳ Pending
+**Status:** ✅ Complete
 
-**Results:** Pending.
+**Results:** Auditor verdict: **Pass for clean-base readiness, with explicit live-runtime caveats.** I independently re-read the claimed source surfaces (`REF-01`, `REF-02`, `REF-04`, `REF-06`, `REF-07`), inspected the committed implementation chain (`59d795b`, `5ab0df9`, `8920cb4`), and reran the repo-level static checks that are truthful on this host: `python3 -m py_compile python_mediapipe/args.py python_mediapipe/main.py`, `/home/derrick/.local/bin/godot --headless --path .testbed --script res://scripts/proving_harness.gd --check-only`, and `git diff --check`.
+
+What is now good enough to treat as a cleaner base for deeper functionality work:
+1. **Sidecar lifecycle targeting is materially safer in source (`REF-01`, `REF-02`, `REF-07`).** The old broad Linux host sweeps are gone from the normal path: no prelaunch `pkill -f python_mediapipe/main.py`, no generic `pkill -9 -f main.py`, and no `/dev/video0` `fuser` kill. Each launch now carries an explicit `--sidecar-identity=<token>` marker, that identity is recorded in launcher state and logged by Python, and the remaining Linux fallback cleanup is narrowed to that explicit token instead of generic filenames.
+2. **Platform truth is clearer and less misleading (`REF-01`, `REF-02`).** Linux remains the only source-proven rich lifecycle path; macOS/Windows are now described truthfully as direct-PID scaffold lanes with identity markers, not implied parity.
+3. **The Boxing header overlap fix is structural, not cosmetic (`REF-04`, `REF-06`).** `HeaderIcon` is no longer a root-positioned overlay; it now lives beside `TitleLabel` inside `HeaderRow`, which removes the overlap cause at scene-structure level.
+4. **Preview-fit/layout is structurally tightened (`REF-03`, `REF-04`, `REF-06`).** The runtime `MediaPipeCameraView` now inherits the placeholder `CameraDisplay` layout contract before replacement, so the intended panel bounds and keep-aspect behavior are preserved in source instead of relying on default TextureRect behavior.
+
+What remains unverified and must still be treated as Derrick-only runtime truth:
+1. **Actual live start/stop behavior on a rendered host session is not proven by this audit.** I did not witness a real sidecar launch, heartbeat timeout, graceful stop, or forced cleanup sequence under a live Godot window.
+2. **The narrowed Linux fallback `pkill -f -- --sidecar-identity=...` is source-safe in intent but not live-proven here under failure conditions.** I am not claiming runtime proof that it always catches only the intended process in every host scenario.
+3. **macOS and Windows lifecycle behavior remain unvalidated scaffold lanes.** The source wording is now honest, but there is still no native-host proof of launch/teardown parity.
+4. **The visual fixes are structurally convincing, but not visually witnessed in a live rendered scene during this audit.** I am not claiming screenshot/window proof from this pass.
+
+Bottom line: this slice is **clean enough to use as the base for the larger functionality bug pass** because the risky cleanup semantics and the obvious proving-shell layout defects have been reduced to a more truthful, source-sound baseline. It should **not** be oversold as fully runtime-validated completion.
 
 ---
 
 ## Final Results
 
-**Status:** ⏳ Draft
+**Status:** ✅ Complete
 
-**What We Built:** Pending.
+**What We Built:** A cleaner MediaPipe proving baseline: safer sidecar identity/cleanup semantics, a structurally fixed Boxing header, and preview layout inheritance that should keep the runtime camera surface within its intended bounds while preserving aspect ratio.
 
-**Reference Check:** Pending.
+**Reference Check:** `REF-01`, `REF-02`, `REF-04`, `REF-06`, and `REF-07` were re-audited directly against committed source. `REF-03` remains indirectly validated through the proving-harness layout handoff rather than a live rendered runtime pass. No deliberate deviations were found from the stated clean-base scope.
 
 **Commits:**
-- Pending
+- `59d795b` - Tighten mediapipe sidecar identity cleanup
+- `5ab0df9` - Fix proving preview layout bounds
+- `8920cb4` - Fix boxing proving header layout
 
-**Lessons Learned:** Pending.
+**Lessons Learned:** For this repo, source-level cleanup safety and UI structure can be audited with good confidence, but lifecycle truth and rendered-layout truth still need an explicit live-host pass before anyone claims more than a clean base.
 
 ---
 
