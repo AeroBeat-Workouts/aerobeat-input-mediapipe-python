@@ -119,18 +119,7 @@ func get_server_pid() -> int:
 func is_server_running() -> bool:
 	if _launch_info.is_empty():
 		return false
-	if _desktop_sidecar_launcher().is_process_alive(_launch_info):
-		return true
-	if OS.get_name() == "Linux":
-		var log_path := _get_server_log_path()
-		if FileAccess.file_exists(log_path):
-			var output: Array = []
-			OS.execute("grep", ["-c", "MediaPipe started", log_path], output, false)
-			if output.size() > 0:
-				var count_str: String = output[0].strip_edges()
-				if count_str.is_valid_int() and int(count_str) > 0:
-					return true
-	return false
+	return _desktop_sidecar_launcher().is_process_alive(_launch_info)
 
 func start_server() -> bool:
 	if _is_running:
@@ -181,25 +170,26 @@ func _get_close_path_stop_mode_label() -> String:
 	elif skip_sidecar_terminate_kill_escalation_on_close_debug:
 		parts.append("skip_terminate_kill_escalation")
 	if OS.get_name() == "Linux" and skip_linux_pkill_main_py_on_close_debug:
-		parts.append("skip_linux_pkill_main_py")
+		parts.append("skip_linux_sidecar_identity_pkill")
 	if OS.get_name() == "Linux" and skip_linux_video0_fuser_cleanup_on_close_debug:
-		parts.append("skip_linux_video0_fuser")
+		parts.append("legacy_skip_linux_video0_fuser_noop")
 	return "+".join(parts)
 
 func _run_linux_cleanup_patterns() -> void:
-	var output: Array = []
-	if skip_linux_pkill_main_py_on_close_debug:
-		_debug_log("Close-path debug enabled: skipping Linux pkill patterns that target python_mediapipe/main.py")
-	else:
-		OS.execute("pkill", ["-9", "-f", "python_mediapipe/main.py"], output, false)
-		OS.delay_msec(100)
-		OS.execute("pkill", ["-9", "-f", "main.py"], output, false)
-		OS.delay_msec(100)
 	if skip_linux_video0_fuser_cleanup_on_close_debug:
-		_debug_log("Close-path debug enabled: skipping Linux /dev/video0 fuser cleanup")
-	else:
-		OS.execute("fuser", ["-k", "-9", "/dev/video0"], output, false)
-		OS.delay_msec(100)
+		_debug_log("Legacy debug toggle skip_linux_video0_fuser_cleanup_on_close_debug is now a no-op because /dev/video0 fuser cleanup was removed")
+	if skip_linux_pkill_main_py_on_close_debug:
+		_debug_log("Close-path debug enabled: skipping Linux fallback pkill for explicit sidecar identity")
+		return
+
+	var sidecar_identity := String(_launch_info.get("sidecar_identity", "")).strip_edges()
+	if sidecar_identity.is_empty():
+		_debug_log("Linux fallback cleanup skipped because no explicit sidecar identity was recorded")
+		return
+
+	var output: Array = []
+	OS.execute("pkill", ["-9", "-f", "--", "--sidecar-identity=%s" % sidecar_identity], output, false)
+	OS.delay_msec(100)
 
 func _cleanup_server_state() -> void:
 	if _heartbeat_udp:
@@ -299,12 +289,6 @@ func _finish_install_check() -> void:
 	install_pid = -1
 	emit_signal("installation_complete", false)
 
-func _kill_existing_servers() -> void:
-	if OS.get_name() == "Linux":
-		var output: Array = []
-		OS.execute("pkill", ["-f", "python_mediapipe/main.py"], output, false)
-		await get_tree().create_timer(0.5).timeout
-
 func _build_linux_prelaunch_commands() -> PackedStringArray:
 	return PackedStringArray([
 		"export DISPLAY=:1",
@@ -341,8 +325,6 @@ func _sidecar_show_window_requested() -> bool:
 	return raw_value in ["1", "true", "yes", "on"]
 
 func _start_detached_server() -> int:
-	await _kill_existing_servers()
-
 	var python: String = _find_python()
 	var script: String = ProjectSettings.globalize_path(_resolve_package_path("python_mediapipe/main.py"))
 	var project_dir: String = ProjectSettings.globalize_path(_desktop_sidecar_runtime().get_package_root(get_script().resource_path))
@@ -379,7 +361,11 @@ func _start_detached_server() -> int:
 		return -1
 
 	server_pid = int(_launch_info.get("process_group_id", _launch_info.get("pid", -1)))
-	print("[AutoStartManager] Started sidecar with strategy %s and server PID %d" % [String(_launch_info.get("strategy", "unknown")), server_pid])
+	print("[AutoStartManager] Started sidecar with strategy %s and server PID %d (identity: %s)" % [
+		String(_launch_info.get("strategy", "unknown")),
+		server_pid,
+		String(_launch_info.get("sidecar_identity", "")),
+	])
 	for note in _launch_info.get("notes", PackedStringArray()):
 		print("[AutoStartManager] %s" % note)
 	return server_pid

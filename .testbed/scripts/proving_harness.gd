@@ -1365,9 +1365,9 @@ func _get_close_path_stop_mode_label() -> String:
 	elif skip_sidecar_terminate_kill_escalation_on_close_debug:
 		parts.append("skip_terminate_kill_escalation")
 	if skip_linux_pkill_main_py_on_close_debug:
-		parts.append("skip_linux_pkill_main_py")
+		parts.append("skip_linux_sidecar_identity_pkill")
 	if skip_linux_video0_fuser_cleanup_on_close_debug:
-		parts.append("skip_linux_video0_fuser")
+		parts.append("legacy_skip_linux_video0_fuser_noop")
 	return "+".join(parts)
 
 func _log_shutdown_summary_once(reason: String) -> void:

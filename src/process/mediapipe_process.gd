@@ -95,7 +95,12 @@ func start(config: Variant) -> bool:
 	_pid = int(_launch_info.get("pid", -1))
 	_pgid = int(_launch_info.get("process_group_id", -1))
 	var strategy := String(_launch_info.get("strategy", "unknown"))
-	print("[MediaPipeProcess] Started Python sidecar - Strategy: %s, PID: %d, PGID: %d" % [strategy, _pid, _pgid])
+	print("[MediaPipeProcess] Started Python sidecar - Strategy: %s, PID: %d, PGID: %d, Identity: %s" % [
+		strategy,
+		_pid,
+		_pgid,
+		String(_launch_info.get("sidecar_identity", "")),
+	])
 	var notes: PackedStringArray = _launch_info.get("notes", PackedStringArray())
 	for note in notes:
 		print("[MediaPipeProcess] %s" % note)

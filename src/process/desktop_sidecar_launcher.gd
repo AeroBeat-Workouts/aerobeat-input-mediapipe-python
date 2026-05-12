@@ -17,6 +17,10 @@ static func build_state_paths(label: String) -> Dictionary:
 		"log_file": state_dir.path_join("%s-%s.log" % [safe_label, nonce]),
 	}
 
+static func build_sidecar_identity(label: String) -> String:
+	var safe_label := label.to_lower().replace(" ", "-")
+	return "aerobeat-sidecar-%s-%d-%d" % [safe_label, Time.get_unix_time_from_system(), randi()]
+
 static func read_pid_file(path: String) -> int:
 	var file: FileAccess = FileAccess.open(path, FileAccess.READ)
 	if file:
@@ -50,6 +54,7 @@ static func launch_detached(context: Node, label: String, command: String, args:
 		"log_file": state_paths.get("log_file", ""),
 		"platform": OS.get_name(),
 		"validated_on_host": false,
+		"sidecar_identity": "",
 		"notes": PackedStringArray(),
 	}
 
@@ -57,6 +62,11 @@ static func launch_detached(context: Node, label: String, command: String, args:
 	var redirect_to_log := bool(options.get("redirect_to_log", false))
 	var log_file := String(info.get("log_file", ""))
 	var prelaunch_commands: PackedStringArray = options.get("prelaunch_commands", PackedStringArray())
+	var sidecar_identity := String(options.get("sidecar_identity", build_sidecar_identity(label))).strip_edges()
+	var launch_args := PackedStringArray(args)
+	if not sidecar_identity.is_empty():
+		launch_args.append("--sidecar-identity=%s" % sidecar_identity)
+		info["sidecar_identity"] = sidecar_identity
 
 	match OS.get_name():
 		"Linux":
@@ -66,7 +76,7 @@ static func launch_detached(context: Node, label: String, command: String, args:
 			if not working_directory.is_empty():
 				shell_parts.append("cd %s" % shell_quote(working_directory))
 
-			var launch_command := "setsid nohup %s" % _join_command(command, args)
+			var launch_command := "setsid nohup %s" % _join_command(command, launch_args)
 			if redirect_to_log:
 				launch_command += " > %s 2>&1" % shell_quote(log_file)
 			else:
@@ -98,27 +108,27 @@ static func launch_detached(context: Node, label: String, command: String, args:
 			info["validated_on_host"] = true
 			return info
 		"macOS":
-			var mac_pid := OS.create_process(command, args)
+			var mac_pid := OS.create_process(command, launch_args)
 			if mac_pid <= 0:
 				return info
 			info["ok"] = true
 			info["strategy"] = "macos-direct-pid"
 			info["pid"] = mac_pid
 			info["notes"] = PackedStringArray([
-				"macOS launch currently uses a direct detached PID strategy.",
-				"Process-group isolation and teardown parity are scaffolded but not validated on this Linux host.",
+				"macOS launch currently uses an explicit direct detached PID strategy with a sidecar identity marker in argv.",
+				"This is intentional scaffolding, not Linux-equivalent lifecycle parity, and remains unvalidated on this Linux host.",
 			])
 			return info
 		"Windows":
-			var windows_pid := OS.create_process(command, args)
+			var windows_pid := OS.create_process(command, launch_args)
 			if windows_pid <= 0:
 				return info
 			info["ok"] = true
 			info["strategy"] = "windows-direct-pid"
 			info["pid"] = windows_pid
 			info["notes"] = PackedStringArray([
-				"Windows launch currently uses a direct detached PID strategy.",
-				"taskkill-based teardown is scaffolded but not validated on this Linux host.",
+				"Windows launch currently uses an explicit direct detached PID strategy with a sidecar identity marker in argv.",
+				"This is intentional scaffolding, not Linux-equivalent lifecycle parity, and remains unvalidated on this Linux host.",
 			])
 			return info
 		_:

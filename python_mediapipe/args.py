@@ -78,5 +78,7 @@ def parse_args():
                        help="Show OpenCV debug window with pose overlay (default: disabled)")
     parser.add_argument("--window-scale", type=float, default=1.0,
                        help="Scale factor for debug window (default: 1.0)")
+    parser.add_argument("--sidecar-identity", type=str, default="",
+                       help="Explicit launch identity marker used by the host lifecycle manager")
     
     return parser.parse_args()

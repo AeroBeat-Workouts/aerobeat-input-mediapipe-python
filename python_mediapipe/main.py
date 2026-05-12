@@ -707,6 +707,8 @@ def main():
     processing_fps = args.max_fps / skip_frames
 
     print(f"MediaPipe started - Camera: {args.camera}, UDP: {args.host}:{args.port}")
+    if args.sidecar_identity:
+        print(f"Sidecar identity: {args.sidecar_identity}")
     print(f"Resolution: {args.width}x{args.height}, Model: {args.model_complexity} ({model_path.name}), "
           f"Detection: {args.detection_confidence}, Tracking: {args.tracking_confidence}")
     print(f"Multi-pose: 2 people max (Player 1 = Green, Player 2 = Magenta)")
