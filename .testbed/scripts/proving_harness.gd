@@ -18,7 +18,7 @@ const MAX_TRAIL_POINTS := 36
 const MAX_TRAIL_AGE_MS := 1800
 const MAX_TRAIL_FRAME_JUMP := 0.28
 const TRAIL_VISIBILITY_THRESHOLD_FLOOR := 0.18
-const TRAIL_NEAR_BOUNDS_MARGIN := 0.08
+const MAX_TRAIL_FALLBACK_SPREAD := 0.18
 
 const BOXING_EVENT_ORDER := [
 	"punch_left",
@@ -411,8 +411,6 @@ func _resolve_trail_hand_point(landmarks: Array, wrist_id: int, fallback_ids: Ar
 		return wrist
 
 	var candidates: Array[Dictionary] = []
-	if _trail_landmark_is_candidate(wrist):
-		candidates.append(wrist)
 	for landmark_id: int in fallback_ids:
 		var candidate := _find_landmark(landmarks, landmark_id)
 		if _trail_landmark_is_candidate(candidate):
@@ -438,25 +436,37 @@ func _trail_landmark_is_candidate(landmark: Dictionary) -> bool:
 	if float(landmark.get("v", 0.0)) < _trail_visibility_threshold():
 		return false
 	var point := Vector2(float(landmark.get("x", 0.0)), float(landmark.get("y", 0.0)))
-	return _is_point_within_trail_near_bounds(point)
+	return _is_normalized_point_in_bounds(point)
 
 func _synthesize_trail_hand_point(candidates: Array[Dictionary]) -> Dictionary:
+	if candidates.size() < 2:
+		return {}
 	var total_weight := 0.0
 	var blended_point := Vector2.ZERO
 	var best_visibility := 0.0
+	var points: Array[Vector2] = []
 	for candidate: Dictionary in candidates:
 		var visibility := float(candidate.get("v", 0.0))
 		var point := Vector2(float(candidate.get("x", 0.0)), float(candidate.get("y", 0.0)))
-		var clamped_point := Vector2(clampf(point.x, 0.0, 1.0), clampf(point.y, 0.0, 1.0))
-		blended_point += clamped_point * visibility
+		points.append(point)
+		blended_point += point * visibility
 		total_weight += visibility
 		best_visibility = maxf(best_visibility, visibility)
 	if total_weight <= 0.000001:
 		return {}
-	return _make_trail_point(blended_point / total_weight, best_visibility, Time.get_ticks_msec())
+	if _max_point_spread(points) > MAX_TRAIL_FALLBACK_SPREAD:
+		return {}
+	var synthesized_point := blended_point / total_weight
+	if not _is_normalized_point_in_bounds(synthesized_point):
+		return {}
+	return _make_trail_point(synthesized_point, best_visibility, Time.get_ticks_msec())
 
-func _is_point_within_trail_near_bounds(point: Vector2) -> bool:
-	return point.x >= -TRAIL_NEAR_BOUNDS_MARGIN and point.x <= 1.0 + TRAIL_NEAR_BOUNDS_MARGIN and point.y >= -TRAIL_NEAR_BOUNDS_MARGIN and point.y <= 1.0 + TRAIL_NEAR_BOUNDS_MARGIN
+func _max_point_spread(points: Array[Vector2]) -> float:
+	var max_spread := 0.0
+	for i: int in range(points.size()):
+		for j: int in range(i + 1, points.size()):
+			max_spread = maxf(max_spread, points[i].distance_to(points[j]))
+	return max_spread
 
 func _trail_jump_distance(trail: Array, point: Vector2) -> float:
 	if trail.is_empty():
