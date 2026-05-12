@@ -1,7 +1,7 @@
 # AeroBeat MediaPipe Python — Cookie Boxing UI Missing and Close Crash
 
 **Date:** 2026-05-08
-**Status:** In Progress
+**Status:** Closed for now
 **Agent:** Pico 🐱‍🏍
 
 ---
@@ -163,9 +163,9 @@ Follow-up research tightened that further: the screenshot is not the proving har
 **Files Created/Deleted/Modified:**
 - plan updates and audit notes only
 
-**Status:** ⏳ Pending
+**Status:** ✅ Complete
 
-**Results:** Pending.
+**Results:** Source-only audit completed. No repo-owned path was found that directly targets the **editor** or could intentionally invoke the Godot editor quit/close dialog. Strongest negative evidence: there is no `EditorPlugin`, `EditorInterface`, `Engine.is_editor_hint()`, or `@tool` usage in the repo-owned runtime/testbed source; `.testbed/project.godot` only enables `res://addons/aerobeat-input-core/plugin.cfg`, not a plugin from this repo. Explicit quit/close calls do exist, but they are confined to the **running project window** path: `.testbed/scripts/proving_harness.gd` and `.testbed/scripts/test_scene.gd` handle `NOTIFICATION_WM_CLOSE_REQUEST` by stopping scene resources and then calling `get_tree().quit()`, while `src/autostart_manager.gd`, `src/providers/mediapipe_provider.gd`, `src/mediapipe_input_with_camera.gd`, and `src/process/mediapipe_process.gd` respond to close/exit notifications by stopping sidecar/provider/camera state only. Those are plausible contributors to the broader close-time instability/crash hunt, especially after the recent shutdown-ladder commits (`e719624`, `c247339`, `2f40d25`, `fb037e7`, `87be0df`) that added/changed close-time teardown branches, but they still do **not** constitute a project-side path that should ask the editor itself to exit. Input/shortcut audit also came back clean for this symptom: outside third-party GUT files, the only repo-owned `_input` key handler is `src/mediapipe_input_with_camera.gd`, which toggles camera visibility on `KEY_TAB`; no repo-owned `ui_cancel`, quit accelerators, Alt+F4/Ctrl+Q-style bindings, or editor-close shortcuts were found. Net: **no strong project-side/editor-context suspect for the editor-close dialog itself**; strongest repo-side suspects remain only for the separate close-time teardown/crash family, not for causing the editor prompt.
 
 ---
 
@@ -2433,9 +2433,9 @@ Terminal-safe validation only: `~/.local/bin/godot --headless --path .testbed --
 **Files Created/Deleted/Modified:**
 - plan updates / verification notes only unless a truthful docs correction is required
 
-**Status:** ⏳ Pending
+**Status:** ✅ Closed without separate QA pass
 
-**Results:** Pending.
+**Results:** The bug hunt was closed for now after repeated non-repros on the newer protected baseline and multiple narrower teardown branches, so this separate QA handoff bead was no longer needed and was closed without additional QA work.
 
 ### Task 105: Audit the narrowed `normal_stop` crash ladder before Derrick’s next live reruns
 
@@ -2451,9 +2451,9 @@ Terminal-safe validation only: `~/.local/bin/godot --headless --path .testbed --
 **Files Created/Deleted/Modified:**
 - plan updates / audit notes only
 
-**Status:** ⏳ Pending
+**Status:** ✅ Closed without separate audit pass
 
-**Results:** Pending.
+**Results:** The bug hunt was closed for now after repeated non-repros on the newer protected baseline and multiple narrower teardown branches, so this separate audit handoff bead was no longer needed and was closed without additional audit work.
 
 ### Task 106: If needed, split Linux `/dev/video0` cleanup from sidecar-targeting `pkill` cleanup
 
@@ -2646,9 +2646,9 @@ Use this section as the operator-facing checklist for the next focused reruns. T
 
 **What this isolates:** nothing new yet; this is the control row for the deeper ladder.
 
-**Result:** ⏳ Pending
+**Result:** ✅ Complete
 
-**Notes:**
+**Notes:** Derrick’s present control path (Flow + `TRACKING` with landmarks/trails on, no shutdown booleans enabled) stayed clean through roughly 24 repeated close cycles. That means current `normal_stop` should now be treated as a **protected baseline**, not the older historically crashy baseline, because the broader Linux cleanup that had already landed earlier is part of this row.
 
 ### Rung B — Launcher TERM-only, Linux cleanup still intact
 
@@ -2684,9 +2684,9 @@ Use this section as the operator-facing checklist for the next focused reruns. T
 
 **What this isolates:** pure launcher TERM path with no forced KILL and no repo Linux cleanup afterward.
 
-**Result:** ⏳ Pending
+**Result:** ✅ Complete
 
-**Notes:**
+**Notes:** Derrick completed 20 repeated runs on this triple-boolean TERM-only branch without reproducing the Zorin GUI crash. This materially weakens the earlier theory that simply removing the newer launcher/Linux cleanup protections would make the old crash immediately reappear.
 
 ### Rung D — Keep launcher unchanged, skip only repo-side sidecar `pkill` pair
 
@@ -2703,9 +2703,9 @@ Use this section as the operator-facing checklist for the next focused reruns. T
 
 **What this isolates:** repo-owned sidecar `pkill` cleanup versus the rest of normal stop.
 
-**Result:** ⏳ Pending
+**Result:** ✅ Complete
 
-**Notes:**
+**Notes:** Derrick ran 20 repeated Flow reruns on this branch without a crash. That weakens the sidecar-targeting Linux `pkill` pair as a primary single-point explanation for the historical Zorin GUI crash.
 
 ### Rung E — Keep launcher unchanged, skip only `/dev/video0` cleanup
 
@@ -2722,9 +2722,9 @@ Use this section as the operator-facing checklist for the next focused reruns. T
 
 **What this isolates:** camera-device `fuser` cleanup versus the rest of normal stop.
 
-**Result:** ⏳ Pending
+**Result:** ✅ Complete
 
-**Notes:**
+**Notes:** Derrick ran 20 repeated Flow reruns on this branch without a crash. That weakens `/dev/video0` forced cleanup as a primary single-point explanation for the historical Zorin GUI crash.
 
 ### Optional Rung F — Launcher unchanged, skip both repo Linux cleanup branches
 
@@ -2741,9 +2741,9 @@ Use this section as the operator-facing checklist for the next focused reruns. T
 
 **What this isolates:** launcher-managed stop alone, with repo Linux cleanup entirely removed.
 
-**Result:** ⏳ Pending
+**Result:** ✅ Complete
 
-**Notes:**
+**Notes:** Derrick ran 20 repeated Flow reruns on this branch without a crash. Removing both repo Linux cleanup branches together still did not revive the old crash, which weakens the Linux cleanup layer as the current trigger on this host/surface.
 
 ### Task 107: Add a separate deeper `normal_stop` shutdown-ladder section to the crash-test webpage
 
@@ -2780,9 +2780,9 @@ Use this section as the operator-facing checklist for the next focused reruns. T
 **Files Created/Deleted/Modified:**
 - plan updates / QA notes only unless a truthful docs correction is required
 
-**Status:** ⏳ Pending
+**Status:** ✅ Closed without separate QA pass
 
-**Results:** Pending.
+**Results:** Derrick reviewed and accepted the focused shutdown-ladder webpage section as good enough for active use before a separate QA pass was run, so this bead was closed without additional QA work.
 
 ### Task 109: Audit the deeper `normal_stop` shutdown-ladder webpage section
 
@@ -2798,9 +2798,9 @@ Use this section as the operator-facing checklist for the next focused reruns. T
 **Files Created/Deleted/Modified:**
 - plan updates / audit notes only
 
-**Status:** ⏳ Pending
+**Status:** ✅ Closed without separate audit pass
 
-**Results:** Pending.
+**Results:** Derrick accepted the focused shutdown-ladder webpage section as good enough for active use before a separate audit pass was run, so this bead was closed without additional audit work.
 
 ### Task 110: Tighten focused shutdown-ladder effective-mode column wrapping
 
@@ -2861,9 +2861,28 @@ Use this section as the operator-facing checklist for the next focused reruns. T
 
 **Results:** Focused ladder Notes usability fix completed in `.testbed/.crash-test/crash-test.html` without touching the original 60-row matrix table. The ladder table now uses `table-layout: fixed` and explicit ladder-only column sizing so the wide explanatory columns stop stealing all remaining space from Notes: added `.rung-column` (`19ch`), kept the wrapped `.effective-mode-column` (`16ch`), added `.inspector-column` (`22ch`), `.isolates-column` (`24ch`), and a ladder-only `.notes-column` sized to `30%` / `30ch`. The ladder header and row markup now tag those columns explicitly, and inspector-setting `<code>` entries now share the same wrap-safe treatment as the effective-mode column so the earlier wrapping improvement stays intact while Notes gets a predictable wide remainder column again. Safe validation passed with a `python3` HTML string-assert check confirming the new ladder-only layout hooks/classes plus `git diff --check -- .testbed/.crash-test/crash-test.html .plans/2026-05-08-cookie-boxing-ui-missing-and-close-crash.md`. Landed in commit `0c4035b` (`Widen crash test ladder notes column`) and pushed to `origin/main`.
 
+### Task 113: Audit project-side paths that could trigger the Godot editor quit/close prompt
+
+**Bead ID:** `oc-evca`
+**SubAgent:** `primary` (for `research` workflow role)
+**Role:** `research`
+**References:** `REF-04`, `REF-18`, `REF-20`
+**Prompt:** Claim bead `oc-evca` with `bd update oc-evca --status in_progress --json`. Audit the repo for any project-side/editor-context path that could plausibly trigger the Godot editor dialog `Stop running project before exiting the editor?` during repeated proving-scene play/close testing. Focus on quit/close/tree-exit/editor-plugin/editor-interface interactions, input handlers that might map to close/quit, window-close handling, and any code that behaves differently in editor context versus game runtime. Scope is audit only unless a tiny truth-revealing note is necessary. Update the active plan with truthful findings and close the bead with a concise reason when complete.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- source files only for reading
+
+**Files Created/Deleted/Modified:**
+- plan updates / audit notes only
+
+**Status:** ✅ Complete
+
+**Results:** Audit found no strong repo-side/editor-context path that should directly trigger Godot’s editor dialog `Stop running project before exiting the editor?`. No repo-owned `EditorPlugin`, `EditorInterface`, `Engine.is_editor_hint()`, or `@tool` usage was found in this runtime/testbed path, and the only repo-owned quit/close calls in `.testbed/scripts/proving_harness.gd` / `.testbed/scripts/test_scene.gd` target the running play window via `get_tree().quit()` after WM close requests rather than the editor itself. Runtime components such as `src/autostart_manager.gd`, `src/providers/mediapipe_provider.gd`, `src/mediapipe_input_with_camera.gd`, and `src/process/mediapipe_process.gd` do participate in broader exit/teardown handling, but no strong evidence was found that this repo explicitly requests editor exit. Best current read: the rare editor-close prompt is a separate weak symptom, more plausibly window-manager/editor/X11 weirdness than a direct repo-side editor quit path.
+
 ## Final Results
 
-**Status:** ⚠️ Partial
+**Status:** ✅ Closed for now
 
 **What We Built:**
 - A working file-backed prerecorded proving path for Boxing/Flow scenes, including Inspector-based clip selection and visibly advancing/looping preview playback.
@@ -2875,7 +2894,9 @@ Use this section as the operator-facing checklist for the next focused reruns. T
   - quiet-by-default proving/camera/autostart logging
   - runtime-tree `.gdignore` shields to stop Godot CSV import noise
   - harness event/snapshot spam reduced to concise startup/exit signal
-- A completed 60-row shutdown-mode crash matrix that now sharply localizes the surviving Zorin/X11 crash to the plain `normal_stop` teardown family.
+- A completed 60-row shutdown-mode crash matrix that localized the surviving Zorin/X11 crash to the shared `normal_stop` teardown family.
+- A second focused shutdown-ladder tracker in the crash-test webpage for narrower reruns.
+- A final closeout result from today’s reruns: the **current broadened `normal_stop` baseline stayed stable**, and multiple narrower protection-removal branches also failed to reproduce the historical crash on Derrick’s present host/surface.
 
 **Reference Check:**
 - `REF-04` / `REF-06`: satisfied for the proving-harness/source-owned feature and cleanup work.
@@ -2895,8 +2916,10 @@ Use this section as the operator-facing checklist for the next focused reruns. T
 - Treat prerecorded proving playback as a first-class product feature, not just a debugging convenience.
 - Dirty repro surfaces are worse than slow repro surfaces; when crash hunting, reject contaminated runs instead of over-interpreting them.
 - The strongest crash-isolation progress still comes from changing one teardown variable while keeping playback constant.
-- The completed shutdown matrix now strongly suggests the bug lives in the shared `normal_stop` teardown path, not in proving playback broadly.
-- `BadWindow` can accompany clean closes, so it should be tracked as a useful symptom but not treated as a sufficient crash classifier by itself.
+- The completed shutdown matrix strongly pointed at `normal_stop`, but later review showed that today’s `normal_stop` is already a **broadened protected baseline**, not the older historical baseline; that distinction matters when reading non-repros.
+- Removing individual newer shutdown protections (`pkill`, `/dev/video0` `fuser`, launcher KILL escalation, and even the triple-boolean TERM-only branch) did **not** revive the old crash on Derrick’s present host/surface, so the historical crash is currently best treated as **dormant / not reproducing** rather than actively solved by one newly isolated call.
+- `BadWindow` can accompany clean closes and even appears in unrelated Godot 4.6.2 projects, so it should no longer be treated as meaningful evidence in this bug family.
+- The rare Godot editor close prompt looks like a separate weak symptom with no strong repo-side trigger found.
 - For GUI-sensitive branches, Derrick’s direct observation remains the ground truth; subagent/source/headless work should sharpen the next human repro, not replace it.
 
 ---
