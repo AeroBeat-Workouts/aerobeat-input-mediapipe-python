@@ -2802,6 +2802,26 @@ Use this section as the operator-facing checklist for the next focused reruns. T
 
 **Results:** Pending.
 
+### Task 110: Tighten focused shutdown-ladder effective-mode column wrapping
+
+**Bead ID:** `oc-tunw`
+**SubAgent:** `primary` (for `coder` workflow role)
+**Role:** `coder`
+**References:** `REF-04`
+**Prompt:** Claim bead `oc-tunw` with `bd update oc-tunw --status in_progress --json`. Adjust the new focused shutdown-ladder table in `.testbed/.crash-test/crash-test.html` so the `Effective shutdown mode` column no longer forces the table overly wide. Keep the column width closer to the header width and allow long mode strings to wrap cleanly, so the columns to the left have more room. Keep scope tightly limited to this layout/readability fix, run safe validation, update the active plan with results, commit/push, and close the bead with a concise reason when complete.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- `.testbed/.crash-test/`
+
+**Files Created/Deleted/Modified:**
+- `.testbed/.crash-test/crash-test.html`
+- `.plans/2026-05-08-cookie-boxing-ui-missing-and-close-crash.md`
+
+**Status:** ✅ Complete
+
+**Results:** Scoped layout/readability fix completed in `.testbed/.crash-test/crash-test.html`. The focused shutdown-ladder table now has a dedicated `.ladder-table` class with a narrower `min-width` (`1220px` instead of inheriting the global `1350px` table minimum), the `Effective shutdown mode` header/cells now use an `effective-mode-column` width cap (`16ch`), and the effective-mode `<code>` content now wraps cleanly via `white-space: normal` plus `overflow-wrap: anywhere` instead of forcing the ladder table overly wide. This preserves the focused ladder content and behavior while giving the columns to the left more room. Safe validation passed with `python3` string-assert checks against the updated HTML structure/CSS plus `git diff --check`. Commit/push and bead closure completed after the edit.
+
 ## Final Results
 
 **Status:** ⚠️ Partial

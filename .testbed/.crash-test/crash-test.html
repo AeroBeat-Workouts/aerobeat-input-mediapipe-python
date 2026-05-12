@@ -230,6 +230,23 @@
       background: rgba(7, 13, 23, 0.55);
     }
 
+    .ladder-table {
+      min-width: 1220px;
+    }
+
+    .ladder-table .effective-mode-column {
+      width: 16ch;
+      max-width: 16ch;
+    }
+
+    .ladder-table .effective-mode-cell code {
+      display: inline-block;
+      max-width: 100%;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
     thead th {
       position: sticky;
       top: 0;
@@ -438,12 +455,12 @@
           </p>
           <div class="summary-grid" id="ladder-summary-grid"></div>
           <div class="table-wrap">
-            <table>
+            <table class="ladder-table">
               <thead>
                 <tr>
                   <th class="nowrap">#</th>
                   <th>Rung</th>
-                  <th>Effective shutdown mode</th>
+                  <th class="effective-mode-column">Effective shutdown mode</th>
                   <th>Inspector settings to flip</th>
                   <th>What this isolates</th>
                   <th class="checkbox-cell">Tested</th>
@@ -758,7 +775,7 @@
               <strong>${rung.label}</strong>
             </div>
           </td>
-          <td><code>${rung.effectiveMode}</code></td>
+          <td class="effective-mode-cell effective-mode-column"><code>${rung.effectiveMode}</code></td>
           <td>
             <div class="combo">${rung.inspectorSettings.map((setting) => `<span><code>${setting}</code></span>`).join("")}</div>
           </td>
