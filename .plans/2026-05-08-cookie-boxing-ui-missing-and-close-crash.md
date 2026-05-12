@@ -2401,6 +2401,30 @@ Safe validation only: `git diff --check -- .testbed/.crash-test/crash-test.html`
 - Separate product/UI branch remains queued:
   - wait for Derrick’s Penpot slice, then redesign the Boxing proving scene to replace text-heavy status with gesture icons and active-state/highlight buttons
 
+## Tonight's Stopping Point — 2026-05-11
+
+- The shutdown-isolation work is now landed and source-audited:
+  - `2f40d25` — `Add narrow shutdown isolation toggles`
+  - `fb037e7` — `Fix Linux pkill isolation toggle`
+- The local crash tracker is now expanded and source-audited to represent the real shutdown ladder:
+  - `0830980` — `Expand crash-test tracker shutdown modes`
+- Tracker truth now supports these shutdown modes explicitly:
+  - `normal_stop`
+  - `heartbeat_only`
+  - `normal_stop+skip_terminate_sync`
+  - `normal_stop+skip_linux_pkill_main_py`
+  - `normal_stop+skip_terminate_sync+skip_linux_pkill_main_py`
+- Important manual-testing caveat remains explicit:
+  - `boxing_proving.tscn` still bakes `skip_sidecar_stop_on_close_debug = true`
+  - for any Boxing narrow-mode test, Derrick must first turn that broad bypass back off in the root Inspector or the effective mode remains `heartbeat_only`
+- Derrick began the new shutdown-mode matrix tonight on Chip and completed the prerecorded half of the next ladder with **no crashes on any prerecorded-video runs**.
+- Live-camera rows are intentionally deferred to tomorrow from Cookie’s terminal, where Derrick will continue the new shutdown-mode matrix and wrap up this crash-hunt pass.
+- Best current next step:
+  1. resume on Cookie’s terminal tomorrow
+  2. continue the **live-camera** rows for the new shutdown modes first
+  3. use the expanded tracker page as the truth log rather than ad-hoc notes
+  4. only revisit Boxing after Flow/live-camera results if the signal is still ambiguous or scene comparison is needed
+
 ## Final Results
 
 **Status:** ⚠️ Partial
