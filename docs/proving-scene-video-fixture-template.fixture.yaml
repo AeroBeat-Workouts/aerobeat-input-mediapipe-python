@@ -1,210 +1,40 @@
-# Human-authored fixture metadata template.
-# YAML is preferred over JSON here because comments/descriptions matter during
-# capture, review, and truth-boundary discussions.
+# Minimal truthful proving-fixture template.
 #
-# How to use this file:
-# - Required fields should always be filled in for a real fixture.
-# - Optional fields can stay empty if they do not add value yet.
-# - Conditionally optional fields are only needed when that kind of clip/assertion applies.
-# - Keep the video basename and fixture basename aligned.
+# This first fixture-system slice is intentionally small:
+# - the fixture owns the video path
+# - expected gestures are authored as direct time windows
+# - forbidden gestures are optional clip-wide bans
+# - the proving harness records a structured event timeline + state snapshots
+#
+# Time windows are human-authored, near-second truth. Prefer honest
+# approximate windows over fake millisecond precision.
 
-# Required: bump only when the fixture schema changes in a breaking way.
 schema_version: 1
+fixture_id: boxing__punch_left__positive__guard_start_end__take_01
+family: boxing
 
-# Required: unique durable id, usually matching the filename basename.
-fixture_id: flow__swing_left__positive__cam-cookie-logitech-c920__take-01
+video:
+  # Relative to this YAML file unless absolute.
+  path: ./boxing__punch_left__positive__guard_start_end__take_01.mp4
 
-# Required: trust level for this clip. Use candidate until a human approves it.
-approval_level: candidate
+# Optional human notes for authoring/audit context.
+notes:
+  - candidate Boxing clip with repeated left punches
+  - windows below are approximate human-authored timing, not frame-exact labels
 
-# Required: detector family this fixture belongs to. Expected values today: boxing | flow.
-family: flow
+expected_gestures:
+  - name: punch_left
+    windows:
+      - start_ms: 900
+        end_ms: 1300
+      - start_ms: 1900
+        end_ms: 2300
+      - start_ms: 2900
+        end_ms: 3300
+      - start_ms: 3900
+        end_ms: 4300
 
-# Required: specific feature under test. Use proving-scene vocabulary like swing_left.
-feature: swing_left
-
-# Required: what the clip is meant to prove. Common values: positive | negative | boundary | rearm | occlusion | framing.
-intent: positive
-
-# Required: broad motion pattern. Common values: oneshot | state | continuous | mixed.
-motion_shape: oneshot
-
-# Required: sibling video filename stored beside this YAML file.
-video_file: flow__swing_left__positive__cam-cookie-logitech-c920__take-01.mp4
-
-# Required: ISO-8601 timestamp for when the clip was recorded.
-captured_at: 2026-05-05T00:00:00-04:00
-
-# Required: person who recorded/performed the take.
-captured_by: Derrick Barra
-
-# Required: machine or rig name used to capture the clip.
-capture_host: cookie
-
-# Required: camera/input provenance used to interpret the clip later.
-camera:
-  # Required: human-readable camera label or model.
-  label: logitech-c920
-
-  # Required: short note about camera placement/orientation from the subject's point of view.
-  mode: front-facing
-
-  # Required: true if the incoming image was mirrored before detection/review; false otherwise.
-  mirrored_input: true
-
-  # Required: intended or observed frame rate of the source video.
-  frame_rate: 30
-
-  # Required: recorded pixel dimensions of the source clip.
-  resolution:
-    # Required: frame width in pixels.
-    width: 1920
-
-    # Required: frame height in pixels.
-    height: 1080
-
-# Required: plain-English capture context that may explain why a take is good or bad.
-environment:
-  # Optional: room/background summary. Helpful when framing or occlusion might matter later.
-  room_notes: even front lighting, neutral background
-
-  # Optional: specific lighting note if glare, backlight, shadows, or brightness matter.
-  lighting_notes: no major backlight
-
-  # Optional: note anything about clothing/body visibility that affects tracking confidence.
-  wardrobe_notes: arms/hands clearly visible
-
-# Required: timing anchors for the clip. These let humans and automation agree on when the action happens.
-clip_timing:
-  # Required: full video duration in milliseconds.
-  duration_ms: 2600
-
-  # Required: neutral lead-in before the interesting motion begins.
-  lead_in_ms: 700
-
-  # Required: approximate moment the target action begins.
-  action_start_ms: 800
-
-  # Required: approximate moment the target action finishes.
-  action_end_ms: 1400
-
-  # Required: when the clip has settled enough that reset/re-arm/state exit should be observable.
-  settle_end_ms: 2400
-
-# Required: short bullets describing what this fixture is allowed to prove.
-claims:
-  - regression check for emitted swing_left event class
-  - regression check for emitted placement/direction payload
-  - regression check for swing ready/reset observability fields
-
-# Required: short bullets describing what this fixture explicitly does NOT prove.
-non_claims:
-  - does not prove live camera ergonomics
-  - does not prove universal threshold correctness
-  - does not replace human verification
-
-# Required section: human review state for deciding whether candidate becomes canonical.
-review:
-  # Required: review workflow state, for example pending | approved | rejected.
-  status: pending
-
-  # Optional until reviewed: who approved/rejected this take.
-  reviewed_by: ''
-
-  # Optional until reviewed: when the review decision happened.
-  reviewed_at: ''
-
-  # Optional: reviewer notes, reasons, caveats, or promotion guidance.
-  notes: ''
-
-# Required section: what the detector itself should do when this clip is replayed.
-expected_detector_behavior:
-  # Conditionally optional: expected emitted events. Leave empty only for fixtures that assert pure non-emission/state behavior.
-  expected_events:
-    - # Required per expected event: detector signal name that should be emitted.
-      name: swing_left
-
-      # Required per expected event: how many times this event should appear in the clip.
-      count: 1
-
-      # Conditionally optional: timing window for when this event may fire. Strongly recommended for most fixtures.
-      window_ms:
-        # Required when window_ms is present: earliest acceptable event time.
-        start: 850
-
-        # Required when window_ms is present: latest acceptable event time.
-        end: 1500
-
-      # Conditionally optional: emitted payload fields expected on this event. Use {} when the event has no payload requirements.
-      payload:
-        # Optional: expected placement label if this event carries placement.
-        placement: center
-
-        # Optional: expected direction label if this event carries direction.
-        direction: left
-
-  # Optional but recommended: events that must not appear because they would indicate a false positive or cross-trigger.
-  forbidden_events:
-    - swing_right
-    - trail_left
-    - trail_right
-
-  # Conditionally optional: sustained-state expectations for state/continuous fixtures. Use [] for one-shot fixtures.
-  expected_state_windows: []
-
-  # Conditionally optional: ready/reset/re-arm expectations. Strongly recommended for repeatable event/state fixtures.
-  expected_ready_transitions:
-    - # Required when used: signal whose ready lifecycle is being checked.
-      signal: swing_left
-
-      # Required when used: detector should already be ready before this time.
-      must_be_ready_before_ms: 800
-
-      # Conditionally optional: window where temporary reset/not-ready is acceptable after firing.
-      may_be_reset_during_ms:
-        # Required when may_be_reset_during_ms is present: reset window start.
-        start: 850
-
-        # Required when may_be_reset_during_ms is present: reset window end.
-        end: 1700
-
-      # Required when used: detector should have re-armed again by this time.
-      must_be_ready_again_by_ms: 2400
-
-# Required section: proving-scene/debug surfaces that should exist during evaluation.
-expected_observability:
-  # Required: proving scene used to validate UI/debug truth for this family.
-  scene: flow_proving.tscn
-
-  # Required: scene fields/labels that should be surfaced for this fixture's claim set.
-  required_scene_surfaces:
-    - signal_board.swing_left.status
-    - signal_board.swing_left.count
-    - signal_board.swing_left.last
-    - signal_board.swing_left.emitted_placement
-    - signal_board.swing_left.emitted_direction
-    - signal_board.swing_left.candidate_placement
-    - signal_board.swing_left.candidate_direction
-
-  # Required: underlying debug/state fields that automation or humans should be able to inspect.
-  required_debug_fields:
-    - gesture_debug.ready.swing_left
-    - gesture_debug.flow.left.placement_candidate
-    - gesture_debug.flow.left.direction_candidate
-    - gesture_debug.flow.left.swing_meta.placement
-    - gesture_debug.flow.left.swing_meta.direction
-    - gesture_debug.flow.left.swing_analysis.duration_ms
-    - gesture_debug.flow.left.swing_analysis.arc_length
-    - gesture_debug.flow.left.swing_analysis.net_distance
-    - gesture_debug.flow.left.swing_analysis.directional_consistency
-
-# Required section: related evidence files kept beside the fixture when available.
-artifacts:
-  # Conditionally optional: markdown notes file for human review/testing context. Keep empty only if no notes file exists.
-  notes_file: flow__swing_left__positive__cam-cookie-logitech-c920__take-01.notes.md
-
-  # Optional: link back to the live human-verification session or notebook that produced this fixture.
-  source_session_ref: human-verification-session-2026-05-05-cookie
-
-  # Optional: screenshots or stills worth preserving as approval/debug evidence.
-  screenshots: []
+# Optional. Omit entirely when false-positive bans are not important for the clip.
+forbidden_gestures:
+  - name: punch_right
+  - name: uppercut_right

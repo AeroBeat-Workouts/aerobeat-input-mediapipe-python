@@ -1,78 +1,28 @@
 schema_version: 1
 fixture_id: boxing__punch_right__positive__guard_start_end__take_01
-approval_level: candidate
 family: boxing
-feature: punch_right
-intent: positive
-motion_shape: repeated
-video_file: boxing__punch_right__positive__guard_start_end__take_01.mp4
-captured_at: 2026-05-08T18:52:13-04:00
-captured_by: Derrick Barra
-capture_host: cookie
-camera:
-  label: Logitech Brio
-  mode: front-facing
-  mirrored_input: true
-  frame_rate: 24
-  resolution:
-    width: 1920
-    height: 1080
-environment:
-  room_notes: Gambit Games Office - Inside OMG Labs within Tech Hub Orlando Building
-  lighting_notes: office ceiling lights
-  wardrobe_notes: pending-human-review
-clip_timing:
-  duration_ms: 6016
-  lead_in_ms: 500
-  action_start_ms: 1000
-  action_end_ms: 5000
-  settle_end_ms: 6016
-claims:
-  - regression check for repeated punch_right detections from a prerecorded guard-start/guard-end clip
-  - regression check that Boxing proving observability and trail/debug surfaces remain stable across a repeated right-hand action clip
-non_claims:
-  - does not yet prove canonical timing windows or power thresholds for each punch
-  - does not replace live human verification on Cookie
-  - does not yet prove cross-camera generalization
-review:
-  status: pending
-  reviewed_by: ''
-  reviewed_at: ''
-  notes: Candidate fixture from Derrick's recorded take: 4 right punches, starts in guard, ends in guard. Approximate cadence is about 1 second per punch and about 1 second between punches. Human review still needed for exact per-punch timing windows and wardrobe notes.
-expected_detector_behavior:
-  expected_events:
-    - name: punch_right
-      count: 4
-      payload: {}
-  forbidden_events:
-    - punch_left
-    - hook_left
-    - hook_right
-    - uppercut_left
-    - uppercut_right
-    - knee_left
-    - knee_right
-  expected_state_windows: []
-  expected_ready_transitions:
-    - signal: punch_right
-      must_be_ready_before_ms: 900
-      may_be_reset_during_ms:
-        start: 900
-        end: 5400
-      must_be_ready_again_by_ms: 6016
-expected_observability:
-  scene: boxing_proving.tscn
-  required_scene_surfaces:
-    - signal_board.punch_right.status
-    - signal_board.punch_right.count
-    - signal_board.punch_right.last
-    - signal_board.punch_right.last_power
-  required_debug_fields:
-    - gesture_debug.ready.punch_right
-    - gesture_debug.boxing.right.punch_distance
-    - gesture_debug.boxing.right.punch_velocity
-    - gesture_debug.boxing.right.punch_extension
-artifacts:
-  notes_file: boxing__punch_right__positive__guard_start_end__take_01.notes.md
-  source_session_ref: human-recorded-fixture-2026-05-08
-  screenshots: []
+video:
+  path: ./boxing__punch_right__positive__guard_start_end__take_01.mp4
+notes:
+  - candidate Boxing clip from Derrick's recorded take
+  - starts in guard, ends in guard, with four repeated right punches
+  - windows below are approximate human-authored boxing truth for this first fixture slice
+expected_gestures:
+  - name: punch_right
+    windows:
+      - start_ms: 900
+        end_ms: 1300
+      - start_ms: 1900
+        end_ms: 2300
+      - start_ms: 2900
+        end_ms: 3300
+      - start_ms: 3900
+        end_ms: 4300
+forbidden_gestures:
+  - name: punch_left
+  - name: hook_left
+  - name: hook_right
+  - name: uppercut_left
+  - name: uppercut_right
+  - name: knee_left
+  - name: knee_right

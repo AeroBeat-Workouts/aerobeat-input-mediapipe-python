@@ -5,7 +5,6 @@ const DEFAULT_VIEWPORT_SIZE := Vector2i(1280, 720)
 
 var _scene_path := ""
 var _fixture_path := ""
-var _video_path := ""
 var _output_dir := ""
 var _capture_delay_ms := DEFAULT_CAPTURE_DELAY_MS
 var _scene_root: Control = null
@@ -14,17 +13,16 @@ var _captured := false
 
 func _initialize() -> void:
 	var args := OS.get_cmdline_user_args()
-	if args.size() < 4:
-		push_error("usage: <scene_path> <fixture_path> <video_path> <output_dir> [capture_delay_ms]")
+	if args.size() < 3:
+		push_error("usage: <scene_path> <fixture_path> <output_dir> [capture_delay_ms]")
 		quit(2)
 		return
 
 	_scene_path = args[0]
 	_fixture_path = args[1]
-	_video_path = args[2]
-	_output_dir = args[3]
-	if args.size() >= 5 and String(args[4]).is_valid_int():
-		_capture_delay_ms = max(int(args[4]), 1000)
+	_output_dir = args[2]
+	if args.size() >= 4 and String(args[3]).is_valid_int():
+		_capture_delay_ms = max(int(args[3]), 1000)
 
 	DirAccess.make_dir_recursive_absolute(_output_dir)
 	root.size = DEFAULT_VIEWPORT_SIZE
@@ -43,32 +41,52 @@ func _initialize() -> void:
 		return
 
 	_scene_root = node
+	_force_fixture_runtime_settings(_scene_root)
 	root.add_child(_scene_root)
+	call_deferred("_run_capture_sequence")
 
-func _process(_delta: float) -> bool:
+func _force_fixture_runtime_settings(node: Node) -> void:
+	for property_variant: Variant in node.get_property_list():
+		var property_info: Dictionary = property_variant if property_variant is Dictionary else {}
+		var property_name := String(property_info.get("name", ""))
+		if property_name == "startup_mode":
+			node.set("startup_mode", 0)
+		elif property_name == "prerecorded_video_source":
+			var video_source := OS.get_environment("AEROBEAT_MEDIAPIPE_CAMERA_SOURCE")
+			if not video_source.is_empty():
+				node.set("prerecorded_video_source", video_source)
+
+func _run_capture_sequence() -> void:
 	if _captured or _scene_root == null:
-		return false
-
+		quit(5)
+		return
+	await create_timer(float(_capture_delay_ms) / 1000.0).timeout
+	if _captured or _scene_root == null:
+		quit(5)
+		return
 	var elapsed_ms := Time.get_ticks_msec() - _started_at_ms
-	if elapsed_ms < _capture_delay_ms:
-		return false
-
 	_captured = true
 	await process_frame
 	await process_frame
 	await _capture_outputs(elapsed_ms)
 	quit(0)
-	return false
 
 func _capture_outputs(elapsed_ms: int) -> void:
 	var screenshot_path := _output_dir.path_join("proving.png")
 	var report_json_path := _output_dir.path_join("report.json")
 	var report_md_path := _output_dir.path_join("report.md")
 
-	var image := root.get_texture().get_image()
-	var save_err := image.save_png(screenshot_path)
-	if save_err != OK:
-		push_warning("failed to save screenshot to %s (err=%d)" % [screenshot_path, save_err])
+	var root_texture := root.get_texture()
+	if root_texture != null:
+		var image := root_texture.get_image()
+		if image != null:
+			var save_err := image.save_png(screenshot_path)
+			if save_err != OK:
+				push_warning("failed to save screenshot to %s (err=%d)" % [screenshot_path, save_err])
+		else:
+			push_warning("failed to capture screenshot image for %s" % screenshot_path)
+	else:
+		push_warning("failed to capture screenshot texture for %s" % screenshot_path)
 
 	var harness_report := _collect_harness_report(elapsed_ms, screenshot_path)
 	_write_text_file(report_json_path, JSON.stringify(harness_report, "\t"))
@@ -78,7 +96,7 @@ func _capture_outputs(elapsed_ms: int) -> void:
 func _collect_harness_report(elapsed_ms: int, screenshot_path: String) -> Dictionary:
 	var report := {
 		"fixture_path": ProjectSettings.globalize_path(_fixture_path),
-		"video_path": ProjectSettings.globalize_path(_video_path),
+		"video_path": OS.get_environment("AEROBEAT_MEDIAPIPE_CAMERA_SOURCE"),
 		"scene_path": _scene_path,
 		"captured_at": Time.get_datetime_string_from_system(true, true),
 		"elapsed_ms": elapsed_ms,
@@ -86,6 +104,7 @@ func _collect_harness_report(elapsed_ms: int, screenshot_path: String) -> Dictio
 		"viewport_size": {"width": root.size.x, "height": root.size.y},
 		"status": {},
 		"surfaces": {},
+		"fixture_capture": {},
 	}
 
 	var status_label := _scene_root.get_node_or_null("Margin/VSplit/Header/StatusLabel") as Label
@@ -121,6 +140,8 @@ func _collect_harness_report(elapsed_ms: int, screenshot_path: String) -> Dictio
 		"metrics": _node_text(metrics_label),
 		"events": _node_text(events_label),
 	}
+	if _scene_root != null and _scene_root.has_method("get_fixture_capture_report"):
+		report["fixture_capture"] = _scene_root.call("get_fixture_capture_report")
 	return report
 
 func _node_text(node: Node) -> String:
