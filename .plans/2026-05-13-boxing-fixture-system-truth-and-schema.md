@@ -352,7 +352,7 @@ Net recommendation: keep the truthful schema work separate from library-ingestio
   - `scripts/run_proving_fixture_capture.sh .testbed/assets/fixtures/boxing/punch_left/boxing__punch_left__positive__guard_start_end__take_01.fixture.yaml`
 - **Observed runtime truth from the real Boxing run:** the new fixture path works and emits structured evidence, but the left-punch fixture currently **fails** validation in a way consistent with the known detector truth problem: `punch_left` never emitted inside the authored windows, while forbidden `uppercut_right` emitted at `3623ms`. Run artifact folder: `.testbed/test-results/fixtures/20260513-111002__boxing__punch_left__positive__guard_start_end__take_01/`.
 - **Follow-up truth explicitly recorded instead of hidden scope creep:** this slice builds the reusable fixture path, but richer ready/state-window assertions still need a later bead once Boxing event truth is cleaner.
-- **Commit:** pending before handoff.
+- **Commit:** `9e02894` — `Implement first truthful fixture-system slice`.
 
 ---
 
@@ -420,19 +420,21 @@ Net recommendation: keep the truthful schema work separate from library-ingestio
 
 ## Final Results
 
-**Status:** ⚠️ Draft
+**Status:** ⚠️ Partial
 
 **What We Built:**
-- Pending execution.
+- Task 4 landed a truthful first fixture-system slice: real fixture parsing, fixture-owned video resolution, shared harness event/state capture, and direct gesture-window validation artifacts for prerecorded proving runs.
 
 **Reference Check:**
-- Not yet executed.
+- `REF-02`, `REF-04`, and `REF-05` are now exercised directly by the new runner/capture path.
+- `REF-06` remains the runtime detector truth source that the new fixture validator now exposes more clearly.
 
 **Commits:**
-- Pending.
+- `9e02894` - Implement first truthful fixture-system slice
 
 **Lessons Learned:**
-- Pending.
+- The old capture path had a real early-exit bug, so even the first slice needed to repair the evidence pipeline before validation truth was possible.
+- The new fixture system is now materially usable, but Boxing detector truth still fails on the left-punch clip and should be handled in follow-up QA/audit work rather than hidden inside fixture scope.
 
 ---
 
