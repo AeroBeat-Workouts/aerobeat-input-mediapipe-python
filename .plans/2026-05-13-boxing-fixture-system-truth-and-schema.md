@@ -599,7 +599,7 @@ Net recommendation: keep the truthful schema work separate from library-ingestio
   - The new `stance_transition` fixture naming is an explicit transition-oriented holding name around orthodox/southpaw swaps, but it does **not** claim exact authored chart semantics beyond that until human review confirms a tighter truth.
 - **Commits:**
   - `c77875f` — `Align legacy boxing cross mapping with hook naming`
-  - `7873639` — `Align boxing fixture naming with vocabulary audit`
+  - `c0d8087` — `Align boxing fixture naming with vocabulary audit`
 
 ---
 
