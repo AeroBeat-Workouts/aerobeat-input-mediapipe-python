@@ -1012,12 +1012,7 @@ func _set_state_toggle(events: Array, state_name: String, active: bool) -> void:
 	events.append({"name": StringName("%s_%s" % [state_name, suffix])})
 
 func _build_public_gesture_states() -> Dictionary:
-	var public_states := (_gesture_state.get("states", {}) as Dictionary).duplicate(true)
-	if public_states.has("weave_left"):
-		public_states["lean_left"] = public_states["weave_left"]
-	if public_states.has("weave_right"):
-		public_states["lean_right"] = public_states["weave_right"]
-	return public_states
+	return (_gesture_state.get("states", {}) as Dictionary).duplicate(true)
 
 func _emit_power_event(events: Array, event_name: String, power: float) -> void:
 	events.append({

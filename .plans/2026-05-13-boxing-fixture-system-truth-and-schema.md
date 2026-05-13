@@ -731,6 +731,75 @@ Net recommendation: keep the truthful schema work separate from library-ingestio
 
 ---
 
+### Task 15: Remove legacy Boxing lean compatibility aliases after weave migration
+
+**Bead ID:** `oc-loxi`
+**SubAgent:** `primary` (for `coder` workflow role)
+**Role:** `coder`
+**References:** `REF-06`, `REF-08`, `REF-09` plus implementation references added during Task 12
+**Prompt:** Use bead `oc-loxi`. Claim it on start with `bd update oc-loxi --status in_progress --json`. Derrick has explicitly decided that the temporary `lean_*` compatibility aliases are no longer needed after the `weave_*` migration. Remove the legacy Boxing `lean_*` compatibility layer from detector/provider/public runtime surfaces, keep the implementation truthful and Boxing-only, update any directly related tests/docs/validation surfaces required by the removal, update this plan with exactly what landed, commit/push by default, and close with `bd close oc-loxi --reason "Legacy Boxing lean compatibility removed" --json`.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- `src/detectors/`
+- `src/providers/`
+- `src/`
+- `.testbed/scripts/`
+- directly related tests/docs only if required by the removal
+
+**Files Created/Deleted/Modified:**
+- `src/input_provider.gd`
+- `src/providers/mediapipe_provider.gd`
+- `src/detectors/pose_detector_substrate.gd`
+- `README.md`
+- `.plans/2026-05-13-boxing-fixture-system-truth-and-schema.md`
+
+**Status:** ✅ Complete
+
+**Results:** Removed the repo-local Boxing `lean_*` compatibility layer so `weave_*` is now the only authored wording on this repo's detector/provider/input-provider path. `src/providers/mediapipe_provider.gd` no longer declares or emits `lean_*` alias signals; `src/input_provider.gd` no longer falls back to provider `lean_*` signals or re-emits inherited `lean_*` aliases when weave events fire; and `src/detectors/pose_detector_substrate.gd` no longer injects `lean_left` / `lean_right` into public gesture state dictionaries. `README.md` was tightened to remove the stale compatibility-alias claim. Targeted validation run: `~/.local/bin/godot --headless --path .testbed --check-only --script scripts/proving_harness.gd`; `~/.local/bin/godot --headless --path .testbed --check-only --script addons/aerobeat-input-mediapipe-python/src/providers/mediapipe_provider.gd`; `~/.local/bin/godot --headless --path .testbed --check-only --script addons/aerobeat-input-mediapipe-python/src/input_provider.gd`; `~/.local/bin/godot --headless --path .testbed --script addons/gut/gut_cmdln.gd -gtest=res://tests/unit/test_pose_detector_substrate.gd -gexit` (`12/12` passed); plus a repo-local grep sweep confirming no remaining `lean_left` / `lean_right` references in `src`, `README.md`, `docs`, or `.testbed/tests`. Landed as `Remove boxing lean compatibility aliases` and pushed to `origin/main`. Caveat kept explicit: legacy `lean_*` signal declarations still exist in the mounted `aerobeat-input-core` testbed dependency outside this repo's owned scope, so this task only removes the compatibility layer implemented here.
+
+---
+
+### Task 16: QA removal of legacy Boxing lean compatibility aliases
+
+**Bead ID:** `oc-u9xn`
+**SubAgent:** `primary` (for `qa` workflow role)
+**Role:** `qa`
+**References:** `REF-06`, `REF-08`, `REF-09` plus implementation references added during Task 15
+**Prompt:** Use bead `oc-u9xn`. Claim it on start with `bd update oc-u9xn --status in_progress --json`. After `oc-loxi` lands, verify that the temporary Boxing `lean_*` compatibility layer has been removed cleanly and that primary `weave_*` runtime/provider/proving surfaces still parse, validate, and present truthfully. Update this plan with exact checks run and close with `bd close oc-u9xn --reason "Legacy Boxing lean compatibility QA complete" --json` only if QA truthfully passes.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+
+**Files Created/Deleted/Modified:**
+- plan updates / QA notes only unless a tiny truthful docs correction is required
+
+**Status:** ⏳ Pending
+
+**Results:** Pending.
+
+---
+
+### Task 17: Audit removal of legacy Boxing lean compatibility aliases
+
+**Bead ID:** `oc-fiyc`
+**SubAgent:** `primary` (for `auditor` workflow role)
+**Role:** `auditor`
+**References:** all relevant weave-alignment references from Tasks 12-16
+**Prompt:** Use bead `oc-fiyc`. Claim it on start with `bd update oc-fiyc --status in_progress --json`. After QA completes, independently audit that the old Boxing `lean_*` compatibility layer is actually gone where intended and that the project now speaks `weave_*` consistently without hidden public drift. Update this plan and close with `bd close oc-fiyc --reason "Legacy Boxing lean compatibility audit complete" --json` only if the audit truthfully passes.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+
+**Files Created/Deleted/Modified:**
+- `.plans/2026-05-13-boxing-fixture-system-truth-and-schema.md`
+
+**Status:** ⏳ Pending
+
+**Results:** Pending.
+
+---
+
 ## Final Results
 
 **Status:** ⚠️ Partial

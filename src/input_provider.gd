@@ -173,20 +173,12 @@ func _connect_provider_signals() -> void:
 		_provider.squat_end.connect(_on_provider_squat_end)
 	if _provider.has_signal("weave_left_start") and not _provider.weave_left_start.is_connected(_on_provider_weave_left_start):
 		_provider.weave_left_start.connect(_on_provider_weave_left_start)
-	elif _provider.has_signal("lean_left_start") and not _provider.lean_left_start.is_connected(_on_provider_lean_left_start):
-		_provider.lean_left_start.connect(_on_provider_lean_left_start)
 	if _provider.has_signal("weave_left_end") and not _provider.weave_left_end.is_connected(_on_provider_weave_left_end):
 		_provider.weave_left_end.connect(_on_provider_weave_left_end)
-	elif _provider.has_signal("lean_left_end") and not _provider.lean_left_end.is_connected(_on_provider_lean_left_end):
-		_provider.lean_left_end.connect(_on_provider_lean_left_end)
 	if _provider.has_signal("weave_right_start") and not _provider.weave_right_start.is_connected(_on_provider_weave_right_start):
 		_provider.weave_right_start.connect(_on_provider_weave_right_start)
-	elif _provider.has_signal("lean_right_start") and not _provider.lean_right_start.is_connected(_on_provider_lean_right_start):
-		_provider.lean_right_start.connect(_on_provider_lean_right_start)
 	if _provider.has_signal("weave_right_end") and not _provider.weave_right_end.is_connected(_on_provider_weave_right_end):
 		_provider.weave_right_end.connect(_on_provider_weave_right_end)
-	elif _provider.has_signal("lean_right_end") and not _provider.lean_right_end.is_connected(_on_provider_lean_right_end):
-		_provider.lean_right_end.connect(_on_provider_lean_right_end)
 	if not _provider.sidestep_left_start.is_connected(_on_provider_sidestep_left_start):
 		_provider.sidestep_left_start.connect(_on_provider_sidestep_left_start)
 	if not _provider.sidestep_left_end.is_connected(_on_provider_sidestep_left_end):
@@ -286,31 +278,15 @@ func _on_provider_squat_end() -> void:
 
 func _on_provider_weave_left_start() -> void:
 	weave_left_start.emit()
-	lean_left_start.emit()
 
 func _on_provider_weave_left_end() -> void:
 	weave_left_end.emit()
-	lean_left_end.emit()
 
 func _on_provider_weave_right_start() -> void:
 	weave_right_start.emit()
-	lean_right_start.emit()
 
 func _on_provider_weave_right_end() -> void:
 	weave_right_end.emit()
-	lean_right_end.emit()
-
-func _on_provider_lean_left_start() -> void:
-	_on_provider_weave_left_start()
-
-func _on_provider_lean_left_end() -> void:
-	_on_provider_weave_left_end()
-
-func _on_provider_lean_right_start() -> void:
-	_on_provider_weave_right_start()
-
-func _on_provider_lean_right_end() -> void:
-	_on_provider_weave_right_end()
 
 func _on_provider_sidestep_left_start() -> void:
 	sidestep_left_start.emit()
