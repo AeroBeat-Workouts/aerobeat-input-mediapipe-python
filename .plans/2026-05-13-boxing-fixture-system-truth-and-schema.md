@@ -33,6 +33,10 @@ This plan therefore pivots from trying more Boxing detector tuning first into bu
 | `REF-05` | Existing left-punch Boxing fixture YAML | `/home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-input-mediapipe-python/.testbed/assets/fixtures/boxing/punch_left/boxing__punch_left__positive__guard_start_end__take_01.fixture.yaml` |
 | `REF-06` | Detector substrate that current fixture truth will eventually validate | `/home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-input-mediapipe-python/src/detectors/pose_detector_substrate.gd` |
 | `REF-07` | Today’s memory handoff / known context | `/home/derrick/.openclaw/workspace/memory/2026-05-12.md` |
+| `REF-08` | Boxing proving-scene UI vocabulary surface | `/home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-input-mediapipe-python/.testbed/scripts/boxing_proving_harness.gd` |
+| `REF-09` | Shared proving harness Boxing signal/state surface | `/home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-input-mediapipe-python/.testbed/scripts/proving_harness.gd` |
+| `REF-10` | Current authored Boxing chart examples | `/home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-docs/docs/examples/workout-packages/demo-neon-boxing-bootcamp/charts/` |
+| `REF-11` | Current content-core Boxing chart contract and README | `/home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-content-core/data_types/chart.gd` and `/home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-content-core/README.md` |
 
 ---
 
@@ -445,6 +449,197 @@ Net recommendation: keep the truthful schema work separate from library-ingestio
   - Boxing: `boxing_cross_left_x4.webm`, `boxing_cross_right_x4.webm`, `boxing_run_in_place_x1.webm`, `boxing_stance_change_x4.webm`, `boxing_weave_left_x4.webm`, `boxing_weave_right_x4.webm`
   - Flow: `flow_swing_left_3_right_3_to_left_6_right_6_x4.webm`, `flow_swing_left_6_right_6_to_left_3_right_3_x4.webm`
 - **Reason for leaving those unresolved:** the current filenames do not map cleanly enough to a single truthful curated fixture name without making assumptions about gameplay-family equivalence (`cross` vs `punch`), unsupported/non-emitted runtime semantics (`run_in_place`, `stance_change`, `weave`), or multi-hand/payload truth for the Flow clips.
+- **Post-normalization naming truth from Derrick:** `cross_left/right` are **not** the same family as the current canonical straight `punch_*`; they refer to the horizontal punch family and need their own proper canonical naming aligned to beat-chart truth. `run_in_place` is a legitimate candidate active/inactive Boxing gameplay gesture. `stance_change` is a legitimate possible scored or at least detectable orthodox/southpaw state/event family. `weave_left/right` are likely the intended canonical replacement for the current UI’s `dodge` naming and need beat-chart / gesture-vocabulary alignment before fixture normalization continues.
+
+---
+
+### Task 8: Audit Boxing gesture vocabulary against beat-chart YAML truth and resolve unresolved fixture naming
+
+**Bead ID:** `oc-i6u4`  
+**SubAgent:** `primary` (for `research` workflow role)  
+**Role:** `research`  
+**References:** `REF-04`, `REF-06`, `REF-08`, `REF-09`, `REF-10`, `REF-11`  
+**Prompt:** Use bead `oc-i6u4`. Claim it on start with `bd update oc-i6u4 --status in_progress --json`. Audit the current Boxing gesture vocabulary across fixture names, proving-scene UI naming, detector/event naming, and beat-chart YAML truth to identify drift and resolve the remaining unresolved Boxing fixture names. Confirm the proper canonical naming for the horizontal punch family currently labeled `cross_left/right`, decide how `run_in_place`, `stance_change`, and `weave_left/right` should map into the current Boxing contract, and explicitly check whether current beat-chart YAML content has drifted from the intended vocabulary. Update this plan with the naming decisions, exact source references, and recommended follow-up fixture renames / UI naming updates. Close with `bd close oc-i6u4 --reason "Boxing gesture vocabulary audit complete" --json` when the naming truth pass is complete.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- source/docs/chart paths only if a tiny truthful note is needed
+
+**Files Created/Deleted/Modified:**
+- plan updates only unless a tiny truth-revealing note is required
+
+**Status:** ✅ Complete
+
+**Results:** Completed audit across the unresolved Boxing fixture filenames (`REF-04`), current detector/provider signal surface (`REF-06`), proving-harness/shared-UI naming (`REF-08`, `REF-09`), and current chart/content-core vocabulary (`REF-10`, `REF-11`).
+
+- **Exact unresolved fixture files audited (`REF-04`):**
+  - `.testbed/assets/fixtures/boxing/boxing_cross_left_x4.webm`
+  - `.testbed/assets/fixtures/boxing/boxing_cross_right_x4.webm`
+  - `.testbed/assets/fixtures/boxing/boxing_run_in_place_x1.webm`
+  - `.testbed/assets/fixtures/boxing/boxing_stance_change_x4.webm`
+  - `.testbed/assets/fixtures/boxing/boxing_weave_left_x4.webm`
+  - `.testbed/assets/fixtures/boxing/boxing_weave_right_x4.webm`
+
+- **Detector/event truth today (`REF-06`):**
+  - The only Boxing attack event families currently emitted by `src/providers/mediapipe_provider.gd:12-17,268-279` and generated by `src/detectors/pose_detector_substrate.gd:625-688` are `punch_left/right`, `hook_left/right`, and `uppercut_left/right`.
+  - The only current Boxing state/simple-event families in the detector/provider path are `guard`, `squat`, `lean_left/right`, `sidestep_left/right`, `knee_left/right`, and `leg_lift_left/right` via `src/providers/mediapipe_provider.gd:22-39,288-323` and `src/detectors/pose_detector_substrate.gd:614-624,930-976`.
+  - There is **no current detector/provider/runtime event or state family** for `cross_*`, `run_in_place`, `stance_change`, `orthodox`, `southpaw`, or `weave_*`.
+
+- **Proving-scene / UI truth today (`REF-08`, `REF-09`):**
+  - Shared Boxing harness wiring only knows the same emitted families above: `punch`, `hook`, `uppercut`, `knee`, `guard`, `squat`, `lean`, `sidestep`, and `leg_lift` in `.testbed/scripts/proving_harness.gd:23-48,57-78,309-314`.
+  - The Boxing proving scene already has a dedicated **Hook** tile and labels in `.testbed/scripts/boxing_proving_harness.gd:9-18,46-62`.
+  - The current UI still presents `lean_left/right` as **Dodge Left/Right** and has a `dodge` tile/icon in `.testbed/scripts/boxing_proving_harness.gd:18,33-36,109-116`.
+  - Therefore the product-facing Boxing UI surface currently disagrees with the unresolved fixture filenames: fixture files say `weave_*`, detector internals say `lean_*`, and UI says `dodge`.
+
+- **Beat-chart / content-core truth today (`REF-10`, `REF-11`):**
+  - Current authored Boxing chart examples use `punch_left`, `punch_right`, `guard`, `hook_left`, `hook_right`, `squat`, `knee_left`, `leg_lift_left`, `leg_lift_right`, `sidestep_left`, `sidestep_right`, `uppercut_left`, `uppercut_right`, plus stance cues `orthodox` and `southpaw` in `ab-chart-neon-stride-boxing-medium.yaml:20-49` and `ab-chart-midnight-sprint-boxing-hard.yaml:20-55`.
+  - `run_in_place` is already present in the Boxing example chart at `ab-chart-neon-stride-boxing-medium.yaml:47-49`, so chart-facing Boxing vocabulary already includes it even though runtime detection does not.
+  - Content-core explicitly documents straight punches as `punch_left` / `punch_right` and accepts `orthodox` / `southpaw` as authored stance semantics in `../aerobeat-content-core/README.md:22-25,60-62`.
+  - Content-core still carries a **legacy** replacement map `cross -> punch_right` / `cross_right -> punch_right` in `../aerobeat-content-core/data_types/chart.gd:6-13,78-89`. That is stale against Derrick’s product truth because `cross_*` is not supposed to alias the straight-punch family anymore.
+  - No current chart example uses `dodge`, `weave`, or `stance_change` literal beat types.
+
+- **Resolved naming decisions from this audit:**
+  1. **Horizontal punch family currently labeled `cross_left/right`: canonical replacement should be `hook_left/right`, not `punch_*`.**
+     - Why: the runtime already has a distinct horizontal Boxing family named `hook_left/right` in detector, provider, proving harness, and UI (`REF-06`, `REF-08`, `REF-09`), while chart examples also use `hook_left/right` (`REF-10`).
+     - This matches Derrick’s truth that `cross_*` is a different family from the current straight `punch_*` family.
+     - **Recommended fixture renames:**
+       - `boxing_cross_left_x4.webm` → `.testbed/assets/fixtures/boxing/hook_left/boxing__hook_left__positive__repeat_04__take_01/boxing__hook_left__positive__repeat_04__take_01.webm`
+       - `boxing_cross_right_x4.webm` → `.testbed/assets/fixtures/boxing/hook_right/boxing__hook_right__positive__repeat_04__take_01/boxing__hook_right__positive__repeat_04__take_01.webm`
+     - **Recommended follow-up outside this repo slice:** update `aerobeat-content-core/data_types/chart.gd` so legacy `cross` no longer points at `punch_right`; it should either be rejected without a straight-punch alias or remapped to `hook_right` only if Derrick explicitly wants that legacy compatibility.
+
+  2. **`run_in_place`: treat as canonical authored/gameplay vocabulary now, but runtime support is missing.**
+     - Why: Boxing chart examples already author `run_in_place` (`REF-10`), and Derrick confirmed it is a legitimate Boxing gameplay gesture candidate.
+     - Current drift: chart/docs include it, unresolved fixture filename includes it, but detector/provider/proving harness have no `run_in_place` state or event surface (`REF-06`, `REF-08`, `REF-09`).
+     - **Recommended canonical naming:** `run_in_place`.
+     - **Recommended fixture normalization target:** `.testbed/assets/fixtures/boxing/run_in_place/boxing__run_in_place__positive__repeat_01__take_01/boxing__run_in_place__positive__repeat_01__take_01.webm`
+     - **Recommended runtime follow-up:** model it as a stateful Boxing family similar to `guard` / `squat` (very likely `run_in_place_start` / `run_in_place_end` plus `gesture_states.run_in_place`, or an equivalent active-window representation).
+
+  3. **`stance_change`: keep as detector/fixture family wording only if we mean a transition, but chart-facing authored truth should remain `orthodox` / `southpaw`.**
+     - Why: current Boxing charts and content-core already treat `orthodox` / `southpaw` as the authored semantics (`REF-10`, `REF-11`), and there is no existing `stance_change` chart type.
+     - Current drift: unresolved fixture filename says `stance_change`, while chart truth expresses stance by target stance labels instead.
+     - **Recommended canonical mapping:**
+       - **Chart/authored surface:** `orthodox`, `southpaw`
+       - **Potential detector/runtime family:** `stance_change` only if the implementation is specifically about detecting the transition event or active stance state machine.
+     - **Recommended fixture follow-up:** do **not** invent a chart beat type `stance_change`. Normalize the existing unresolved clip only after a quick human review confirms whether it is `orthodox_to_southpaw`, `southpaw_to_orthodox`, alternating stance swaps, or simply generic stance-change exercise footage. If Derrick wants a holding-name before that review, use `.testbed/assets/fixtures/boxing/stance_change/boxing__stance_change__positive__orthodox_southpaw_repeat_04__take_01/...` with an explicit note that authored chart parity still lives in `orthodox` / `southpaw`, not `stance_change`.
+
+  4. **`weave_left/right` should be the canonical product-facing replacement for the current UI’s `dodge` wording.**
+     - Why: Derrick explicitly called out `weave_left/right` as the intended canonical term, and the current mismatch is already obvious: unresolved fixtures say `weave_*`, UI says `dodge`, detector internals say `lean_*`.
+     - **Recommended canonical naming:**
+       - **Product-facing / fixture / eventual chart term:** `weave_left`, `weave_right`
+       - **Internal geometry helper term:** `lean_left`, `lean_right` may stay internal if useful, but emitted/public detector vocabulary should stop surfacing `dodge` once the rename pass happens.
+     - **Recommended fixture renames:**
+       - `boxing_weave_left_x4.webm` → `.testbed/assets/fixtures/boxing/weave_left/boxing__weave_left__positive__repeat_04__take_01/boxing__weave_left__positive__repeat_04__take_01.webm`
+       - `boxing_weave_right_x4.webm` → `.testbed/assets/fixtures/boxing/weave_right/boxing__weave_right__positive__repeat_04__take_01/boxing__weave_right__positive__repeat_04__take_01.webm`
+     - **Recommended UI/runtime follow-up:** rename the Boxing proving-scene `dodge` tile/labels in `.testbed/scripts/boxing_proving_harness.gd` to `weave`, and decide whether provider/substrate public events should graduate from `lean_left/right_*` to `weave_left/right_*` or expose an explicit alias layer.
+
+- **Drift summary by surface:**
+  - **Fixtures vs detector/UI:** `cross_*`, `run_in_place`, `stance_change`, and `weave_*` exist as raw fixture filenames, but none of those names currently exist as emitted Boxing runtime vocabulary.
+  - **UI vs intended product truth:** proving-scene UI still says `dodge`, while Derrick’s intended canonical term is `weave`.
+  - **Charts/content-core vs detector/runtime:** chart examples already include `run_in_place` and stance semantics (`orthodox` / `southpaw`) that are not represented in the detector/provider/harness event vocabulary.
+  - **Content-core legacy map vs Derrick’s truth:** `cross -> punch_right` is the clearest stale rule remaining in shared chart validation.
+
+- **Small truthful follow-up bead that should likely exist after this audit:** a narrow rename/alignment pass to (1) normalize the six unresolved Boxing fixture files using the mappings above, (2) rename the proving-scene `dodge` UI surface to `weave`, and (3) update content-core legacy Boxing vocabulary so `cross` no longer aliases straight punches.
+
+- **Bottom-line naming truth for future work:**
+  - `punch_left/right` = straight punches
+  - `hook_left/right` = horizontal punch family that old raw filenames called `cross_left/right`
+  - `uppercut_left/right` = unchanged
+  - `weave_left/right` = preferred product-facing name replacing current UI `dodge` wording and current internal `lean_*` public surfacing
+  - `run_in_place` = legitimate authored/gameplay vocabulary, runtime support still missing
+  - `orthodox` / `southpaw` = authored stance chart semantics; `stance_change` is only a possible detector/fixture transition family, not today’s chart type
+
+- **Reference check:** validated directly against `REF-04`, `REF-06`, `REF-08`, `REF-09`, `REF-10`, and `REF-11`.
+
+---
+
+### Task 9: Implement Boxing naming alignment after the vocabulary audit
+
+**Bead ID:** `oc-08zs`  
+**SubAgent:** `primary` (for `coder` workflow role)  
+**Role:** `coder`  
+**References:** `REF-04`, `REF-06`, `REF-08`, `REF-09`, `REF-10`, `REF-11`  
+**Prompt:** Use bead `oc-08zs`. Claim it on start with `bd update oc-08zs --status in_progress --json`. Implement the Boxing naming-alignment slice from Task 8. Normalize unresolved Boxing fixture filenames and folders to the agreed canonical vocabulary (`cross_*` → `hook_*`, standardize public-facing naming to `weave_*`, keep `run_in_place`, and use a clearer transition-oriented name for the current stance-change fixture). Update the Boxing proving UI from `dodge` to `weave`. Before changing shared chart-contract code, truth-check whether the current content-core `cross -> punch_right` mapping is actually stale or intentionally serving straight-punch legacy semantics; only change shared contract code if the surrounding source makes it clearly wrong. Update this plan with exactly what landed, commands run, and any intentionally deferred follow-up. Commit/push by default, then close with `bd close oc-08zs --reason "Boxing naming alignment implemented" --json`.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- `.testbed/assets/fixtures/`
+- `.testbed/scripts/`
+- shared chart-contract repo/files only if truthfully warranted by the mapping audit
+
+**Files Created/Deleted/Modified:**
+- unresolved Boxing fixture videos / stub YAMLs normalized to agreed naming
+- Boxing proving UI naming updated from `dodge` to `weave`
+- any minimal shared-contract cleanup only if the `cross` mapping is confirmed stale
+
+**Status:** ✅ Complete
+
+**Results:** Implemented the Boxing naming-alignment slice as a tight normalization/UI pass plus one justified shared contract fix.
+
+- **Unresolved Boxing fixtures normalized into per-fixture folders with truthful stub YAML sidecars (`REF-04`):**
+  - `boxing_cross_left_x4.webm` → `.testbed/assets/fixtures/boxing/hook_left/boxing__hook_left__positive__repeat_04__take_01/boxing__hook_left__positive__repeat_04__take_01.webm`
+  - `boxing_cross_right_x4.webm` → `.testbed/assets/fixtures/boxing/hook_right/boxing__hook_right__positive__repeat_04__take_01/boxing__hook_right__positive__repeat_04__take_01.webm`
+  - `boxing_run_in_place_x1.webm` → `.testbed/assets/fixtures/boxing/run_in_place/boxing__run_in_place__positive__repeat_01__take_01/boxing__run_in_place__positive__repeat_01__take_01.webm`
+  - `boxing_stance_change_x4.webm` → `.testbed/assets/fixtures/boxing/stance_transition/boxing__stance_transition__positive__orthodox_southpaw_swap_repeat_04__take_01/boxing__stance_transition__positive__orthodox_southpaw_swap_repeat_04__take_01.webm`
+  - `boxing_weave_left_x4.webm` → `.testbed/assets/fixtures/boxing/weave_left/boxing__weave_left__positive__repeat_04__take_01/boxing__weave_left__positive__repeat_04__take_01.webm`
+  - `boxing_weave_right_x4.webm` → `.testbed/assets/fixtures/boxing/weave_right/boxing__weave_right__positive__repeat_04__take_01/boxing__weave_right__positive__repeat_04__take_01.webm`
+- **Stub YAMLs created for all six normalized fixtures:** each new sibling `.fixture.yaml` stays on the truthful minimal schema (`schema_version`, `fixture_id`, `family`, `video.path`, `notes`) and explicitly avoids inventing `expected_gestures` or timing windows.
+- **Boxing proving UI wording updated from `dodge` to `weave` (`REF-08`, `REF-09`):** `.testbed/scripts/boxing_proving_harness.gd` now presents the tile as `Weave` and labels lean-start/end events as `Weave Left/Right` while intentionally keeping the current underlying detector/internal event names `lean_left/right_*` unchanged.
+- **Shared content-core legacy mapping audited and updated because it was clearly stale against surrounding source truth (`REF-10`, `REF-11`):**
+  - `../aerobeat-content-core/data_types/chart.gd` changed legacy replacements from `cross -> punch_right` / `cross_right -> punch_right` to `cross -> hook_right` / `cross_right -> hook_right`.
+  - This was justified by the surrounding README/examples already defining `punch_*` as straight punches and `hook_*` as the horizontal punch family; leaving `cross` mapped to `punch_right` would have kept contradicting the current contract truth.
+- **Commands run:**
+  - `python3 - <<'PY' ... from scripts.proving_fixture_runner import load_fixture ... PY` to load and validate all six new Boxing stub fixtures
+  - `godot --headless --path .testbed --import`
+  - `godot --headless --path ../aerobeat-content-core/.testbed --script res://../tests/run_contract_tests.gd`
+  - `git fetch origin main && git rebase origin/main && git push origin main` in `../aerobeat-content-core` after the shared-repo push rejected on first attempt due to remote drift
+- **Intentionally deferred / kept truthful:**
+  - No Flow fixture work was pulled into this slice.
+  - No gesture timing truth was invented in the new YAML sidecars.
+  - No detector/provider runtime rename from internal `lean_*` to public `weave_*` was attempted here; this slice only updates the proving-scene public wording.
+  - The new `stance_transition` fixture naming is an explicit transition-oriented holding name around orthodox/southpaw swaps, but it does **not** claim exact authored chart semantics beyond that until human review confirms a tighter truth.
+- **Commits:**
+  - `c77875f` — `Align legacy boxing cross mapping with hook naming`
+  - `7873639` — `Align boxing fixture naming with vocabulary audit`
+
+---
+
+### Task 10: QA Boxing naming alignment and unresolved fixture normalization
+
+**Bead ID:** `oc-fplk`  
+**SubAgent:** `primary` (for `qa` workflow role)  
+**Role:** `qa`  
+**References:** `REF-04`, `REF-06`, `REF-08`, `REF-09`, `REF-10`, `REF-11` plus implementation references added during Task 9  
+**Prompt:** Use bead `oc-fplk`. Claim it on start with `bd update oc-fplk --status in_progress --json`. After `oc-08zs` lands, verify that the Boxing naming alignment is truthful across fixture files, proving-scene UI wording, and any shared chart-contract changes. Check that unresolved Boxing fixtures were normalized safely, that `dodge` no longer leaks on the Boxing proving surface if that rename landed, and that any content-core contract change is justified by source truth rather than guesswork. Update this plan with exact checks run and close with `bd close oc-fplk --reason "Boxing naming alignment QA complete" --json` only if QA truthfully passes.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+
+**Files Created/Deleted/Modified:**
+- plan updates / QA notes only unless a tiny truthful docs correction is required
+
+**Status:** ⏳ Pending
+
+**Results:** Pending.
+
+---
+
+### Task 11: Audit Boxing naming alignment against chart truth
+
+**Bead ID:** `oc-g1ew`  
+**SubAgent:** `primary` (for `auditor` workflow role)  
+**Role:** `auditor`  
+**References:** all relevant boxing-vocabulary and implementation references from Tasks 8-10  
+**Prompt:** Use bead `oc-g1ew`. Claim it on start with `bd update oc-g1ew --status in_progress --json`. After QA completes, independently audit the Boxing naming-alignment work against the chart truth and Derrick’s clarified vocabulary decisions. Confirm whether the implementation is truly aligned across fixtures, UI wording, and any shared-contract behavior, and call out any remaining drift explicitly. Update this plan and close with `bd close oc-g1ew --reason "Boxing naming alignment audit complete" --json` only if the audit truthfully passes.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+
+**Files Created/Deleted/Modified:**
+- `.plans/2026-05-13-boxing-fixture-system-truth-and-schema.md`
+
+**Status:** ⏳ Pending
+
+**Results:** Pending.
 
 ---
 

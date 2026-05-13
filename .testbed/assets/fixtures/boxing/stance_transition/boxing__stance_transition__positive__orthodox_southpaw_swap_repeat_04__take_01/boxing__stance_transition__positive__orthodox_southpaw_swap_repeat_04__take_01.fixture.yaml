@@ -1,0 +1,15 @@
+schema_version: 1
+fixture_id: boxing__stance_transition__positive__orthodox_southpaw_swap_repeat_04__take_01
+family: boxing
+video:
+  path: ./boxing__stance_transition__positive__orthodox_southpaw_swap_repeat_04__take_01.webm
+notes:
+  - stub fixture created from legacy loose clip boxing_stance_change_x4.webm
+  - legacy filename used stance_change; normalized to explicit stance_transition naming around orthodox/southpaw swaps
+  - expected_gestures and timing truth still need Derrick manual review
+  - filename suggests repeated reps, but windows/payloads are intentionally not guessed here
+# expected_gestures:
+#   - name: TODO_MANUAL_FILL
+#     windows:
+#       - start_ms: TODO
+#         end_ms: TODO
