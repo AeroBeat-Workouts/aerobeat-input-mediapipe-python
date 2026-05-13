@@ -171,7 +171,7 @@ func test_detects_flow_trail_as_continuation_motion() -> void:
 	assert_eq(emitted_events[0]["direction"], 11)
 	assert_eq(emitted_events[emitted_events.size() - 1]["name"], "trail_right")
 
-func test_detects_guard_squat_lean_and_sidestep_state_events() -> void:
+func test_detects_guard_squat_weave_and_sidestep_state_events() -> void:
 	_calibrate_stance()
 	var guard_start_state := substrate.process_landmarks(_make_pose_frame({
 		PoseLandmarkIds.LEFT_ELBOW: {"x": 0.42, "y": 0.69},
@@ -188,12 +188,12 @@ func test_detects_guard_squat_lean_and_sidestep_state_events() -> void:
 	var squat_end_state := substrate.process_landmarks(_make_pose_frame(), 1500)
 	assert_eq(_event_names(squat_end_state.get("events", [])), ["squat_end"])
 
-	var lean_left_state := substrate.process_landmarks(_make_pose_frame({
+	var weave_left_state := substrate.process_landmarks(_make_pose_frame({
 		PoseLandmarkIds.NOSE: {"x": 0.43, "y": 0.85},
 	}), 1600)
-	assert_eq(_event_names(lean_left_state.get("events", [])), ["lean_left_start"])
-	var lean_end_state := substrate.process_landmarks(_make_pose_frame(), 1700)
-	assert_eq(_event_names(lean_end_state.get("events", [])), ["lean_left_end"])
+	assert_eq(_event_names(weave_left_state.get("events", [])), ["weave_left_start"])
+	var weave_end_state := substrate.process_landmarks(_make_pose_frame(), 1700)
+	assert_eq(_event_names(weave_end_state.get("events", [])), ["weave_left_end"])
 
 	var sidestep_right_state := substrate.process_landmarks(_make_pose_frame({}, 0.60, 1.0), 1800)
 	assert_eq(_event_names(sidestep_right_state.get("events", [])), ["sidestep_right_start"])

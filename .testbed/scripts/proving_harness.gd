@@ -31,10 +31,10 @@ const BOXING_EVENT_ORDER := [
 	"guard_end",
 	"squat_start",
 	"squat_end",
-	"lean_left_start",
-	"lean_left_end",
-	"lean_right_start",
-	"lean_right_end",
+	"weave_left_start",
+	"weave_left_end",
+	"weave_right_start",
+	"weave_right_end",
 	"sidestep_left_start",
 	"sidestep_left_end",
 	"sidestep_right_start",
@@ -71,8 +71,8 @@ const BOXING_KNEE_EVENTS := [
 const BOXING_STATE_ROWS := [
 	{"label": "guard", "state": "guard", "start": "guard_start", "end": "guard_end"},
 	{"label": "squat", "state": "squat", "start": "squat_start", "end": "squat_end"},
-	{"label": "lean_left", "state": "lean_left", "start": "lean_left_start", "end": "lean_left_end"},
-	{"label": "lean_right", "state": "lean_right", "start": "lean_right_start", "end": "lean_right_end"},
+	{"label": "weave_left", "state": "weave_left", "start": "weave_left_start", "end": "weave_left_end"},
+	{"label": "weave_right", "state": "weave_right", "start": "weave_right_start", "end": "weave_right_end"},
 	{"label": "sidestep_left", "state": "sidestep_left", "start": "sidestep_left_start", "end": "sidestep_left_end"},
 	{"label": "sidestep_right", "state": "sidestep_right", "start": "sidestep_right_start", "end": "sidestep_right_end"},
 ]
@@ -310,7 +310,7 @@ func _connect_mode_signals() -> void:
 	if harness_mode == HarnessMode.BOXING:
 		for signal_name: String in ["punch_left", "punch_right", "hook_left", "hook_right", "uppercut_left", "uppercut_right", "knee_left", "knee_right"]:
 			_connect_power_signal(signal_name)
-		for signal_name: String in ["guard_start", "guard_end", "squat_start", "squat_end", "lean_left_start", "lean_left_end", "lean_right_start", "lean_right_end", "sidestep_left_start", "sidestep_left_end", "sidestep_right_start", "sidestep_right_end", "leg_lift_left_start", "leg_lift_left_end", "leg_lift_right_start", "leg_lift_right_end"]:
+		for signal_name: String in ["guard_start", "guard_end", "squat_start", "squat_end", "weave_left_start", "weave_left_end", "weave_right_start", "weave_right_end", "sidestep_left_start", "sidestep_left_end", "sidestep_right_start", "sidestep_right_end", "leg_lift_left_start", "leg_lift_left_end", "leg_lift_right_start", "leg_lift_right_end"]:
 			_connect_simple_signal(signal_name)
 	else:
 		for signal_name: String in ["swing_left", "swing_right", "trail_left", "trail_right"]:
@@ -790,7 +790,7 @@ func _build_summary_text() -> String:
 		lines.append("Body states")
 		lines.append("-----------")
 		lines.append("guard=%s squat=%s" % [str(bool(gesture_states.get("guard", false))), str(bool(gesture_states.get("squat", false)))])
-		lines.append("lean_left=%s lean_right=%s" % [str(bool(gesture_states.get("lean_left", false))), str(bool(gesture_states.get("lean_right", false)))])
+		lines.append("weave_left=%s weave_right=%s" % [str(bool(gesture_states.get("weave_left", false))), str(bool(gesture_states.get("weave_right", false)))])
 		lines.append("sidestep_left=%s sidestep_right=%s" % [str(bool(gesture_states.get("sidestep_left", false))), str(bool(gesture_states.get("sidestep_right", false)))])
 		lines.append("leg_lift_left=%s leg_lift_right=%s" % [str(bool(gesture_states.get("leg_lift_left", false))), str(bool(gesture_states.get("leg_lift_right", false)))])
 		lines.append("height=%s ratio=%s squat_depth=%s" % [String(measurements.get("height_state", &"unknown")), _fmt_float(measurements.get("height_ratio", 0.0)), _fmt_float(measurements.get("squat_depth", 0.0))])

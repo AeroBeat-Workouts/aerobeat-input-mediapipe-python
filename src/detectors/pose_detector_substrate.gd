@@ -144,7 +144,7 @@ func process_landmarks(landmarks: Array, timestamp_ms: int = 0) -> Dictionary:
 		"baseline": _baseline.duplicate(true),
 		"metrics": metrics,
 		"events": events.duplicate(true),
-		"gesture_states": _gesture_state.get("states", {}).duplicate(true),
+		"gesture_states": _build_public_gesture_states(),
 		"gesture_debug": _build_gesture_debug_state(),
 	}
 	_last_processed_timestamp_ms = timestamp_ms
@@ -214,7 +214,7 @@ func _build_empty_state() -> Dictionary:
 			"baseline": _baseline.duplicate(true),
 		},
 		"events": [],
-		"gesture_states": _gesture_state.get("states", {}).duplicate(true),
+		"gesture_states": _build_public_gesture_states(),
 		"gesture_debug": _build_gesture_debug_state(),
 	}
 
@@ -545,8 +545,8 @@ func _reset_gesture_state() -> void:
 		"states": {
 			"guard": false,
 			"squat": false,
-			"lean_left": false,
-			"lean_right": false,
+			"weave_left": false,
+			"weave_right": false,
 			"sidestep_left": false,
 			"sidestep_right": false,
 			"leg_lift_left": false,
@@ -614,7 +614,7 @@ func _detect_intent_events(landmarks_by_id: Dictionary, metrics: Dictionary, tim
 	_process_guard(events, left_shoulder, right_shoulder, left_elbow, right_elbow, left_wrist, right_wrist, shoulder_width)
 	if torso_confidence >= lower_body_confidence_gate:
 		_process_squat(events, float(measurements.get("height_ratio", 1.0)))
-	_process_lean(events, float(measurements.get("head_lateral_offset", 0.0)), float(measurements.get("hip_lateral_offset", 0.0)), float(measurements.get("head_drop_ratio", 0.0)))
+	_process_weave(events, float(measurements.get("head_lateral_offset", 0.0)), float(measurements.get("hip_lateral_offset", 0.0)), float(measurements.get("head_drop_ratio", 0.0)))
 	_process_sidestep(events, float(measurements.get("lateral_offset", 0.0)), float(measurements.get("head_lateral_offset", 0.0)), float(measurements.get("hip_lateral_offset", 0.0)))
 	if left_foot_confidence >= lower_body_confidence_gate:
 		_process_knee(events, "left", float(measurements.get("left_knee_rise", 0.0)), float(measurements.get("left_foot_rise", 0.0)), float(measurements.get("right_knee_rise", 0.0)), left_hip, left_ankle, torso_height)
@@ -946,20 +946,20 @@ func _process_squat(events: Array, height_ratio: float) -> void:
 	elif active and height_ratio >= 0.92:
 		_set_state_toggle(events, "squat", false)
 
-func _process_lean(events: Array, head_offset: float, hip_offset: float, head_drop_ratio: float) -> void:
+func _process_weave(events: Array, head_offset: float, hip_offset: float, head_drop_ratio: float) -> void:
 	var relative_offset := head_offset - hip_offset
-	var leaning_left := head_offset <= -0.30 and relative_offset <= -0.12 and head_drop_ratio >= 0.05
-	var leaning_right := head_offset >= 0.30 and relative_offset >= 0.12 and head_drop_ratio >= 0.05
+	var weaving_left := head_offset <= -0.30 and relative_offset <= -0.12 and head_drop_ratio >= 0.05
+	var weaving_right := head_offset >= 0.30 and relative_offset >= 0.12 and head_drop_ratio >= 0.05
 	var neutral := absf(head_offset) <= 0.12 and absf(relative_offset) <= 0.08
-	if leaning_left:
-		_set_state_toggle(events, "lean_right", false)
-		_set_state_toggle(events, "lean_left", true)
-	elif leaning_right:
-		_set_state_toggle(events, "lean_left", false)
-		_set_state_toggle(events, "lean_right", true)
+	if weaving_left:
+		_set_state_toggle(events, "weave_right", false)
+		_set_state_toggle(events, "weave_left", true)
+	elif weaving_right:
+		_set_state_toggle(events, "weave_left", false)
+		_set_state_toggle(events, "weave_right", true)
 	elif neutral:
-		_set_state_toggle(events, "lean_left", false)
-		_set_state_toggle(events, "lean_right", false)
+		_set_state_toggle(events, "weave_left", false)
+		_set_state_toggle(events, "weave_right", false)
 
 func _process_sidestep(events: Array, lateral_offset: float, head_offset: float, hip_offset: float) -> void:
 	var body_aligned := absf(head_offset - hip_offset) <= 0.18
@@ -1010,6 +1010,14 @@ func _set_state_toggle(events: Array, state_name: String, active: bool) -> void:
 	_gesture_state["states"][state_name] = active
 	var suffix := "start" if active else "end"
 	events.append({"name": StringName("%s_%s" % [state_name, suffix])})
+
+func _build_public_gesture_states() -> Dictionary:
+	var public_states := (_gesture_state.get("states", {}) as Dictionary).duplicate(true)
+	if public_states.has("weave_left"):
+		public_states["lean_left"] = public_states["weave_left"]
+	if public_states.has("weave_right"):
+		public_states["lean_right"] = public_states["weave_right"]
+	return public_states
 
 func _emit_power_event(events: Array, event_name: String, power: float) -> void:
 	events.append({

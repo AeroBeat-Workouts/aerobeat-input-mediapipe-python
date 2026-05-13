@@ -23,6 +23,11 @@ signal guard_start()
 signal guard_end()
 signal squat_start()
 signal squat_end()
+signal weave_left_start()
+signal weave_left_end()
+signal weave_right_start()
+signal weave_right_end()
+# Compatibility aliases for existing lean-named consumers.
 signal lean_left_start()
 signal lean_left_end()
 signal lean_right_start()
@@ -293,13 +298,17 @@ func _emit_detector_events(events: Array) -> void:
 				squat_start.emit()
 			"squat_end":
 				squat_end.emit()
-			"lean_left_start":
+			"weave_left_start", "lean_left_start":
+				weave_left_start.emit()
 				lean_left_start.emit()
-			"lean_left_end":
+			"weave_left_end", "lean_left_end":
+				weave_left_end.emit()
 				lean_left_end.emit()
-			"lean_right_start":
+			"weave_right_start", "lean_right_start":
+				weave_right_start.emit()
 				lean_right_start.emit()
-			"lean_right_end":
+			"weave_right_end", "lean_right_end":
+				weave_right_end.emit()
 				lean_right_end.emit()
 			"sidestep_left_start":
 				sidestep_left_start.emit()

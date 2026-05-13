@@ -338,8 +338,8 @@ This repo now exposes an assembly-facing `src/input_provider.gd` via `plugin.cfg
   - `uppercut_left` / `uppercut_right`
   - `guard_start` / `guard_end`
   - `squat_start` / `squat_end`
-  - `lean_left_start` / `lean_left_end`
-  - `lean_right_start` / `lean_right_end`
+  - `weave_left_start` / `weave_left_end` (compatibility alias: `lean_left_start` / `lean_left_end`)
+  - `weave_right_start` / `weave_right_end` (compatibility alias: `lean_right_start` / `lean_right_end`)
   - `sidestep_left_start` / `sidestep_left_end`
   - `sidestep_right_start` / `sidestep_right_end`
   - `knee_left` / `knee_right`

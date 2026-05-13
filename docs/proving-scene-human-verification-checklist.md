@@ -271,24 +271,24 @@ Same expectations as left, but for `uppercut_right`.
   - screenshot while active
   - note whether depth thresholds feel practical
 
-### 9. Lean left state
+### 9. Weave left state
 
 - Exercise:
-  - lean torso/head clearly to Derrick's left, then return neutral
+  - weave torso/head clearly to Derrick's left, then return neutral
 - Expected visible result:
-  - `lean_left` activates without also activating `lean_right`
+  - `weave_left` activates without also activating `weave_right`
   - lateral offset lines in the summary move in the expected direction
   - state clears near neutral
 - Watch for:
-  - lean confused with sidestep
+  - weave confused with sidestep
   - state staying on after recentring
 - Capture:
   - intended/detected enter/exit counts
   - tag `AMB` if body English needed is unclear
 
-### 10. Lean right state
+### 10. Weave right state
 
-Same expectations as left, but for `lean_right`.
+Same expectations as left, but for `weave_right`.
 
 ### 11. Sidestep left state
 
