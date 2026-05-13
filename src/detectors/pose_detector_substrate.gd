@@ -396,6 +396,8 @@ func _update_tracking_state(landmarks_by_id: Dictionary) -> StringName:
 	return TRACKING_DEGRADED
 
 func _update_baseline(metrics: Dictionary, tracking_state: StringName, landmarks_by_id: Dictionary) -> void:
+	if bool(_baseline.get("is_calibrated", false)):
+		return
 	if tracking_state != TRACKING_TRACKING and tracking_state != TRACKING_REACQUIRING:
 		return
 	var measurements: Dictionary = metrics.get("measurements", {})
@@ -597,22 +599,32 @@ func _detect_intent_events(landmarks_by_id: Dictionary, metrics: Dictionary, tim
 	var left_ankle := PoseMetrics.get_landmark(landmarks_by_id, PoseLandmarkIds.LEFT_ANKLE)
 	var right_ankle := PoseMetrics.get_landmark(landmarks_by_id, PoseLandmarkIds.RIGHT_ANKLE)
 	var velocities: Dictionary = metrics.get("velocities", {})
+	var confidences: Dictionary = metrics.get("confidences", {})
 	var left_hand_velocity: Vector3 = velocities.get("left_hand", Vector3.ZERO)
 	var right_hand_velocity: Vector3 = velocities.get("right_hand", Vector3.ZERO)
-	_update_flow_hand_history("left", left_wrist, float(metrics.get("confidences", {}).get("left_hand", 0.0)), timestamp_ms)
-	_update_flow_hand_history("right", right_wrist, float(metrics.get("confidences", {}).get("right_hand", 0.0)), timestamp_ms)
+	var left_hand_confidence := float(confidences.get("left_hand", 0.0))
+	var right_hand_confidence := float(confidences.get("right_hand", 0.0))
+	var left_foot_confidence := float(confidences.get("left_foot", 0.0))
+	var right_foot_confidence := float(confidences.get("right_foot", 0.0))
+	var torso_confidence := float(confidences.get("torso", 0.0))
+	var lower_body_confidence_gate := maxf(_get_min_visibility(), 0.5)
+	_update_flow_hand_history("left", left_wrist, left_hand_confidence, timestamp_ms)
+	_update_flow_hand_history("right", right_wrist, right_hand_confidence, timestamp_ms)
 
 	_process_guard(events, left_shoulder, right_shoulder, left_elbow, right_elbow, left_wrist, right_wrist, shoulder_width)
-	_process_squat(events, float(measurements.get("height_ratio", 1.0)))
+	if torso_confidence >= lower_body_confidence_gate:
+		_process_squat(events, float(measurements.get("height_ratio", 1.0)))
 	_process_lean(events, float(measurements.get("head_lateral_offset", 0.0)), float(measurements.get("hip_lateral_offset", 0.0)), float(measurements.get("head_drop_ratio", 0.0)))
 	_process_sidestep(events, float(measurements.get("lateral_offset", 0.0)), float(measurements.get("head_lateral_offset", 0.0)), float(measurements.get("hip_lateral_offset", 0.0)))
-	_process_knee(events, "left", float(measurements.get("left_knee_rise", 0.0)), float(measurements.get("left_foot_rise", 0.0)), float(measurements.get("right_knee_rise", 0.0)), left_hip, left_ankle, torso_height)
-	_process_knee(events, "right", float(measurements.get("right_knee_rise", 0.0)), float(measurements.get("right_foot_rise", 0.0)), float(measurements.get("left_knee_rise", 0.0)), right_hip, right_ankle, torso_height)
-	_process_leg_lift(events, "left", float(measurements.get("left_leg_angle_from_core_deg", 0.0)), left_hip, left_ankle, torso_height)
-	_process_leg_lift(events, "right", float(measurements.get("right_leg_angle_from_core_deg", 0.0)), right_hip, right_ankle, torso_height)
+	if left_foot_confidence >= lower_body_confidence_gate:
+		_process_knee(events, "left", float(measurements.get("left_knee_rise", 0.0)), float(measurements.get("left_foot_rise", 0.0)), float(measurements.get("right_knee_rise", 0.0)), left_hip, left_ankle, torso_height)
+		_process_leg_lift(events, "left", float(measurements.get("left_leg_angle_from_core_deg", 0.0)), left_hip, left_ankle, torso_height)
+	if right_foot_confidence >= lower_body_confidence_gate:
+		_process_knee(events, "right", float(measurements.get("right_knee_rise", 0.0)), float(measurements.get("right_foot_rise", 0.0)), float(measurements.get("left_knee_rise", 0.0)), right_hip, right_ankle, torso_height)
+		_process_leg_lift(events, "right", float(measurements.get("right_leg_angle_from_core_deg", 0.0)), right_hip, right_ankle, torso_height)
+	_process_straight_punch(events, "left", left_shoulder, left_elbow, left_wrist, float(measurements.get("left_elbow_bend_deg", 0.0)), float(measurements.get("left_arm_extension", 0.0)), left_hand_velocity, shoulder_width)
+	_process_straight_punch(events, "right", right_shoulder, right_elbow, right_wrist, float(measurements.get("right_elbow_bend_deg", 0.0)), float(measurements.get("right_arm_extension", 0.0)), right_hand_velocity, shoulder_width)
 	if not _get_state("guard"):
-		_process_straight_punch(events, "left", left_shoulder, left_elbow, left_wrist, float(measurements.get("left_elbow_bend_deg", 0.0)), float(measurements.get("left_arm_extension", 0.0)), left_hand_velocity, shoulder_width)
-		_process_straight_punch(events, "right", right_shoulder, right_elbow, right_wrist, float(measurements.get("right_elbow_bend_deg", 0.0)), float(measurements.get("right_arm_extension", 0.0)), right_hand_velocity, shoulder_width)
 		_process_hook(events, "left", left_shoulder, left_elbow, left_wrist, float(measurements.get("left_elbow_bend_deg", 0.0)), left_hand_velocity, shoulder_width)
 		_process_hook(events, "right", right_shoulder, right_elbow, right_wrist, float(measurements.get("right_elbow_bend_deg", 0.0)), right_hand_velocity, shoulder_width)
 		_process_uppercut(events, "left", left_elbow, left_wrist, float(measurements.get("left_elbow_bend_deg", 0.0)), left_hand_velocity, shoulder_width)

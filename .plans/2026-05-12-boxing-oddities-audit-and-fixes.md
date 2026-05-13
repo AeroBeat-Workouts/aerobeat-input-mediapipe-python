@@ -141,14 +141,24 @@ The key risk is mixing overlay bugs with detector bugs. If skeleton/trail projec
 
 **Folders Created/Deleted/Modified:**
 - `.plans/`
-- source paths only for reading unless a tiny truth note is required
+- `src/detectors/`
 
 **Files Created/Deleted/Modified:**
-- plan updates only unless a tiny truth-revealing note is required
+- `.plans/2026-05-12-boxing-oddities-audit-and-fixes.md`
+- `src/detectors/pose_detector_substrate.gd`
 
-**Status:** ⏳ Pending
+**Status:** ✅ Complete
 
-**Results:** Pending.
+**Results:** Finished as a coherent detector-side cleanup tied directly to the left-punch fixture contract rather than ad-hoc tuning.
+
+- **Fixture/YAML contract used as source of truth:** `REF-01` screenshot symptoms were checked against `.testbed/assets/fixtures/boxing/punch_left/boxing__punch_left__positive__guard_start_end__take_01.fixture.yaml`, whose `expected_detector_behavior` requires `punch_left` count `4` and explicitly forbids `hook_left`, `uppercut_left`, `knee_left`, and `knee_right`.
+- **Coherent partial work kept:** the `src/detectors/pose_detector_substrate.gd` edits all map to the exact false-negative / false-positive pattern from that fixture:
+  - straight punches now evaluate even while `guard` state is active, instead of being blanket-suppressed for guard-start / guard-end punch clips;
+  - squat/knee/leg-lift detection now requires torso/foot confidence above a lower-body gate before those detectors can fire, reducing low-confidence lower-body spam that violates the fixture's forbidden-event list;
+  - baseline calibration now freezes after first successful calibration instead of continuing to drift on later frames, preventing the detector from re-normalizing itself deeper into the clip.
+- **Incomplete partial work reverted:** the local `boxing_proving.tscn` changes (`startup_mode = 0`, `skip_sidecar_stop_on_close_debug = false`) were only debug/runtime toggles for local capture attempts, not durable product work, so they were reverted. The unrelated dirty archived crash-hunt plan file was left untouched as requested.
+- **Validation:** `godot --headless --path .testbed --quit` completed project load / parse successfully after the cleanup. It still emits the pre-existing headless shutdown leak/resource warnings, but the edited detector script parses cleanly.
+- **Truth boundary:** this closes the interrupted detector pass cleanly at source level, but it does **not** claim full fixture success yet because I did not get a completed runtime fixture-capture report from the proving scene before cleanup. Overlay clipping work (`Task 2`) is still pending separately.
 
 ---
 
