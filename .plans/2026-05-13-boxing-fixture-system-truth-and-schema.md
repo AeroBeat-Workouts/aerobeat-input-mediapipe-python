@@ -370,9 +370,22 @@ Net recommendation: keep the truthful schema work separate from library-ingestio
 **Files Created/Deleted/Modified:**
 - plan updates / QA notes only unless a truthful docs correction is required
 
-**Status:** ⏳ Pending
+**Status:** ✅ Complete
 
-**Results:** Pending.
+**Results:** QA pass for the fixture-system slice itself, with the Boxing detector truth still failing openly as expected.
+
+- **Scope kept narrow per retry:** reviewed Task 4's landed scope/results, inspected the existing left-punch artifact folder, and re-ran only lightweight validation (no new long Godot proving run).
+- **Contract is understandable and matches the landed slice:** checked `docs/proving-scene-video-fixtures.md`, `docs/proving-scene-video-fixtures-plain-language.md`, and `docs/proving-scene-video-fixture-template.fixture.yaml` against `.testbed/assets/fixtures/boxing/punch_left/boxing__punch_left__positive__guard_start_end__take_01.fixture.yaml`. The active fixture uses exactly the documented minimal contract (`schema_version`, `fixture_id`, `family`, `video.path`, `expected_gestures` windows, optional `forbidden_gestures`) with no misleading extra schema claims.
+- **Fixture-owned video resolution is real, not aspirational:** loaded the fixture through `scripts.proving_fixture_runner.load_fixture(...)` and confirmed it resolves the expected Boxing scene plus a real existing sibling MP4 path, with no loader warnings.
+- **Existing validation artifacts are concrete and audit-friendly:** inspected `.testbed/test-results/fixtures/20260513-111002__boxing__punch_left__positive__guard_start_end__take_01/` and confirmed the full expected bundle exists: `report.json`, `summary.json`, `assertions.json`, `event_timeline.json`, `state_timeline.json`, `report.md`, `godot.log`, and `proving.png`.
+- **The artifact verdict is truthful about detector reality:** `summary.json` reports `result: fail` with 6 passed / 6 failed assertions. `assertions.json` and `report.md` clearly show that authored `punch_left` windows found zero matching events and that forbidden `uppercut_right` fired at `3623ms`. `event_timeline.json` corroborates that no `punch_left` event was emitted while other events (`provider_started`, `squat_start`, `guard_start`, `guard_end`, `uppercut_right`) were captured. This is exactly the kind of honest evidence Derrick needs while trimming/editing Boxing clips.
+- **Lightweight validation rerun:**
+  - `python3 -m py_compile scripts/proving_fixture_runner.py scripts/test_proving_fixture_runner.py`
+  - `python3 scripts/test_proving_fixture_runner.py`
+  - `python3 - <<'PY' ... load_fixture(...) ... PY` to confirm parsed fields, resolved video path, and warnings
+  - `python3 - <<'PY' ... inspect report.json keys ... PY` to confirm structured capture payload shape
+- **QA verdict:** the first fixture-system slice is **usable for Boxing fixture authoring/validation now** because it truthfully loads fixture-owned videos, applies the documented minimal schema, and emits evidence Derrick can trust even when detector truth fails. The current left-punch failure is a **Boxing detector/truth problem surfaced by the fixture system**, not a failure of the fixture-system slice itself.
+- **Non-blocking QA note for later follow-up:** `report.json` is still the raw capture artifact and does not embed the validation summary directly; the canonical pass/fail verdict currently lives in `summary.json` / `assertions.json` / `report.md`. That is acceptable for this slice because the sidecar artifacts are present and unambiguous, but future polish could inline the validation block for easier single-file consumption.
 
 ---
 
@@ -412,9 +425,26 @@ Net recommendation: keep the truthful schema work separate from library-ingestio
 - uncategorized Boxing/Flow fixture videos moved into per-fixture folders
 - matching stub YAML sidecars generated using the updated truthful schema
 
-**Status:** ⏳ Pending
+**Status:** ✅ Complete
 
-**Results:** Pending.
+**Results:** Completed as a narrow safe normalization pass only; ambiguous legacy names were intentionally left untouched instead of being guessed into the new schema.
+
+- **Normalized into per-fixture folders with sibling stub YAMLs:**
+  - `boxing_knee_left_x4.webm` → `.testbed/assets/fixtures/boxing/knee_left/boxing__knee_left__positive__repeat_04__take_01/boxing__knee_left__positive__repeat_04__take_01.webm`
+  - `boxing_knee_right_x4.webm` → `.testbed/assets/fixtures/boxing/knee_right/boxing__knee_right__positive__repeat_04__take_01/boxing__knee_right__positive__repeat_04__take_01.webm`
+  - `boxing_leg_lift_left_x4.webm` → `.testbed/assets/fixtures/boxing/leg_lift_left/boxing__leg_lift_left__positive__repeat_04__take_01/boxing__leg_lift_left__positive__repeat_04__take_01.webm`
+  - `boxing_leg_lift_right_x4.webm` → `.testbed/assets/fixtures/boxing/leg_lift_right/boxing__leg_lift_right__positive__repeat_04__take_01/boxing__leg_lift_right__positive__repeat_04__take_01.webm`
+  - `boxing_sidestep_left_x4.webm` → `.testbed/assets/fixtures/boxing/sidestep_left/boxing__sidestep_left__positive__repeat_04__take_01/boxing__sidestep_left__positive__repeat_04__take_01.webm`
+  - `boxing_sidestep_right_x4.webm` → `.testbed/assets/fixtures/boxing/sidestep_right/boxing__sidestep_right__positive__repeat_04__take_01/boxing__sidestep_right__positive__repeat_04__take_01.webm`
+  - `boxing_squat_x4.webm` → `.testbed/assets/fixtures/boxing/squat/boxing__squat__positive__repeat_04__take_01/boxing__squat__positive__repeat_04__take_01.webm`
+  - `boxing_uppercut_left_x4.webm` → `.testbed/assets/fixtures/boxing/uppercut_left/boxing__uppercut_left__positive__repeat_04__take_01/boxing__uppercut_left__positive__repeat_04__take_01.webm`
+  - `boxing_uppercut_right_x4.webm` → `.testbed/assets/fixtures/boxing/uppercut_right/boxing__uppercut_right__positive__repeat_04__take_01/boxing__uppercut_right__positive__repeat_04__take_01.webm`
+- **Stub sidecars created for each normalized clip:** each new per-fixture folder now includes a sibling `.fixture.yaml` using the truthful minimal schema (`schema_version`, `fixture_id`, `family`, `video.path`, and `notes`). The stubs intentionally do **not** invent `expected_gestures` or timing windows; each file includes explicit manual-fill comments for Derrick to author later.
+- **Validation performed:** repo-local fixture parsing was rechecked by loading every new stub through `scripts/proving_fixture_runner.py::load_fixture()`. All new stub YAMLs resolved their sibling video paths successfully and stayed at zero authored `expected_gestures`, which is the intended truthful placeholder state for this pass.
+- **Explicit unresolved clips left untouched because the naming/feature mapping was not safe enough to guess:**
+  - Boxing: `boxing_cross_left_x4.webm`, `boxing_cross_right_x4.webm`, `boxing_run_in_place_x1.webm`, `boxing_stance_change_x4.webm`, `boxing_weave_left_x4.webm`, `boxing_weave_right_x4.webm`
+  - Flow: `flow_swing_left_3_right_3_to_left_6_right_6_x4.webm`, `flow_swing_left_6_right_6_to_left_3_right_3_x4.webm`
+- **Reason for leaving those unresolved:** the current filenames do not map cleanly enough to a single truthful curated fixture name without making assumptions about gameplay-family equivalence (`cross` vs `punch`), unsupported/non-emitted runtime semantics (`run_in_place`, `stance_change`, `weave`), or multi-hand/payload truth for the Flow clips.
 
 ---
 
