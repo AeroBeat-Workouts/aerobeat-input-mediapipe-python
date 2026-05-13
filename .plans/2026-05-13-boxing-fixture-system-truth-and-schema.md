@@ -1,7 +1,7 @@
 # AeroBeat MediaPipe Python — Boxing Fixture System Truth and Schema
 
-**Date:** 2026-05-13  
-**Status:** In Progress  
+**Date:** 2026-05-13
+**Status:** In Progress
 **Agent:** Pico 🐱‍🏍
 
 ---
@@ -44,10 +44,10 @@ This plan therefore pivots from trying more Boxing detector tuning first into bu
 
 ### Task 1: Audit the current fixture system and reduce it to truthful required fields
 
-**Bead ID:** `oc-qmku`  
-**SubAgent:** `primary` (for `research` workflow role)  
-**Role:** `research`  
-**References:** `REF-02`, `REF-03`, `REF-04`, `REF-05`, `REF-06`  
+**Bead ID:** `oc-qmku`
+**SubAgent:** `primary` (for `research` workflow role)
+**Role:** `research`
+**References:** `REF-02`, `REF-03`, `REF-04`, `REF-05`, `REF-06`
 **Prompt:** Use bead `oc-qmku`. Claim it on start with `bd update oc-qmku --status in_progress --json` and close it on completion with `bd close oc-qmku --reason "Fixture schema audit complete" --json`. Audit the current prerecorded fixture system end-to-end. Identify which YAML fields are actually consumed, which fields are unimplemented / hallucinated / stale, and what the minimum truthful fixture contract should be if the goal is golden-truth validation. Prioritize Derrick’s proposed essentials: fixture identity, video path/reference, expected gestures, and their timestamp windows. Recommend which current fields should stay, change, or be removed.
 
 **Folders Created/Deleted/Modified:**
@@ -128,10 +128,10 @@ This plan therefore pivots from trying more Boxing detector tuning first into bu
 
 ### Task 2: Design a machine-checkable gesture-window validation contract for Boxing first, Flow-compatible second
 
-**Bead ID:** `oc-mqnk`  
-**SubAgent:** `primary` (for `research` workflow role)  
-**Role:** `research`  
-**References:** `REF-02`, `REF-03`, `REF-04`, `REF-05`, `REF-06`  
+**Bead ID:** `oc-mqnk`
+**SubAgent:** `primary` (for `research` workflow role)
+**Role:** `research`
+**References:** `REF-02`, `REF-03`, `REF-04`, `REF-05`, `REF-06`
 **Prompt:** Use bead `oc-mqnk`. Claim it on start with `bd update oc-mqnk --status in_progress --json` and close it on completion with `bd close oc-mqnk --reason "Fixture validation path design complete" --json`. Design the fixture validation contract that future QA and subagents can actually run. The contract should let a prerecorded fixture declare expected gesture families and time ranges, plus any forbidden gestures when useful. Boxing is the first target, but the design must remain compatible with future Flow fixtures. Recommend where event capture should happen, how time windows should be compared, and what output/evidence a machine-checkable validator should emit.
 
 **Folders Created/Deleted/Modified:**
@@ -215,10 +215,10 @@ Design conclusion / implementation guidance for the next coding slice:
 
 ### Task 3: Define the Boxing fixture-library normalization workflow for Derrick’s trimmed videos
 
-**Bead ID:** `oc-5ru0`  
-**SubAgent:** `primary` (for `research` or `coder` workflow role depending on findings)  
-**Role:** `research`  
-**References:** `REF-04`, `REF-05`  
+**Bead ID:** `oc-5ru0`
+**SubAgent:** `primary` (for `research` or `coder` workflow role depending on findings)
+**Role:** `research`
+**References:** `REF-04`, `REF-05`
 **Prompt:** Use bead `oc-5ru0`. Claim it on start with `bd update oc-5ru0 --status in_progress --json` and close it on completion with `bd close oc-5ru0 --reason "Boxing fixture normalization workflow defined" --json`. Define the practical repo workflow for turning Derrick’s Boxing video inventory into clean reusable fixtures. Cover folder naming, file naming, YAML generation expectations, positive/negative clip organization, and any helper tooling that would reduce manual formatting mistakes. Do not assume all videos are ready today; design for an incremental boxing-first rollout while Derrick trims clips in parallel.
 
 **Folders Created/Deleted/Modified:**
@@ -315,10 +315,10 @@ Net recommendation: keep the truthful schema work separate from library-ingestio
 
 ### Task 4: Implement the first truthful fixture-system slice
 
-**Bead ID:** `oc-74wo`  
-**SubAgent:** `primary` (for `coder` workflow role)  
-**Role:** `coder`  
-**References:** `REF-02`, `REF-03`, `REF-04`, `REF-05`, `REF-06`  
+**Bead ID:** `oc-74wo`
+**SubAgent:** `primary` (for `coder` workflow role)
+**Role:** `coder`
+**References:** `REF-02`, `REF-03`, `REF-04`, `REF-05`, `REF-06`
 **Prompt:** Use bead `oc-74wo`. Claim it on start with `bd update oc-74wo --status in_progress --json`. Before coding, read the completed results for `oc-qmku`, `oc-mqnk`, and `oc-5ru0`, and respect the current product decision that fixtures should use direct gesture windows and optional forbidden gestures, with no broader action-envelope feature. Then implement the smallest truthful fixture-system slice needed to make Boxing fixtures materially more real and usable. Prioritize the shared harness recorder + validator path, truthful fixture loading, and any minimal schema/template cleanup needed to support that. Run relevant validation, commit/push by default, and close the bead with `bd close oc-74wo --reason "First fixture-system slice implemented" --json` when done.
 
 **Folders Created/Deleted/Modified:**
@@ -362,10 +362,10 @@ Net recommendation: keep the truthful schema work separate from library-ingestio
 
 ### Task 5: QA the first fixture-system slice against Boxing fixture authoring/validation reality
 
-**Bead ID:** `oc-4wme`  
-**SubAgent:** `primary` (for `qa` workflow role)  
-**Role:** `qa`  
-**References:** `REF-04`, `REF-05`, plus implementation references added during execution  
+**Bead ID:** `oc-4wme`
+**SubAgent:** `primary` (for `qa` workflow role)
+**Role:** `qa`
+**References:** `REF-04`, `REF-05`, plus implementation references added during execution
 **Prompt:** Use bead `oc-4wme`. Claim it on start with `bd update oc-4wme --status in_progress --json`. After `oc-74wo` lands, verify that the first fixture-system slice is actually usable for Boxing fixture work. Check whether a subagent could understand the contract, whether the YAML fields line up with source reality, and whether the validation path emits evidence that Derrick can trust while continuing to trim/edit Boxing videos. Close with `bd close oc-4wme --reason "Fixture-system QA complete" --json` only if the QA truthfully passes.
 
 **Folders Created/Deleted/Modified:**
@@ -395,10 +395,10 @@ Net recommendation: keep the truthful schema work separate from library-ingestio
 
 ### Task 6: Independently audit whether the fixture system is ready to become the golden-truth path for Boxing
 
-**Bead ID:** `oc-wnnh`  
-**SubAgent:** `primary` (for `auditor` workflow role)  
-**Role:** `auditor`  
-**References:** all relevant fixture/design/implementation references from the completed tasks  
+**Bead ID:** `oc-wnnh`
+**SubAgent:** `primary` (for `auditor` workflow role)
+**Role:** `auditor`
+**References:** all relevant fixture/design/implementation references from the completed tasks
 **Prompt:** Use bead `oc-wnnh`. Claim it on start with `bd update oc-wnnh --status in_progress --json`. After QA completes, independently audit the new fixture-system work and decide whether it is actually ready to serve as the golden-truth validation path for Boxing clips, and what still blocks full Boxing detector truth passes if anything remains incomplete. Close with `bd close oc-wnnh --reason "Fixture-system audit complete" --json` only if the audit truthfully passes.
 
 **Folders Created/Deleted/Modified:**
@@ -415,10 +415,10 @@ Net recommendation: keep the truthful schema work separate from library-ingestio
 
 ### Task 7: Normalize the uncategorized Boxing and Flow videos into the new fixture layout with stub YAMLs
 
-**Bead ID:** `oc-h9pl`  
-**SubAgent:** `primary` (for `coder` workflow role)  
-**Role:** `coder`  
-**References:** `REF-04`, `REF-05`, plus implementation references added during Task 4  
+**Bead ID:** `oc-h9pl`
+**SubAgent:** `primary` (for `coder` workflow role)
+**Role:** `coder`
+**References:** `REF-04`, `REF-05`, plus implementation references added during Task 4
 **Prompt:** Use bead `oc-h9pl`. Claim it on start with `bd update oc-h9pl --status in_progress --json`. After `oc-74wo` lands, take the current uncategorized Boxing and Flow videos in `.testbed/assets/fixtures/` that do not yet live in their own per-fixture folder with sibling YAML, normalize them into the updated fixture layout, rename them to match the curated fixture naming convention already used by the existing tested fixtures, and generate stub YAML sidecars that follow the updated truthful schema. Do not invent gesture-event timing truth: leave the event/timing sections in clearly marked manual-fill state for Derrick to complete later. Close with `bd close oc-h9pl --reason "Uncategorized fixtures normalized with stub YAMLs" --json` when the rename/move/stub generation pass is done.
 
 **Folders Created/Deleted/Modified:**
@@ -455,10 +455,10 @@ Net recommendation: keep the truthful schema work separate from library-ingestio
 
 ### Task 8: Audit Boxing gesture vocabulary against beat-chart YAML truth and resolve unresolved fixture naming
 
-**Bead ID:** `oc-i6u4`  
-**SubAgent:** `primary` (for `research` workflow role)  
-**Role:** `research`  
-**References:** `REF-04`, `REF-06`, `REF-08`, `REF-09`, `REF-10`, `REF-11`  
+**Bead ID:** `oc-i6u4`
+**SubAgent:** `primary` (for `research` workflow role)
+**Role:** `research`
+**References:** `REF-04`, `REF-06`, `REF-08`, `REF-09`, `REF-10`, `REF-11`
 **Prompt:** Use bead `oc-i6u4`. Claim it on start with `bd update oc-i6u4 --status in_progress --json`. Audit the current Boxing gesture vocabulary across fixture names, proving-scene UI naming, detector/event naming, and beat-chart YAML truth to identify drift and resolve the remaining unresolved Boxing fixture names. Confirm the proper canonical naming for the horizontal punch family currently labeled `cross_left/right`, decide how `run_in_place`, `stance_change`, and `weave_left/right` should map into the current Boxing contract, and explicitly check whether current beat-chart YAML content has drifted from the intended vocabulary. Update this plan with the naming decisions, exact source references, and recommended follow-up fixture renames / UI naming updates. Close with `bd close oc-i6u4 --reason "Boxing gesture vocabulary audit complete" --json` when the naming truth pass is complete.
 
 **Folders Created/Deleted/Modified:**
@@ -554,10 +554,10 @@ Net recommendation: keep the truthful schema work separate from library-ingestio
 
 ### Task 9: Implement Boxing naming alignment after the vocabulary audit
 
-**Bead ID:** `oc-08zs`  
-**SubAgent:** `primary` (for `coder` workflow role)  
-**Role:** `coder`  
-**References:** `REF-04`, `REF-06`, `REF-08`, `REF-09`, `REF-10`, `REF-11`  
+**Bead ID:** `oc-08zs`
+**SubAgent:** `primary` (for `coder` workflow role)
+**Role:** `coder`
+**References:** `REF-04`, `REF-06`, `REF-08`, `REF-09`, `REF-10`, `REF-11`
 **Prompt:** Use bead `oc-08zs`. Claim it on start with `bd update oc-08zs --status in_progress --json`. Implement the Boxing naming-alignment slice from Task 8. Normalize unresolved Boxing fixture filenames and folders to the agreed canonical vocabulary (`cross_*` → `hook_*`, standardize public-facing naming to `weave_*`, keep `run_in_place`, and use a clearer transition-oriented name for the current stance-change fixture). Update the Boxing proving UI from `dodge` to `weave`. Before changing shared chart-contract code, truth-check whether the current content-core `cross -> punch_right` mapping is actually stale or intentionally serving straight-punch legacy semantics; only change shared contract code if the surrounding source makes it clearly wrong. Update this plan with exactly what landed, commands run, and any intentionally deferred follow-up. Commit/push by default, then close with `bd close oc-08zs --reason "Boxing naming alignment implemented" --json`.
 
 **Folders Created/Deleted/Modified:**
@@ -605,10 +605,10 @@ Net recommendation: keep the truthful schema work separate from library-ingestio
 
 ### Task 10: QA Boxing naming alignment and unresolved fixture normalization
 
-**Bead ID:** `oc-fplk`  
-**SubAgent:** `primary` (for `qa` workflow role)  
-**Role:** `qa`  
-**References:** `REF-04`, `REF-06`, `REF-08`, `REF-09`, `REF-10`, `REF-11` plus implementation references added during Task 9  
+**Bead ID:** `oc-fplk`
+**SubAgent:** `primary` (for `qa` workflow role)
+**Role:** `qa`
+**References:** `REF-04`, `REF-06`, `REF-08`, `REF-09`, `REF-10`, `REF-11` plus implementation references added during Task 9
 **Prompt:** Use bead `oc-fplk`. Claim it on start with `bd update oc-fplk --status in_progress --json`. After `oc-08zs` lands, verify that the Boxing naming alignment is truthful across fixture files, proving-scene UI wording, and any shared chart-contract changes. Check that unresolved Boxing fixtures were normalized safely, that `dodge` no longer leaks on the Boxing proving surface if that rename landed, and that any content-core contract change is justified by source truth rather than guesswork. Update this plan with exact checks run and close with `bd close oc-fplk --reason "Boxing naming alignment QA complete" --json` only if QA truthfully passes.
 
 **Folders Created/Deleted/Modified:**
@@ -625,11 +625,99 @@ Net recommendation: keep the truthful schema work separate from library-ingestio
 
 ### Task 11: Audit Boxing naming alignment against chart truth
 
-**Bead ID:** `oc-g1ew`  
-**SubAgent:** `primary` (for `auditor` workflow role)  
-**Role:** `auditor`  
-**References:** all relevant boxing-vocabulary and implementation references from Tasks 8-10  
+**Bead ID:** `oc-g1ew`
+**SubAgent:** `primary` (for `auditor` workflow role)
+**Role:** `auditor`
+**References:** all relevant boxing-vocabulary and implementation references from Tasks 8-10
 **Prompt:** Use bead `oc-g1ew`. Claim it on start with `bd update oc-g1ew --status in_progress --json`. After QA completes, independently audit the Boxing naming-alignment work against the chart truth and Derrick’s clarified vocabulary decisions. Confirm whether the implementation is truly aligned across fixtures, UI wording, and any shared-contract behavior, and call out any remaining drift explicitly. Update this plan and close with `bd close oc-g1ew --reason "Boxing naming alignment audit complete" --json` only if the audit truthfully passes.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+
+**Files Created/Deleted/Modified:**
+- `.plans/2026-05-13-boxing-fixture-system-truth-and-schema.md`
+
+**Status:** ⏳ Pending
+
+**Results:** Pending.
+
+---
+
+### Task 12: Rename internal Boxing lean wording to weave across detector/provider surfaces
+
+**Bead ID:** `oc-r095`
+**SubAgent:** `primary` (for `coder` workflow role)
+**Role:** `coder`
+**References:** `REF-06`, `REF-08`, `REF-09`, `REF-10`, `REF-11` plus implementation references added during Task 9
+**Prompt:** Use bead `oc-r095`. Claim it on start with `bd update oc-r095 --status in_progress --json`. Implement the internal naming-alignment pass so Boxing detector/provider/public runtime wording uses `weave` instead of `lean` where that family is intended to be product-facing. Update detector/provider/harness/public surfaces carefully, keep compatibility in mind for existing validation and fixture tooling, update this plan with exactly what landed and what compatibility/deferred choices were made, commit/push by default, and close with `bd close oc-r095 --reason "Internal Boxing weave naming alignment implemented" --json`.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- `src/detectors/`
+- `src/providers/`
+- `.testbed/scripts/`
+- `docs/`
+
+**Files Created/Deleted/Modified:**
+- `src/detectors/pose_detector_substrate.gd`
+- `src/providers/mediapipe_provider.gd`
+- `src/input_provider.gd`
+- `.testbed/scripts/proving_harness.gd`
+- `.testbed/scripts/boxing_proving_harness.gd`
+- `.testbed/tests/unit/test_pose_detector_substrate.gd`
+- `docs/proving-scene-human-verification-checklist.md`
+- `docs/proving-scene-human-verification-log-template.md`
+- `README.md`
+- `.plans/2026-05-13-boxing-fixture-system-truth-and-schema.md`
+
+**Status:** ✅ Complete
+
+**Results:**
+- Renamed the Boxing detector’s primary state/event family from `lean_*` to `weave_*` in `src/detectors/pose_detector_substrate.gd`, including the internal state keys, emitted event names, and shared proving/fixture-visible `gesture_states` output.
+- Added a narrow compatibility bridge instead of pretending the old surface vanished instantly:
+  - detector `gesture_states` now publish `weave_left` / `weave_right` as primary while also mirroring `lean_left` / `lean_right` aliases for legacy readers;
+  - `src/providers/mediapipe_provider.gd` now declares and emits `weave_left/right_start/end` as the primary provider signals while still emitting the legacy `lean_*` aliases from the same detector events;
+  - `src/input_provider.gd` now exposes addon-local `weave_*` signals and still relays inherited `lean_*` signals for compatibility.
+- Updated the shared Boxing proving harness and Boxing proving UI surface to consume/display `weave_*` instead of `lean_*`, so future fixture capture reports and event timelines are truthful to the current Boxing product wording.
+- Updated the targeted detector unit slice plus directly related Boxing verification docs/README to use `weave` terminology, while documenting the retained `lean_*` aliases as compatibility-only.
+- Validation run during this coder pass:
+  - `bd update oc-r095 --status in_progress --json`
+  - `git diff --check` *(reported pre-existing trailing whitespace in this active plan section before cleanup)*
+  - `~/.local/bin/godot --headless --path .testbed --check-only --script scripts/proving_harness.gd`
+  - `~/.local/bin/godot --headless --path .testbed --check-only --script addons/aerobeat-input-mediapipe-python/src/providers/mediapipe_provider.gd`
+  - `~/.local/bin/godot --headless --path .testbed --check-only --script addons/aerobeat-input-mediapipe-python/src/input_provider.gd`
+  - `~/.local/bin/godot --headless --path .testbed --script addons/gut/gut_cmdln.gd -gtest=res://tests/unit/test_pose_detector_substrate.gd -gexit` → `12/12 passed`
+- Commit hash(es): code/docs/tests landed in `6e96c15` (`Align boxing weave runtime naming`). This Task 12 plan update is being recorded in the follow-up plan/doc commit for the coder handoff.
+
+---
+
+### Task 13: QA internal Boxing weave naming alignment
+
+**Bead ID:** `oc-4663`
+**SubAgent:** `primary` (for `qa` workflow role)
+**Role:** `qa`
+**References:** `REF-06`, `REF-08`, `REF-09`, `REF-10`, `REF-11` plus implementation references added during Task 12
+**Prompt:** Use bead `oc-4663`. Claim it on start with `bd update oc-4663 --status in_progress --json`. After `oc-r095` lands, verify that the Boxing runtime/public naming alignment from `lean` to `weave` is truthful and consistent across detector/provider/proving/fixture validation surfaces, and that no stale public `lean_*` wording remains where `weave_*` is now intended. Update this plan with exact checks run and close with `bd close oc-4663 --reason "Internal Boxing weave naming QA complete" --json` only if QA truthfully passes.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+
+**Files Created/Deleted/Modified:**
+- plan updates / QA notes only unless a tiny truthful docs correction is required
+
+**Status:** ⏳ Pending
+
+**Results:** Pending.
+
+---
+
+### Task 14: Audit internal Boxing weave naming alignment
+
+**Bead ID:** `oc-1tao`
+**SubAgent:** `primary` (for `auditor` workflow role)
+**Role:** `auditor`
+**References:** all relevant boxing-naming references from Tasks 9-13
+**Prompt:** Use bead `oc-1tao`. Claim it on start with `bd update oc-1tao --status in_progress --json`. After QA completes, independently audit the internal/public `weave` naming alignment and call out any remaining drift or compatibility caveats clearly. Update this plan and close with `bd close oc-1tao --reason "Internal Boxing weave naming audit complete" --json` only if the audit truthfully passes.
 
 **Folders Created/Deleted/Modified:**
 - `.plans/`
