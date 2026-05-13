@@ -352,7 +352,7 @@ Net recommendation: keep the truthful schema work separate from library-ingestio
   - `scripts/run_proving_fixture_capture.sh .testbed/assets/fixtures/boxing/punch_left/boxing__punch_left__positive__guard_start_end__take_01.fixture.yaml`
 - **Observed runtime truth from the real Boxing run:** the new fixture path works and emits structured evidence, but the left-punch fixture currently **fails** validation in a way consistent with the known detector truth problem: `punch_left` never emitted inside the authored windows, while forbidden `uppercut_right` emitted at `3623ms`. Run artifact folder: `.testbed/test-results/fixtures/20260513-111002__boxing__punch_left__positive__guard_start_end__take_01/`.
 - **Follow-up truth explicitly recorded instead of hidden scope creep:** this slice builds the reusable fixture path, but richer ready/state-window assertions still need a later bead once Boxing event truth is cleaner.
-- **Commit:** `9e02894` — `Implement first truthful fixture-system slice`.
+- **Commit:** `666d4db` — `Implement first truthful fixture-system slice`.
 
 ---
 
@@ -430,7 +430,8 @@ Net recommendation: keep the truthful schema work separate from library-ingestio
 - `REF-06` remains the runtime detector truth source that the new fixture validator now exposes more clearly.
 
 **Commits:**
-- `9e02894` - Implement first truthful fixture-system slice
+- `666d4db` - Implement first truthful fixture-system slice
+- `5dea008` - Update fixture-system plan with task 4 results
 
 **Lessons Learned:**
 - The old capture path had a real early-exit bug, so even the first slice needed to repair the evidence pipeline before validation truth was possible.
