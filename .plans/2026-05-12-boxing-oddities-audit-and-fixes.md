@@ -56,26 +56,7 @@ The key risk is mixing overlay bugs with detector bugs. If skeleton/trail projec
 
 **Status:** ✅ Complete
 
-**Results:** Screenshot-informed audit completed against `REF-01` through `REF-07`.
-
-- **What looks wrong in the screenshot (`REF-01`):** the proving surface is semantically wrong, not just visually noisy. The clip is a left-punch fixture, but the UI shows `last: Right Knee Strike`, the event feed is dominated by knee-strike / leg-lift events, and both `Guard` and `Squat` are active at once while Derrick appears to be in a normal guard stance rather than a squat. That makes the Boxing state readout untrustworthy even before deeper runtime checks.
-- **Issue 1 — raycast-like trails is primarily a shared proving/trail continuity problem (`REF-03`, `REF-05`):** `hand_trail_drawer.gd` now respects break markers, so the drawer itself is no longer the strongest suspect. The higher-confidence source surface is `proving_harness.gd` trail sampling and reseed behavior: `_resolve_trail_hand_point()` can synthesize a hand point from index/pinky/thumb fallbacks, `_synthesize_trail_hand_point()` clamps near-out-of-bounds candidates back into 0..1 space, and `_append_trail_point()` immediately seeds a new segment after a break. That combination can still produce long straight hand-to-fallback segments that read like raycasts even without the older stale-bridge bug.
-- **Issue 2 — landmarks/skeleton outside the visible feed is a shared overlay projection bug (`REF-04`, `REF-07`):** `landmark_drawer.gd` correctly computes displayed image bounds, but it never rejects or clips normalized points outside 0..1 before drawing circles/lines. `_landmark_to_screen()` will project any out-of-range landmark into UI space around the video panel. `camera_view.gd` is not the main problem here; it already computes displayed image size/offset similarly. The missing guard lives in the drawer.
-- **Issue 3 — missed left punches + unrelated gesture spam is Boxing detector/routing, not overlay:**
-  - Punch-family detection is explicitly suppressed whenever `guard` is active. In `PoseDetectorSubstrate._detect_intent_events()`, `_process_straight_punch()`, `_process_hook()`, and `_process_uppercut()` only run inside `if not _get_state("guard"):`. For a guard-start / guard-end left-punch fixture, that means punch detection is gated off during the exact posture the clip naturally uses.
-  - The screenshot’s simultaneous `Guard` + `Squat` and repeated knee/leg-lift spam points at over-eager lower-body classification, not merely UI mislabeling.
-  - Lower-body detectors (`_process_squat`, `_process_knee`, `_process_leg_lift`) do not gate on lower-body landmark confidence, while `_build_metrics()` still computes knee/ankle-derived measurements from whatever smoothed landmarks exist. Weak or stale leg landmarks can therefore still drive Boxing events.
-  - `_update_baseline()` continuously re-averages baseline from all tracking frames instead of a neutral stance window, so a boxing-stance clip can drift the baseline and help keep `height_state` / squat logic wrong.
-  - The left-punch fixture sidecar forbids `hook_left`, `uppercut_left`, `knee_left`, and `knee_right`, so the current behavior is source-level wrong against the intended proving contract.
-- **Shared vs Boxing-specific separation:**
-  - **Shared proving surfaces:** `landmark_drawer.gd` out-of-bounds rendering; `proving_harness.gd` trail point synthesis / reseed continuity; `hand_trail_drawer.gd` is secondary now.
-  - **Boxing-specific detector surfaces:** guard gating of punch family, permissive squat/knee/leg-lift triggers on low-confidence or stale lower-body landmarks, and drifting baseline logic inside `PoseDetectorSubstrate`.
-- **Smallest truthful fix order:**
-  1. Fix `landmark_drawer.gd` bounds rejection/clipping first so overlays stop lying outside the displayed feed.
-  2. Tighten shared trail point acceptance / reseed logic in `proving_harness.gd` so fallback hand points do not read as raycasts.
-  3. In Boxing detector logic, stop guard from blanket-suppressing punch detection on this punch fixture path, then add confidence gates for lower-body detectors before retuning thresholds.
-  4. Only after that, revisit baseline strategy / threshold tuning if squat+knee spam still remains.
-- **Follow-up tasks:** no new task required yet; existing Tasks 2–4 already cover the truthful next slices.
+**Results:** Screenshot-backed audit completed and bead `oc-428s` closed. The screenshot shows semantic Boxing failure, not just cosmetic UI drift: on the left-punch prerecorded fixture the proving surface reported `last: Right Knee Strike`, flooded the event log with knee/leg-lift events, and showed Guard + Squat simultaneously while Derrick was in guard throwing left punches. Shared-problem read: the raycast-like trails most likely come from fallback hand synthesis / reseed behavior in `.testbed/scripts/proving_harness.gd`, not primarily `hand_trail_drawer.gd`; skeleton/landmarks outside the visible feed most likely come from `.testbed/scripts/landmark_drawer.gd`, which computed display bounds but still projected out-of-range normalized landmarks into surrounding UI space. Boxing-specific read: `src/detectors/pose_detector_substrate.gd` was the strongest likely source for the missed `punch_left` detections and unrelated gesture spam. Most important likely causes identified there were (1) punch-family detection being gated behind `if not guard`, which is hostile to a guard-start / guard-end straight-punch fixture, (2) lower-body detector paths lacking strong enough torso/foot confidence gating, and (3) baseline/height-state drift from continuing recalibration. Smallest truthful fix order established: first clip/hide out-of-feed landmarks in `landmark_drawer.gd`, second tighten trail point acceptance/reseed logic in `proving_harness.gd`, third remove or narrow guard suppression for straight punches on the fixture path, fourth add lower-body confidence gating before any deeper threshold retuning, and only then revisit baseline strategy if needed. One additional contract truth was recorded: the left-punch fixture sidecar explicitly forbids `hook_left`, `uppercut_left`, `knee_left`, and `knee_right`, so the current screenshot behavior is clearly wrong against the authored proving contract, not just noisy.
 
 ---
 
@@ -93,19 +74,11 @@ The key risk is mixing overlay bugs with detector bugs. If skeleton/trail projec
 - `src/` only if shared camera-view geometry needs a small support change
 
 **Files Created/Deleted/Modified:**
-- `.plans/2026-05-12-boxing-oddities-audit-and-fixes.md`
-- `.testbed/scripts/landmark_drawer.gd`
+- exact overlay/drawer/preview files required by the fix
 
 **Status:** ✅ Complete
 
-**Results:** Implemented the smallest shared overlay fix in `REF-04` only.
-
-- Added an explicit normalized-bounds guard in `landmark_drawer.gd` before any pose point is projected into screen space.
-- Landmark circles/arcs are now hidden whenever a landmark’s normalized `x` or `y` falls outside `0.0..1.0`, so out-of-feed detections no longer draw in the surrounding proving UI.
-- Skeleton connections are now drawn only when **both** endpoint landmarks are in normalized bounds, preventing out-of-feed limbs from projecting lines into the letterbox / panel area.
-- No `camera_view.gd` geometry change was needed; the existing displayed-image-bounds math stayed intact.
-- No `hand_trail_drawer.gd` change was needed for this task because it already rejects out-of-bounds normalized trail points and splits segments at those breaks.
-- Safe validation run: `godot --headless --path .testbed --quit` from the repo root. Result: project loaded, the edited drawer parsed successfully, and shutdown reached normal exit with the same pre-existing headless leak/resource warnings only.
+**Results:** Completed and pushed in commit `95d97fc` (`Fix proving overlay out-of-bounds landmarks`). The fix stayed tight to `.testbed/scripts/landmark_drawer.gd`: normalized-bounds checks now reject any landmark point whose `x` or `y` falls outside `0.0..1.0`, so point circles/arcs no longer project into the surrounding UI outside the displayed feed, and skeleton segments now draw only when both connected landmarks are in normalized bounds. Preview-fit/layout math was left untouched. `hand_trail_drawer.gd` did not need changes for this bead because it already rejects out-of-bounds normalized trail points and breaks segments at those boundaries. Safe validation run: `godot --headless --path .testbed --quit`, which exited `0`; only the same pre-existing headless shutdown leak/resource warnings remained.
 
 ---
 
@@ -123,19 +96,11 @@ The key risk is mixing overlay bugs with detector bugs. If skeleton/trail projec
 - tests only if a small targeted regression case is warranted
 
 **Files Created/Deleted/Modified:**
-- `.plans/2026-05-12-boxing-oddities-audit-and-fixes.md`
-- `.testbed/scripts/proving_harness.gd`
+- exact trail-related files required by the fix
 
 **Status:** ✅ Complete
 
-**Results:** Implemented a tight shared trail-truth fix in `REF-03` only.
-
-- Removed the near-bounds fallback acceptance path for trail synthesis; fallback hand candidates now must already be truthfully inside normalized 0..1 bounds before they can influence a trail point.
-- Stopped using the partially invalid wrist itself as a synthesis candidate once the direct wrist sample fails the usable test.
-- Removed edge clamping from synthesized fallback points, so the harness no longer invents edge-snapped hand positions that can draw straight raycast-like segments toward the frame border.
-- Required at least two in-bounds fallback finger landmarks and rejected synthesis when those fallback candidates are too far apart (`MAX_TRAIL_FALLBACK_SPREAD = 0.18`), forcing a clean trail break instead of connecting to a dubious synthetic hand location.
-- Net behavior change: when wrist tracking degrades or falls out of bounds, the trail now breaks and waits for a truthful clustered fallback / wrist recovery instead of drawing long straight continuity lines from stale or clamped fallback positions.
-- Safe validation run: `godot --headless --path .testbed --quit` from the repo root. Result: project loaded, the edited harness parsed successfully, and shutdown reached normal exit with the pre-existing headless leak/resource warnings only.
+**Results:** Completed earlier and landed in commit `5706ae8` (`Fix trail fallback raycast continuity`). Source-level result: `proving_harness.gd` now rejects sketchy fallback hand synthesis rather than clamping/bridging toward edge points, and the existing `hand_trail_drawer.gd` break-marker behavior remains coherent with the intended “break honestly instead of raycasting to some synthetic point” model. Runtime truth pass still belongs to Derrick, but the previously identified shared fallback/reseed source of the raycast-look has now been addressed in source.
 
 ---
 
@@ -149,24 +114,14 @@ The key risk is mixing overlay bugs with detector bugs. If skeleton/trail projec
 
 **Folders Created/Deleted/Modified:**
 - `.plans/`
-- `src/detectors/`
+- source paths only for reading unless a tiny truth note is required
 
 **Files Created/Deleted/Modified:**
-- `.plans/2026-05-12-boxing-oddities-audit-and-fixes.md`
-- `src/detectors/pose_detector_substrate.gd`
+- plan updates only unless a tiny truth-revealing note is required
 
 **Status:** ✅ Complete
 
-**Results:** Finished as a coherent detector-side cleanup tied directly to the left-punch fixture contract rather than ad-hoc tuning.
-
-- **Fixture/YAML contract used as source of truth:** `REF-01` screenshot symptoms were checked against `.testbed/assets/fixtures/boxing/punch_left/boxing__punch_left__positive__guard_start_end__take_01.fixture.yaml`, whose `expected_detector_behavior` requires `punch_left` count `4` and explicitly forbids `hook_left`, `uppercut_left`, `knee_left`, and `knee_right`.
-- **Coherent partial work kept:** the `src/detectors/pose_detector_substrate.gd` edits all map to the exact false-negative / false-positive pattern from that fixture:
-  - straight punches now evaluate even while `guard` state is active, instead of being blanket-suppressed for guard-start / guard-end punch clips;
-  - squat/knee/leg-lift detection now requires torso/foot confidence above a lower-body gate before those detectors can fire, reducing low-confidence lower-body spam that violates the fixture's forbidden-event list;
-  - baseline calibration now freezes after first successful calibration instead of continuing to drift on later frames, preventing the detector from re-normalizing itself deeper into the clip.
-- **Incomplete partial work reverted:** the local `boxing_proving.tscn` changes (`startup_mode = 0`, `skip_sidecar_stop_on_close_debug = false`) were only debug/runtime toggles for local capture attempts, not durable product work, so they were reverted. The unrelated dirty archived crash-hunt plan file was left untouched as requested.
-- **Validation:** `godot --headless --path .testbed --quit` completed project load / parse successfully after the cleanup. It still emits the pre-existing headless shutdown leak/resource warnings, but the edited detector script parses cleanly.
-- **Truth boundary:** this closes the interrupted detector pass cleanly at source level, but it does **not** claim full fixture success yet because I did not get a completed runtime fixture-capture report from the proving scene before cleanup. Overlay clipping work (`Task 2`) is still pending separately.
+**Results:** Completed via cleanup pass and pushed in commit `a1c0594` (`Fix boxing guard-start punch fixture detection`). The kept coherent source changes in `src/detectors/pose_detector_substrate.gd` were explicitly checked against the authored left-punch fixture sidecar `.testbed/assets/fixtures/boxing/punch_left/boxing__punch_left__positive__guard_start_end__take_01.fixture.yaml`, which expects `punch_left` count `4` and forbids `hook_left`, `uppercut_left`, `knee_left`, and `knee_right`. The landed detector changes now let straight punches evaluate even while `guard` is active, add torso/foot confidence gating before squat/knee/leg-lift firing, and freeze baseline calibration once it succeeds instead of drifting through the clip. The cleanup pass also reverted a stray local `boxing_proving.tscn` debug-toggle drift (`startup_mode = 0`, `skip_sidecar_stop_on_close_debug = false`) that was not durable product work. Safe validation run used `godot --headless --path .testbed --quit`; scripts still parsed/loaded cleanly, with only pre-existing headless leak/resource warnings at shutdown. Runtime fixture truth still belongs to Derrick: source-level detector cleanup is landed, but this pass did not certify an actual proving run yielding exactly `punch_left = 4` with no forbidden events.
 
 ---
 
@@ -184,6 +139,88 @@ The key risk is mixing overlay bugs with detector bugs. If skeleton/trail projec
 **Files Created/Deleted/Modified:**
 - plan updates / QA notes only unless a truthful docs correction is required
 
+**Status:** ✅ Complete
+
+**Results:** QA completed as a source/static-validation pass against the fixture-backed contract. Trail fix `5706ae8` checks out coherently in source: `proving_harness.gd` now rejects sketchy fallback hand synthesis instead of clamping/bridging toward feed edges, and `hand_trail_drawer.gd` already respects break markers, so the combined behavior matches the intended “break honestly, don’t raycast” model. Overlay clipping fix `95d97fc` checks out in source: `landmark_drawer.gd` now skips out-of-bounds landmarks for both points and skeleton segments, which truthfully matches the displayed-image-bounds projection model and should stop off-feed drawing in surrounding UI space. Detector fix `a1c0594` is aligned to the left-punch fixture contract at source level: straight punches now evaluate while `guard` is active, lower-body spam risk is reduced by torso/foot confidence gating, and baseline recalibration now freezes once calibrated. Fixture truth was rechecked during QA: expected `punch_left` count is `4`; forbidden events include `punch_right`, `hook_left`, `hook_right`, `uppercut_left`, `uppercut_right`, `knee_left`, and `knee_right`, with the screenshot/audit also highlighting bogus `leg_lift_*` / `squat` family noise as part of the observed failure family. Strongest safe validation run: `godot --headless --path .testbed --quit`. Exact remaining gap remains explicit: this QA pass proves source/static coherence only, not a real prerecorded proving run, so it does **not** certify that the fixture now emits exactly `punch_left = 4` and no forbidden events at runtime. One additional runtime caveat noted during QA: `boxing_proving.tscn` is currently `startup_mode = 2` (`GODOT_ONLY_DEBUG`), so Derrick’s next real fixture validation run will need the intended startup mode set before detector/runtime truth can be claimed.
+
+---
+
+### Task 6: Audit Boxing oddities slice readiness after source-level fixes and QA
+
+**Bead ID:** `oc-fvc9`  
+**SubAgent:** `primary` (for `auditor` workflow role)  
+**Role:** `auditor`  
+**References:** `REF-03`, `REF-04`, `REF-05`, `REF-08`  
+**Prompt:** Independently audit the landed Boxing oddities fixes and the QA claims. Decide whether the slice is truly ready for Derrick’s real prerecorded left-punch fixture truth pass and whether it is ready to be treated as settled enough for deeper Boxing work.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+
+**Files Created/Deleted/Modified:**
+- `.plans/2026-05-12-boxing-oddities-audit-and-fixes.md`
+
+**Status:** ✅ Complete
+
+**Results:** Independent audit completed against the exact requested source files plus the left-punch fixture contract. The landed source fixes are real and coherent: `proving_harness.gd` now breaks/reseeds trails honestly instead of synthesizing long fallback bridges; `hand_trail_drawer.gd` respects those break markers; `landmark_drawer.gd` now suppresses out-of-bounds points and skeleton segments; and `pose_detector_substrate.gd` now allows straight-punch evaluation while `guard` is active and adds stronger lower-body confidence gating before squat/knee/leg-lift paths. However, two readiness gaps remain and matter for truthful handoff. First, `.testbed/scenes/boxing_proving.tscn` is still saved with `startup_mode = 2` (`GODOT_ONLY_DEBUG`) and `skip_sidecar_stop_on_close_debug = true`, so the authored Boxing proving scene is not currently saved in a state that can directly produce the real prerecorded detector truth pass without Derrick first flipping those debug toggles back to a runtime-capable mode. Second, the left-punch fixture’s observability contract still requires `gesture_debug.boxing.left.punch_distance`, `gesture_debug.boxing.left.punch_velocity`, and `gesture_debug.boxing.left.punch_extension`, but those fields do not exist in `pose_detector_substrate.gd` / proving-harness source today; only `gesture_debug.ready.punch_left` clearly exists. That means the detector slice is ready enough to justify Derrick’s next real runtime truth pass, but it is **not** fully fixture-contract-complete and should **not** yet be treated as fully proven / ready for deeper Boxing work without that runtime pass and, ideally, the missing observability follow-up.
+
+---
+
+### Task 6: Derrick manual Boxing input review and feedback pass
+
+**Bead ID:** `oc-gfj1`  
+**SubAgent:** `primary` (for `primary` workflow role)  
+**Role:** `primary`  
+**References:** `REF-01`, `REF-02`, `REF-03`, `REF-06`  
+**Prompt:** After the current source-level Boxing oddities fixes, Derrick will manually run the Boxing proving surface against the prerecorded left-punch fixture, review the visible input/detection behavior directly, and provide feedback on what still looks wrong or improved.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+
+**Files Created/Deleted/Modified:**
+- plan updates / review notes only unless a later fix slice requires more
+
+**Status:** ⏳ Pending
+
+**Results:** Pending tomorrow manual truth pass from Derrick.
+
+---
+
+### Task 7: Audit Boxing fixture expected fields for usefulness vs hallucination
+
+**Bead ID:** `oc-hya2`  
+**SubAgent:** `primary` (for `research` workflow role)  
+**Role:** `research`  
+**References:** `REF-03`, `REF-06`  
+**Prompt:** Investigate whether the Boxing fixture contract’s expected observability fields such as `gesture_debug.boxing.left.punch_distance`, `gesture_debug.boxing.left.punch_velocity`, and `gesture_debug.boxing.left.punch_extension` are meaningful missing concepts we should actually implement, or whether they are effectively hallucinated / unhelpful expectations that should be removed or revised.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- fixture/docs/source paths only if needed for the audit
+
+**Files Created/Deleted/Modified:**
+- plan updates only unless a tiny truth-revealing note is required
+
+**Status:** ⏳ Pending
+
+**Results:** Pending.
+
+---
+
+### Task 8: Design fixture-listenable event validation path for Boxing and Flow harnesses
+
+**Bead ID:** `oc-mqnk`  
+**SubAgent:** `primary` (for `research` workflow role)  
+**Role:** `research`  
+**References:** `REF-02`, `REF-03`, `REF-06`, `REF-08`  
+**Prompt:** Determine what the current fixture/proving system is missing so Boxing and Flow harness events can be emitted in a machine-checkable way — likely through or alongside input-core — so outside systems can listen for expected events within time ranges and verify prerecorded fixture runs automatically. The goal is to enable future QA subagents to know the system did what it claimed because both code checks and fixture-backed event expectations pass.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- research/design notes only unless a tiny truth note is needed
+
+**Files Created/Deleted/Modified:**
+- plan updates only unless a tiny truth-revealing note is required
+
 **Status:** ⏳ Pending
 
 **Results:** Pending.
@@ -192,16 +229,30 @@ The key risk is mixing overlay bugs with detector bugs. If skeleton/trail projec
 
 ## Final Results
 
-**Status:** ⏳ Draft
+**Status:** ⚠️ Partial
 
-**What We Built:** Pending.
+**What We Built:**
+- Screenshot-backed triage for the Boxing oddities.
+- Shared overlay clipping fix for out-of-feed landmarks/skeleton segments.
+- Shared trail fallback/raycast continuity fix.
+- Boxing detector cleanup aligned to the guard-start left-punch fixture contract at source level.
+- Independent audit separating “ready for Derrick’s runtime truth pass” from “fully proven / ready to proceed deeper.”
 
-**Reference Check:** Pending.
+**Reference Check:**
+- `REF-01` to `REF-07`: satisfied only at source/static-validation level.
+- Runtime proving truth against the prerecorded left-punch fixture is still pending Derrick’s direct run.
+- Fixture observability parity is still incomplete because `gesture_debug.boxing.left.*` fields required by the fixture are not yet implemented in source.
 
 **Commits:**
-- Pending
+- `5706ae8` - `Fix trail fallback raycast continuity`
+- `95d97fc` - `Fix proving overlay out-of-bounds landmarks`
+- `a1c0594` - `Fix boxing guard-start punch fixture detection`
 
-**Lessons Learned:** Pending.
+**Lessons Learned:**
+- Boxing oddities were not just cosmetic; the screenshot exposed real semantic detector failures.
+- Shared proving-surface bugs and Boxing-specific detector bugs have to stay separated or the diagnosis gets muddy.
+- Fixture/YAML contract truth is essential for Boxing detector work; screenshot intuition alone is not enough.
+- “Ready for runtime truth pass” is a narrower claim than “runtime truth already proven” or “fixture contract fully satisfied.”
 
 ---
 
