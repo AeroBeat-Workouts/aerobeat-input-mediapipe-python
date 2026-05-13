@@ -69,6 +69,8 @@ func _draw_skeleton(width: float, height: float, offset: Vector2 = Vector2.ZERO)
 		if landmark_dict.has(id1) and landmark_dict.has(id2):
 			var lm1: Dictionary = landmark_dict[id1]
 			var lm2: Dictionary = landmark_dict[id2]
+			if not _is_landmark_in_bounds(lm1) or not _is_landmark_in_bounds(lm2):
+				continue
 			
 			var pos1: Vector2 = _landmark_to_screen(lm1, width, height, offset)
 			var pos2: Vector2 = _landmark_to_screen(lm2, width, height, offset)
@@ -77,11 +79,19 @@ func _draw_skeleton(width: float, height: float, offset: Vector2 = Vector2.ZERO)
 
 func _draw_landmarks(width: float, height: float, offset: Vector2 = Vector2.ZERO) -> void:
 	for lm: Dictionary in _landmarks:
+		if not _is_landmark_in_bounds(lm):
+			continue
 		var pos: Vector2 = _landmark_to_screen(lm, width, height, offset)
 		var color: Color = LANDMARK_COLOR if lm.v > 0.8 else LANDMARK_COLOR_LOW_CONFIDENCE
 		
 		draw_circle(pos, LANDMARK_RADIUS, color)
 		draw_arc(pos, LANDMARK_RADIUS, 0.0, TAU, 16, Color.BLACK, 1.0)
+
+func _is_landmark_in_bounds(lm: Dictionary) -> bool:
+	return float(lm.get("x", -1.0)) >= 0.0 \
+		and float(lm.get("x", -1.0)) <= 1.0 \
+		and float(lm.get("y", -1.0)) >= 0.0 \
+		and float(lm.get("y", -1.0)) <= 1.0
 
 func _landmark_to_screen(lm: Dictionary, width: float, height: float, offset: Vector2 = Vector2.ZERO) -> Vector2:
 	# Provider landmarks are already normalized into AeroBeat's mirrored gameplay space:

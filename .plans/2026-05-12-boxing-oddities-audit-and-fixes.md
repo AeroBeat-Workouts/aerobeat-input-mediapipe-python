@@ -93,11 +93,19 @@ The key risk is mixing overlay bugs with detector bugs. If skeleton/trail projec
 - `src/` only if shared camera-view geometry needs a small support change
 
 **Files Created/Deleted/Modified:**
-- exact overlay/drawer/preview files required by the fix
+- `.plans/2026-05-12-boxing-oddities-audit-and-fixes.md`
+- `.testbed/scripts/landmark_drawer.gd`
 
-**Status:** ⏳ Pending
+**Status:** ✅ Complete
 
-**Results:** Pending.
+**Results:** Implemented the smallest shared overlay fix in `REF-04` only.
+
+- Added an explicit normalized-bounds guard in `landmark_drawer.gd` before any pose point is projected into screen space.
+- Landmark circles/arcs are now hidden whenever a landmark’s normalized `x` or `y` falls outside `0.0..1.0`, so out-of-feed detections no longer draw in the surrounding proving UI.
+- Skeleton connections are now drawn only when **both** endpoint landmarks are in normalized bounds, preventing out-of-feed limbs from projecting lines into the letterbox / panel area.
+- No `camera_view.gd` geometry change was needed; the existing displayed-image-bounds math stayed intact.
+- No `hand_trail_drawer.gd` change was needed for this task because it already rejects out-of-bounds normalized trail points and splits segments at those breaks.
+- Safe validation run: `godot --headless --path .testbed --quit` from the repo root. Result: project loaded, the edited drawer parsed successfully, and shutdown reached normal exit with the same pre-existing headless leak/resource warnings only.
 
 ---
 
