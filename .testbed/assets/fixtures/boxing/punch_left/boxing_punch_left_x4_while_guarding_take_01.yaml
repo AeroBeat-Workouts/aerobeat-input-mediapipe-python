@@ -18,7 +18,8 @@ expected_gestures:
         end_ms: 3833
       - start_ms: 4833
         end_ms: 5088
-- name: guard
+  - name: guard
+    surface: state
     windows:
       - start_ms: 0
         end_ms: 1150
@@ -38,11 +39,10 @@ forbidden_gestures:
   - name: uppercut_right
   - name: knee_left
   - name: knee_right
-  - name: squat
-  - name: leg_lift_left
-  - name: leg_lift_right
-  - name: run_in_place
-  - name: weave_left
-  - name: weave_right
-  - name: side_step_left
-  - name: side_step_right
+  - name: squat_start
+  - name: leg_lift_left_start
+  - name: leg_lift_right_start
+  - name: weave_left_start
+  - name: weave_right_start
+  - name: sidestep_left_start
+  - name: sidestep_right_start

@@ -28,6 +28,11 @@ expected_gestures:
         end_ms: 1300
       - start_ms: 1900
         end_ms: 2300
+  - name: guard
+    surface: state
+    windows:
+      - start_ms: 0
+        end_ms: 850
 forbidden_gestures:
   - name: punch_right
 ```
@@ -43,6 +48,7 @@ forbidden_gestures:
 
 - `expected_gestures[]`
   - `name`
+  - `surface` (optional; defaults to `event`; use `state` for state-window truth like `guard`)
   - `windows[]`
     - `start_ms`
     - `end_ms`
@@ -92,15 +98,17 @@ Each run produces:
 
 This slice currently validates:
 
-- emitted gesture events inside authored windows
-- extra same-name gesture events outside authored windows
+- emitted gesture events inside authored `event` windows
+- extra same-name gesture events outside authored `event` windows
+- state truth windows for authored `surface: state` expectations (for example `guard`)
+- extra true-state segments outside authored `state` windows
 - optional forbidden gestures across the clip
 - that the harness captured structured event/state evidence
 
 This slice does **not** yet claim to validate:
 
 - ready/re-arm assertions from fixture YAML
-- rich state-window assertions from fixture YAML
+- richer state semantics beyond simple true-window segment overlap
 - full observability-surface requirements from fixture YAML
 - universal live-camera behavior
 

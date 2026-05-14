@@ -189,13 +189,16 @@ def normalize_expected_gesture_item(item: Any, index: int, legacy_mode: bool = F
         raise FixtureError(f"expected_gestures[{index}] is missing name")
 
     payload = item.get("payload") if isinstance(item.get("payload"), dict) else {}
+    surface = str(item.get("surface") or "event").strip().lower()
+    if surface not in {"event", "state"}:
+        raise FixtureError(f"expected_gestures[{index}] for {name} surface must be 'event' or 'state'")
     windows_source = item.get("windows")
     if windows_source is None:
         windows_source = item.get("windows_ms")
     if windows_source is None and isinstance(item.get("window_ms"), dict):
         windows_source = [item.get("window_ms")]
     if not isinstance(windows_source, list) or not windows_source:
-        raise FixtureError(f"expected_gestures[{index}] for {name} must declare one or more direct windows")
+        raise FixtureError(f"expected_gestures[{index}] for {name} must declare one or more {surface} windows")
 
     windows: list[dict[str, int]] = []
     for window_index, window in enumerate(windows_source):
@@ -204,6 +207,7 @@ def normalize_expected_gesture_item(item: Any, index: int, legacy_mode: bool = F
     return {
         "name": name,
         "payload": payload,
+        "surface": surface,
         "windows": windows,
         "source": "legacy_expected_events" if legacy_mode else "expected_gestures",
     }
@@ -312,9 +316,45 @@ def validate_capture(fixture: Fixture, capture_report: dict[str, Any]) -> Valida
         })
 
     matched_events: dict[str, list[int]] = {}
-    all_expected_names = {gesture["name"] for gesture in fixture.expected_gestures}
     for gesture in fixture.expected_gestures:
         name = gesture["name"]
+        surface = gesture.get("surface", "event")
+        if surface == "state":
+            state_segments = build_state_segments(state_timeline, name)
+            matched_segment_indexes: set[int] = set()
+            for window_index, window in enumerate(gesture["windows"]):
+                overlapping_segments = [
+                    segment
+                    for segment in state_segments
+                    if windows_overlap(window, segment)
+                ]
+                for segment in overlapping_segments:
+                    matched_segment_indexes.add(int(segment["index"]))
+                assertions.append({
+                    "kind": "expected_state_window",
+                    "name": name,
+                    "surface": surface,
+                    "window_index": window_index,
+                    "expected_window_ms": window,
+                    "actual_matches": [simplify_segment(segment) for segment in overlapping_segments],
+                    "status": "pass" if overlapping_segments else "fail",
+                    "message": (
+                        f"expected {name} state to be true at least once in {window['start_ms']}-{window['end_ms']}ms; found {len(overlapping_segments)} overlapping true segment(s)"
+                    ),
+                })
+            extra_segments = [segment for segment in state_segments if int(segment["index"]) not in matched_segment_indexes]
+            assertions.append({
+                "kind": "expected_state_extras",
+                "name": name,
+                "surface": surface,
+                "expected_count": len(gesture["windows"]),
+                "actual_count": len(state_segments),
+                "extra_segments": [simplify_segment(segment) for segment in extra_segments],
+                "status": "pass" if not extra_segments else "fail",
+                "message": f"expected all {name} true-state segments to overlap authored windows; found {len(extra_segments)} unmatched segment(s)",
+            })
+            continue
+
         gesture_events = [event for event in indexed_events if event["name"] == name]
         used_indexes: set[int] = set()
         for window_index, window in enumerate(gesture["windows"]):
@@ -330,6 +370,7 @@ def validate_capture(fixture: Fixture, capture_report: dict[str, Any]) -> Valida
             assertions.append({
                 "kind": "expected_gesture_window",
                 "name": name,
+                "surface": surface,
                 "window_index": window_index,
                 "expected_window_ms": window,
                 "actual_matches": [simplify_event(event) for event in candidates],
@@ -342,6 +383,7 @@ def validate_capture(fixture: Fixture, capture_report: dict[str, Any]) -> Valida
         assertions.append({
             "kind": "expected_gesture_extras",
             "name": name,
+            "surface": surface,
             "expected_count": len(gesture["windows"]),
             "actual_count": len(gesture_events),
             "extra_events": [simplify_event(event) for event in extras],
@@ -365,6 +407,54 @@ def validate_capture(fixture: Fixture, capture_report: dict[str, Any]) -> Valida
 
     ok = all(assertion["status"] == "pass" for assertion in assertions)
     return ValidationResult(ok=ok, assertions=assertions, warnings=warnings, matched_events=matched_events)
+
+
+def build_state_segments(state_timeline: list[Any], name: str) -> list[dict[str, Any]]:
+    segments: list[dict[str, Any]] = []
+    current: dict[str, Any] | None = None
+
+    for idx, raw_state in enumerate(state_timeline):
+        if not isinstance(raw_state, dict):
+            continue
+        timestamp_ms = int(raw_state.get("timestamp_ms") or 0)
+        gesture_states = raw_state.get("gesture_states") if isinstance(raw_state.get("gesture_states"), dict) else {}
+        active = bool(gesture_states.get(name))
+        if active:
+            if current is None:
+                current = {
+                    "index": len(segments),
+                    "name": name,
+                    "start_ms": timestamp_ms,
+                    "end_ms": timestamp_ms,
+                    "sample_count": 1,
+                    "first_state_index": idx,
+                    "last_state_index": idx,
+                }
+            else:
+                current["end_ms"] = timestamp_ms
+                current["sample_count"] = int(current["sample_count"]) + 1
+                current["last_state_index"] = idx
+        elif current is not None:
+            segments.append(current)
+            current = None
+
+    if current is not None:
+        segments.append(current)
+    return segments
+
+
+def windows_overlap(left: dict[str, int], right: dict[str, int]) -> bool:
+    return left["start_ms"] <= right["end_ms"] and right["start_ms"] <= left["end_ms"]
+
+
+def simplify_segment(segment: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "name": segment["name"],
+        "start_ms": segment["start_ms"],
+        "end_ms": segment["end_ms"],
+        "sample_count": segment["sample_count"],
+        "index": segment["index"],
+    }
 
 
 def simplify_event(event: dict[str, Any]) -> dict[str, Any]:
