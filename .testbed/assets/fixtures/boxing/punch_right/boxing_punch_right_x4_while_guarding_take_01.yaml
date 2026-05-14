@@ -1,12 +1,12 @@
 schema_version: 1
-fixture_id: boxing__punch_right__positive__guard_start_end__take_01
+fixture_id: boxing_punch_right_x4_while_guarding_take_01
 family: boxing
 video:
-  path: ./boxing__punch_right__positive__guard_start_end__take_01.mp4
+  path: ./boxing_punch_right_x4_while_guarding_take_01.mp4
 notes:
-  - candidate Boxing clip from Derrick's recorded take
+  - Boxing clip of Derrick
   - starts in guard, ends in guard, with four repeated right punches
-  - windows below are approximate human-authored boxing truth for this first fixture slice
+  - windows below are human validated. No other gestures besides punch_right and guard should be detected
 expected_gestures:
   - name: punch_right
     windows:
@@ -26,3 +26,11 @@ forbidden_gestures:
   - name: uppercut_right
   - name: knee_left
   - name: knee_right
+  - name: squat
+  - name: leg_lift_left
+  - name: leg_lift_right
+  - name: run_in_place
+  - name: weave_left
+  - name: weave_right
+  - name: side_step_left
+  - name: side_step_right
