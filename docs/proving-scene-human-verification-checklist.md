@@ -161,7 +161,7 @@ While testing, keep an eye on these visible surfaces:
 - boxing signal board:
   - punch/hook/uppercut rows with `status`, `count`, `last`, `power`
   - guard suppression line
-  - guard / squat / lean / sidestep / leg_lift rows with `active`, `start/end`, `last`
+  - guard / squat / weave / sidestep / leg_lift rows with `active`, `start/end`, `last`
   - knee rows with `status`, `count`, `last`, `power`
 - live event feed
 
@@ -299,7 +299,7 @@ Same expectations as left, but for `weave_right`.
   - `sidestep_right` stays off
   - body/head/hip offsets support the movement direction
 - Watch for:
-  - lean being mistaken for sidestep
+  - weave being mistaken for sidestep
   - state only firing after leaving safe frame center
 - Capture:
   - clip showing clean enter and return
@@ -377,7 +377,7 @@ These are important because a feature may work alone but fail in context.
   - no sustained state remains incorrectly active
   - attack rows eventually show ready again
 - Capture:
-  - note any stale guard/squat/lean/sidestep/leg-lift state
+  - note any stale guard/squat/weave/sidestep/leg-lift state
 
 ---
 

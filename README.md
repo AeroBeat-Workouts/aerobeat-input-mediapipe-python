@@ -95,7 +95,7 @@ Manual `.testbed/src`, `.testbed/python_mediapipe`, and repo-owned `.testbed/add
 - create and validate the current host's repo-owned Linux dev runtime at `python_mediapipe/assets/runtimes/linux-x64/`
 - scaffold the macOS and Windows runtime roots / manifests for contract work, without claiming they are host-validated here
 - receive pose landmarks in Godot and expose head/hand/foot polling helpers plus normalized detector-state observations
-- emit shipped Boxing gameplay-intent signals: punches, hooks, uppercuts, guard, squat, lean, sidestep, knees, and leg-lift state changes
+- emit shipped Boxing gameplay-intent signals: punches, hooks, uppercuts, guard, squat, weave, sidestep, knees, and leg-lift state changes
 - emit shipped first-pass Flow gameplay-intent signals: `swing_left/right(placement, direction)` and `trail_left/right(placement, direction)`
 - use either a webcam (`--camera 0`) or a video path (`--camera path/to/file.mp4`) when launching the Python sidecar directly
 - look up MediaPipe models from committed assets under `python_mediapipe/assets/models/`
@@ -251,7 +251,7 @@ The workbench will:
 
 For detector truth/tuning work, the repo now keeps dedicated proving scenes under `.testbed/scenes/` and their backing scripts under `.testbed/scripts/`:
 
-- `boxing_proving.tscn` — live Boxing detector proving for punches, guard, squat, lean, sidestep, knees, and leg lifts
+- `boxing_proving.tscn` — live Boxing detector proving for punches, guard, squat, weave, sidestep, knees, and leg lifts
 - `flow_proving.tscn` — live Flow detector proving for swing/trail families, placement, direction, and continuity timing
 - `.testbed/scripts/proving_harness.gd` — shared harness used by both scenes for event feed and threshold readouts
 

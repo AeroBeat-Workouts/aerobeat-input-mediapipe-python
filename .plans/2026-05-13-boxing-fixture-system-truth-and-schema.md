@@ -1368,6 +1368,32 @@ Net result: Derrick's trimmed YAML/video pair is now **valid and usable in the c
 
 ---
 
+---
+
+
+### Task 27: Clean remaining public lean wording after weave migration
+
+**Bead ID:** `oc-qvif`
+**SubAgent:** `primary` (for `coder` workflow role)
+**Role:** `coder`
+**References:** `REF-06`, `REF-08`, `REF-09`, `REF-10`, `REF-11` plus Task 13 QA findings
+**Prompt:** Use bead `oc-qvif`. Claim it on start with `bd update oc-qvif --status in_progress --json`. Task 13 QA found that the repo-owned runtime/provider/proving/fixture surfaces are already on `weave`, but a few repo-owned docs/readme entries still leak stale public `lean` wording. Make the smallest truthful cleanup needed to align those remaining public docs with the current `weave` terminology. Keep scope tight to repo-owned docs/readme text only; do not broaden detector/runtime behavior. Re-run the relevant lightweight validation and grep checks, update this plan with exact files changed and commands run, commit/push by default, and close with `bd close oc-qvif --reason "Remaining public lean wording cleaned" --json` when done.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- `docs/`
+
+**Files Created/Deleted/Modified:**
+- `README.md`
+- `docs/proving-scene-human-verification-checklist.md`
+- `.plans/2026-05-13-boxing-fixture-system-truth-and-schema.md`
+
+**Status:** ✅ Complete
+
+**Results:** Made the smallest truthful repo-owned doc cleanup only: replaced stale public Boxing `lean` wording with `weave` in `README.md` and `docs/proving-scene-human-verification-checklist.md` at the exact Task 13 QA callout surfaces (`README.md:98`, `README.md:254`, `docs/proving-scene-human-verification-checklist.md:164`, `:302`, `:380`). No detector/provider/runtime behavior changed. Commands run for this task: `nl -ba README.md | sed -n '90,110p'`; `nl -ba README.md | sed -n '246,262p'`; `nl -ba docs/proving-scene-human-verification-checklist.md | sed -n '156,172p'`; `nl -ba docs/proving-scene-human-verification-checklist.md | sed -n '294,310p'`; `nl -ba docs/proving-scene-human-verification-checklist.md | sed -n '372,388p'`; targeted `python3` text replacement over the two repo-owned docs; `grep -RInE '\blean\b|Lean' README.md docs/proving-scene-human-verification-checklist.md || true`; `grep -RInE '\bweave\b|Weave' README.md docs/proving-scene-human-verification-checklist.md`; `nl -ba ... | sed -n ...` rechecks for the five flagged lines; and `git diff --check`. Validation remained intentionally lightweight and doc-scoped; the only remaining `lean` hit in the checklist is plain-English movement guidance at line 77, which Task 13 QA had already called acceptable as generic English rather than stale product/runtime vocabulary.
+
+---
+
 ## Final Results
 
 **Status:** ⚠️ Partial
