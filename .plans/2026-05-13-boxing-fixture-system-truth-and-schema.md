@@ -1368,29 +1368,100 @@ Net result: Derrick's trimmed YAML/video pair is now **valid and usable in the c
 
 ---
 
----
+### Task 29: Clean remaining non-blocking Boxing naming drift residue
 
-
-### Task 27: Clean remaining public lean wording after weave migration
-
-**Bead ID:** `oc-qvif`
+**Bead ID:** `oc-c0iz`
 **SubAgent:** `primary` (for `coder` workflow role)
 **Role:** `coder`
-**References:** `REF-06`, `REF-08`, `REF-09`, `REF-10`, `REF-11` plus Task 13 QA findings
-**Prompt:** Use bead `oc-qvif`. Claim it on start with `bd update oc-qvif --status in_progress --json`. Task 13 QA found that the repo-owned runtime/provider/proving/fixture surfaces are already on `weave`, but a few repo-owned docs/readme entries still leak stale public `lean` wording. Make the smallest truthful cleanup needed to align those remaining public docs with the current `weave` terminology. Keep scope tight to repo-owned docs/readme text only; do not broaden detector/runtime behavior. Re-run the relevant lightweight validation and grep checks, update this plan with exact files changed and commands run, commit/push by default, and close with `bd close oc-qvif --reason "Remaining public lean wording cleaned" --json` when done.
+**References:** `REF-04`, `REF-08`, `REF-09`, `REF-10`, `REF-11` plus Task 11 / Task 14 audit findings
+**Prompt:** Use bead `oc-c0iz`. Claim it on start with `bd update oc-c0iz --status in_progress --json`. Clean the remaining non-blocking Boxing naming drift residue that is still left after the main naming-alignment passes. Keep scope tight to truthful cleanup only: remove or rename stale residual `dodge` / old-term references where they are just leftover asset/history drift, and tighten any stub-note/provenance text so it preserves useful history without leaving active terminology drift. Do not broaden into detector/runtime feature work. Re-run the relevant grep/loader/contract checks, update this plan with exact files changed and commands run, commit/push by default, and close with `bd close oc-c0iz --reason "Remaining non-blocking Boxing naming drift cleaned" --json` when done.
 
 **Folders Created/Deleted/Modified:**
 - `.plans/`
-- `docs/`
+- `.testbed/assets/fixtures/boxing/`
+- `.testbed/scripts/`
+- docs/readme paths only if directly required by the residue cleanup
 
 **Files Created/Deleted/Modified:**
-- `README.md`
-- `docs/proving-scene-human-verification-checklist.md`
+- `.testbed/assets/icons/boxing-dodge-1.svg` → renamed to `.testbed/assets/icons/boxing-weave-1.svg`
+- `.testbed/assets/icons/boxing-dodge-1.svg.import` → renamed to `.testbed/assets/icons/boxing-weave-1.svg.import`
+- `.testbed/scripts/boxing_proving_harness.gd`
+- `.testbed/assets/fixtures/boxing/weave_left/boxing__weave_left__positive__repeat_04__take_01.fixture.yaml`
+- `.testbed/assets/fixtures/boxing/weave_right/boxing__weave_right__positive__repeat_04__take_01.fixture.yaml`
 - `.plans/2026-05-13-boxing-fixture-system-truth-and-schema.md`
 
 **Status:** ✅ Complete
 
-**Results:** Made the smallest truthful repo-owned doc cleanup only: replaced stale public Boxing `lean` wording with `weave` in `README.md` and `docs/proving-scene-human-verification-checklist.md` at the exact Task 13 QA callout surfaces (`README.md:98`, `README.md:254`, `docs/proving-scene-human-verification-checklist.md:164`, `:302`, `:380`). No detector/provider/runtime behavior changed. Commands run for this task: `nl -ba README.md | sed -n '90,110p'`; `nl -ba README.md | sed -n '246,262p'`; `nl -ba docs/proving-scene-human-verification-checklist.md | sed -n '156,172p'`; `nl -ba docs/proving-scene-human-verification-checklist.md | sed -n '294,310p'`; `nl -ba docs/proving-scene-human-verification-checklist.md | sed -n '372,388p'`; targeted `python3` text replacement over the two repo-owned docs; `grep -RInE '\blean\b|Lean' README.md docs/proving-scene-human-verification-checklist.md || true`; `grep -RInE '\bweave\b|Weave' README.md docs/proving-scene-human-verification-checklist.md`; `nl -ba ... | sed -n ...` rechecks for the five flagged lines; and `git diff --check`. Validation remained intentionally lightweight and doc-scoped; the only remaining `lean` hit in the checklist is plain-English movement guidance at line 77, which Task 13 QA had already called acceptable as generic English rather than stale product/runtime vocabulary.
+**Results:** Cleaned the remaining narrow Boxing naming residue without broadening into detector/runtime work.
+
+- **What changed:**
+  - Renamed the non-user-facing weave icon asset from `boxing-dodge-1.svg` to `boxing-weave-1.svg`, updated the matching `.import` file, and repointed `.testbed/scripts/boxing_proving_harness.gd` so the Boxing proving UI no longer carries stale `dodge` terminology even in internal asset paths.
+  - Tightened the two normalized weave stub notes so they still preserve provenance (`this was normalized from earlier non-canonical wording drift`) without continuing to surface the old `dodge/lean` pair as active residue text.
+  - Kept scope intentionally tight: no detector/provider/runtime/event naming or behavior changed.
+
+- **Exact commands run:**
+  - `bd update oc-c0iz --status in_progress --json`
+  - `grep -RIn --exclude-dir=.git --exclude-dir=.beads --exclude-dir=.testbed '\<dodge\>\|\<lean\>\|cross_\|cross-' . | head -300`
+  - `find . -name 'boxing-dodge-1.svg' -o -name '*boxing*svg'`
+  - `grep -RIn --exclude-dir=.git --exclude-dir=.beads --exclude-dir=.temp --exclude-dir=python_mediapipe 'boxing-dodge-1\.svg\|dodge/lean drift\|dodge/lean\|legacy public wording used dodge/lean drift' .`
+  - `mv .testbed/assets/icons/boxing-dodge-1.svg .testbed/assets/icons/boxing-weave-1.svg`
+  - `mv .testbed/assets/icons/boxing-dodge-1.svg.import .testbed/assets/icons/boxing-weave-1.svg.import`
+  - `python3 - <<'PY' ... targeted text replacements in the icon/import/script/yaml files ... PY`
+  - `grep -RInE 'boxing-dodge-1\.svg|dodge/lean drift|Dodge|dodge|lean_left|lean_right' .testbed/scripts .testbed/assets/fixtures/boxing src README.md docs 2>/dev/null || true`
+  - `grep -RInE 'boxing-weave-1\.svg|Weave Left|Weave Right|"weave"' .testbed/scripts .testbed/assets/fixtures/boxing 2>/dev/null || true`
+  - `python3 - <<'PY' ... from scripts.proving_fixture_runner import load_fixture ... load all boxing *.fixture.yaml and assert resolved video_path exists ... PY` → `loaded=15`
+  - `python3 - <<'PY' ... yaml.safe_load(...) for the two weave fixture sidecars ... PY`
+  - `~/.local/bin/godot --headless --path .testbed --check-only --script scripts/boxing_proving_harness.gd`
+  - `~/.local/bin/godot --headless --path ../aerobeat-content-core/.testbed --script res://../tests/run_contract_tests.gd`
+
+- **Validation / truth check:**
+  - Repo-owned relevant surfaces no longer report `dodge` hits in `.testbed/scripts`, `.testbed/assets/fixtures/boxing`, `src`, `README.md`, or `docs`.
+  - Boxing fixture loader sweep still passes for all Boxing stub sidecars in this repo (`loaded=15`), and both edited weave YAML files still parse cleanly.
+  - Shared chart contract tests in `../aerobeat-content-core` still pass, so this residue cleanup did not disturb the established Boxing vocabulary/contract truth.
+
+- **Intentional residual history left in place:**
+  - Historical discussion inside this plan file still references the prior `dodge` / `lean` wording because the plan is an audit trail.
+  - `docs/proving-scene-human-verification-checklist.md:77` still uses plain-English `lean` in generic movement guidance; that is not Boxing gesture-contract wording and was intentionally left alone.
+
+---
+
+### Task 30: QA the non-blocking Boxing naming drift cleanup
+
+**Bead ID:** `oc-vjna`
+**SubAgent:** `primary` (for `qa` workflow role)
+**Role:** `qa`
+**References:** Task 29 implementation plus Task 11 / Task 14 audit criteria
+**Prompt:** Use bead `oc-vjna`. Claim it on start with `bd update oc-vjna --status in_progress --json`. After Task 29 lands, verify that the non-blocking Boxing naming-drift cleanup removed the remaining active residual drift without broadening scope into detector/runtime feature work. Check fixture/proving/UI/assets/docs surfaces as applicable, distinguish cleaned active drift from acceptable historical/provenance residue, update this plan with exact checks run and findings, and close with `bd close oc-vjna --reason "Non-blocking Boxing naming drift QA complete" --json` only if QA truthfully passes.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+
+**Files Created/Deleted/Modified:**
+- plan updates / QA notes only unless a tiny truthful docs correction is required
+
+**Status:** ⏳ Pending
+
+**Results:** Pending.
+
+---
+
+### Task 31: Audit the non-blocking Boxing naming drift cleanup
+
+**Bead ID:** `oc-9htn`
+**SubAgent:** `primary` (for `auditor` workflow role)
+**Role:** `auditor`
+**References:** Task 29 implementation plus Task 30 QA findings
+**Prompt:** Use bead `oc-9htn`. Claim it on start with `bd update oc-9htn --status in_progress --json`. After Task 30 completes, independently audit that the non-blocking Boxing naming-drift cleanup truthfully removed the remaining active residue, while preserving any acceptable historical/provenance context and avoiding scope creep into unrelated feature work. Update this plan with exact checks run and audit findings, and close with `bd close oc-9htn --reason "Non-blocking Boxing naming drift audit complete" --json` only if the audit truthfully passes.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+
+**Files Created/Deleted/Modified:**
+- `.plans/2026-05-13-boxing-fixture-system-truth-and-schema.md`
+
+**Status:** ⏳ Pending
+
+**Results:** Pending.
 
 ---
 

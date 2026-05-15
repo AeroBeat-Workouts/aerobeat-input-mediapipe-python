@@ -15,7 +15,7 @@ const BOARD_ICON_PATHS := {
 	"leg_lift": "res://assets/icons/boxing-leg-lift-1.svg",
 	"sidestep": "res://assets/icons/boxing-sidestep-1.svg",
 	"squat": "res://assets/icons/boxing-squat-1.svg",
-	"weave": "res://assets/icons/boxing-dodge-1.svg",
+	"weave": "res://assets/icons/boxing-weave-1.svg",
 }
 const UI_EVENT_LABELS := {
 	"punch_left": "Left Punch",
