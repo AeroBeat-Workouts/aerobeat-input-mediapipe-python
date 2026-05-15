@@ -140,6 +140,9 @@ var _last_event_payloads: Dictionary = {}
 var _last_event_timestamps_ms: Dictionary = {}
 var _event_sequence := 0
 var _fixture_capture_started_at_ms := 0
+var _fixture_time_origin_ms := 0
+var _fixture_time_origin_reason := "scene_ready"
+var _fixture_time_origin_locked := false
 var _fixture_event_timeline: Array[Dictionary] = []
 var _fixture_state_timeline: Array[Dictionary] = []
 var _fixture_state_sequence := 0
@@ -171,6 +174,9 @@ func _ready() -> void:
 	_reset_last_flow_events()
 	_reset_event_tracking()
 	_fixture_capture_started_at_ms = Time.get_ticks_msec()
+	_fixture_time_origin_ms = _fixture_capture_started_at_ms
+	_fixture_time_origin_reason = "scene_ready"
+	_fixture_time_origin_locked = false
 	_record_fixture_state_snapshot("ready")
 	_update_status("Initializing...", Color.WHITE)
 	if startup_mode == StartupMode.GODOT_ONLY_DEBUG:
@@ -349,6 +355,7 @@ func _on_pose_updated(landmarks: Array) -> void:
 
 	_latest_landmarks = landmarks.duplicate(true)
 	_latest_state = provider.get_detector_state() if provider != null else {}
+	_maybe_anchor_fixture_time_origin_to_provider_ready()
 	_record_fixture_state_snapshot("pose_updated")
 
 	if show_landmarks and landmark_drawer:
@@ -1162,11 +1169,30 @@ func _reset_event_tracking() -> void:
 	for event_name: String in BOXING_EVENT_ORDER + FLOW_EVENT_ORDER + ["provider_started", "tracking_lost", "tracking_restored", "camera_stream_failed", "server_failed", "preview_only_provider_disabled", "preview_only_invalid"]:
 		_event_counts[event_name] = 0
 
+func _maybe_anchor_fixture_time_origin_to_provider_ready() -> void:
+	if _fixture_time_origin_locked:
+		return
+	if String(_latest_state.get("tracking_state", &"")) != "tracking":
+		return
+	var ready_timestamp_ms := Time.get_ticks_msec()
+	_rebase_fixture_capture_timeline(ready_timestamp_ms - _fixture_time_origin_ms)
+	_fixture_time_origin_ms = ready_timestamp_ms
+	_fixture_time_origin_reason = "first_tracking_pose"
+	_fixture_time_origin_locked = true
+
+func _rebase_fixture_capture_timeline(delta_ms: int) -> void:
+	if delta_ms == 0:
+		return
+	for event_entry: Dictionary in _fixture_event_timeline:
+		event_entry["timestamp_ms"] = max(int(event_entry.get("timestamp_ms", 0)) - delta_ms, 0)
+	for state_entry: Dictionary in _fixture_state_timeline:
+		state_entry["timestamp_ms"] = max(int(state_entry.get("timestamp_ms", 0)) - delta_ms, 0)
+
 func _fixture_relative_ms(timestamp_ms: int = -1) -> int:
 	var effective_timestamp := timestamp_ms if timestamp_ms >= 0 else Time.get_ticks_msec()
-	if _fixture_capture_started_at_ms <= 0:
+	if _fixture_time_origin_ms <= 0:
 		return 0
-	return max(effective_timestamp - _fixture_capture_started_at_ms, 0)
+	return max(effective_timestamp - _fixture_time_origin_ms, 0)
 
 func _record_fixture_state_snapshot(reason: String) -> void:
 	_fixture_state_sequence += 1
@@ -1183,7 +1209,9 @@ func _record_fixture_state_snapshot(reason: String) -> void:
 
 func get_fixture_capture_report() -> Dictionary:
 	return {
-		"time_basis": "harness_monotonic_ms_since_ready",
+		"time_basis": "provider_tracking_ms_since_first_pose",
+		"time_origin_reason": _fixture_time_origin_reason,
+		"time_origin_offset_ms": max(_fixture_time_origin_ms - _fixture_capture_started_at_ms, 0),
 		"harness_mode": _mode_name().to_lower(),
 		"startup_mode": _get_startup_mode_label(),
 		"camera_source": _get_effective_camera_source(),

@@ -914,6 +914,119 @@ Net result: Derrick's trimmed YAML/video pair is now **valid and usable in the c
 - `.plans/2026-05-13-boxing-fixture-system-truth-and-schema.md`
 - exact analysis notes or tiny source/docs files only if required by the audit
 
+**Status:** ✅ Complete
+
+**Results:** Completed direct audit against `REF-12`/`REF-14` plus focused source review in `REF-02` and `REF-06`.
+
+- **Saved-run truth:** the captured timeline contains only 11 events total: `provider_started` at **2251ms**; `squat_start` at **2349ms**; `uppercut_right` at **2514ms**, **3585ms**, and **3799ms**; `guard_start`/`guard_end` at **2866/3336ms**, **4019/4086ms**, and **4334/4484ms**. There are **zero** `punch_left` events in the entire run.
+- **Why `punch_left` never emitted:** after the provider comes online, the saved `ready.punch_left` flag stays truthy for the whole captured state timeline and never drops, which means `_process_straight_punch()` in `src/detectors/pose_detector_substrate.gd` never satisfied its fire gates (`left_arm_extension >= 0.92`, `left_elbow_bend_deg >= 170`, lateral-dominant outward velocity, and outward wrist distance). This is **not** a harness routing problem — `src/providers/mediapipe_provider.gd` forwards detector events directly, and other boxing events did emit. Smallest truthful read: later authored punch windows are detector/provider classification failures, not fixture-schema failures.
+- **Why `uppercut_right` false positives appeared:** all three forbidden `uppercut_right` events land inside authored left-punch phases (window 2: **2150-2650ms** contains the **2514ms** false positive; window 3: **3333-3833ms** contains the **3585ms** and **3799ms** false positives). In `pose_detector_substrate.gd`, `_process_uppercut()` currently needs only bent elbow, wrist roughly over elbow in X, upward Y velocity, and vertical-dominant motion; it has no stronger side-of-body / cross-body / shoulder-relative placement gate. That makes right-hand recoil/guard motion during a left-punch clip a plausible match. This is most likely a **detector bug / threshold bug** in `_process_uppercut()`, not author timing.
+- **Why `squat_start` false positive appeared:** `squat_start` fires at **2349ms**, only **98ms** after `provider_started`, and the saved run keeps `gesture_states.squat = true` until about **5219ms**. `_process_squat()` activates purely from `height_ratio <= 0.82`. The saved `report.json` latest detector state shows obviously broken vertical measurements while tracking is still reported as active and torso confidence is high: `height_ratio = 0.004398...`, `torso_height = 0.000349...`, `squat_depth = 0.9956`, and head/shoulder/hip Y values collapsed near `0.5`. That evidence strongly points to a **runtime/provider/metric-computation bug** (or malformed normalized landmarks feeding the substrate), not a truthful squat in the clip.
+- **Why `guard` only overlaps some authored windows:** actual guard-true segments are **2867-3334ms**, **4020-4084ms**, and **4336-4453ms**. Those overlap only authored windows **2900-3400ms** and **3900-4650ms**. The first two authored guard windows (**0-1150ms**, **1650-2150ms**) miss entirely because the harness time basis starts at proving-scene readiness, but `provider_started` does not occur until **2251ms**. That is a **time-basis / authoring mismatch** caused by `.testbed/scripts/proving_harness.gd` starting fixture-relative time at `_ready()` (`_fixture_capture_started_at_ms = Time.get_ticks_msec()`) instead of at provider/video-tracking readiness. The final authored guard window (**5287-6000ms**) has no overlap because the detector never re-enters guard after **4484ms**; that remaining miss is more likely a **guard-detector strictness/jitter bug** than a fixture-contract issue.
+- **Smallest truthful fix plan:**
+  1. **Fix harness timing first** in `.testbed/scripts/proving_harness.gd` / fixture capture so boxing fixtures can anchor to provider/video readiness instead of pre-provider startup time. Re-run this same clip and re-author only the windows invalidated by startup skew.
+  2. **Increase saved detector evidence second** by recording per-snapshot `metrics.measurements`, `metrics.velocities`, and key landmark excerpts into `state_timeline`/`report.json`; right now the saved timeline exposes `ready`/state/event truth but hides the exact threshold inputs needed for airtight detector debugging.
+  3. **Then debug punch/uppercut classification** in `src/detectors/pose_detector_substrate.gd`, especially `_process_straight_punch()` and `_process_uppercut()`. Primary hypotheses: straight-punch gates are too strict for this provider’s left-punch geometry, while uppercut gates are too permissive and side-agnostic during guard/recoil.
+  4. **Finally tune `guard` and `squat`** in `pose_detector_substrate.gd` only after the metric capture is visible. For `guard`, inspect the `aligned`, `raised`, and `wrist_near_head` checks against the late clip. For `squat`, inspect where `height_ratio`/`torso_height` collapse and whether the provider normalization or substrate metric derivation is producing impossible vertical geometry.
+- **Suggested validation order:** (a) rerun this exact fixture after the time-basis fix and confirm startup-skew windows move out of failure; (b) inspect per-frame metric traces around **2514ms**, **3585ms**, **3799ms**, **4484-5300ms**; (c) adjust punch/uppercut logic until left-punch events replace the forbidden uppercuts without introducing extras; (d) only then retune guard/squat and revalidate against this same trimmed fixture before broadening to more Boxing YAML authoring.
+- **Truth split:** likely **authoring/time-basis issue** = early guard windows plus first punch window being judged before provider startup. Likely **runtime/provider/detector bugs** = missing later `punch_left` emissions, all `uppercut_right` false positives, persistent `squat_start`, and failure to reacquire the final authored guard hold.
+
+---
+
+### Task 22: Implement provider-anchored fixture timing basis before any per-gesture detector tuning
+
+**Bead ID:** `oc-2gus`
+**SubAgent:** `primary` (for `coder` workflow role)
+**Role:** `coder`
+**References:** `REF-02`, `REF-04`, `REF-06`, `REF-12`, `REF-13`, `REF-14`
+**Prompt:** Use bead `oc-2gus`. Claim it on start with `bd update oc-2gus --status in_progress --json`. Implement the smallest truthful timing-basis fix so fixture-relative timestamps anchor to provider/video readiness instead of pre-provider startup time. Keep scope tight: do not tune gesture thresholds yet except for tiny changes strictly required to make the new timing basis work. Re-run the trimmed boxing-left fixture after the timing-basis fix, capture fresh artifacts, update this plan with exact observed changes, commit/push by default, and close with `bd close oc-2gus --reason "Provider-anchored fixture timing basis implemented" --json` when done.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- `.testbed/scripts/`
+- `.testbed/test-results/fixtures/`
+- exact owned harness/capture paths only if required
+
+**Files Created/Deleted/Modified:**
+- `.plans/2026-05-13-boxing-fixture-system-truth-and-schema.md`
+- exact timing-basis/harness files required by the implementation
+
+**Status:** ✅ Complete
+
+**Results:** Implemented the smallest truthful harness-only timing-basis slice in `REF-02` and re-ran the trimmed Boxing-left fixture without touching detector thresholds.
+
+- **Harness change kept tight to timing basis only:** `.testbed/scripts/proving_harness.gd` now records fixture-relative time from the first real tracking pose instead of scene `_ready()`. The harness initializes at scene-ready, then rebases existing event/state snapshots once tracking becomes truthful, locks the origin, and reports `time_basis`, `time_origin_reason`, and `time_origin_offset_ms` in `fixture_capture`.
+- **Fresh evidence run:** `.testbed/test-results/fixtures/20260514-214817__boxing_punch_left_x4_while_guarding_take_01/`
+- **Observed timing-basis shift vs salvaged `REF-14`:** old run `20260514-183547__boxing_punch_left_x4_while_guarding_take_01` used `harness_monotonic_ms_since_ready`; new run uses `provider_tracking_ms_since_first_pose` with `time_origin_reason = first_tracking_pose` and `time_origin_offset_ms = 2240`.
+- **Exact event rebasing evidence:**
+  - `provider_started`: **2251ms → 0ms**
+  - `squat_start`: **2349ms → 80ms**
+  - first `uppercut_right`: **2514ms → 278ms**
+  - first `guard_start`/`guard_end`: **2866/3336ms → 629/1097ms**
+  - second `guard_start`/`guard_end`: **4019/4086ms → 1813/1847ms**
+  - third `guard_start`/`guard_end`: **4334/4484ms → 2082/2264ms**
+- **Truthful outcome of this slice:** the startup skew is now explicitly removed from fixture-relative timestamps, so early authored windows are no longer being judged against ~2.24s of pre-provider boot time. Remaining failures in this clip are still detector/runtime truth problems, but they are now measured on a provider-anchored clock instead of a proving-scene startup clock.
+- **Scope held:** no `pose_detector_substrate.gd` tuning was done here. The remaining `uppercut_right` / `squat_start` / late-guard issues remain intentionally untouched for later beads.
+
+---
+
+### Task 23: QA the provider-anchored fixture timing basis on the trimmed boxing-left clip
+
+**Bead ID:** `oc-9tdd`
+**SubAgent:** `primary` (for `qa` workflow role)
+**Role:** `qa`
+**References:** `REF-12`, `REF-13`, `REF-14` plus fresh timing-basis artifacts from Task 22
+**Prompt:** Use bead `oc-9tdd`. Claim it on start with `bd update oc-9tdd --status in_progress --json`. After `oc-2gus` lands, independently verify that fixture-relative timing now starts at the truthful provider/video-ready basis and that the trimmed boxing-left artifact timings are easier to reason about. Explicitly call out which previously failing early windows were startup-skew artifacts versus still-real detector failures. Update this plan with exact checks run and close with `bd close oc-9tdd --reason "Provider-anchored timing basis QA complete" --json` only if QA truthfully passes.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+
+**Files Created/Deleted/Modified:**
+- `.plans/2026-05-13-boxing-fixture-system-truth-and-schema.md`
+
+**Status:** ⏳ Pending
+
+**Results:** Pending.
+
+---
+
+### Task 24: Audit the timing-basis slice before any gesture-specific detector tuning
+
+**Bead ID:** `oc-yy9e`
+**SubAgent:** `primary` (for `auditor` workflow role)
+**Role:** `auditor`
+**References:** `REF-12`, `REF-13`, `REF-14` plus fresh timing-basis artifacts from Tasks 22-23
+**Prompt:** Use bead `oc-yy9e`. Claim it on start with `bd update oc-yy9e --status in_progress --json`. After QA completes, independently audit whether the timing basis is now truthful enough that per-gesture tuning can proceed without mixing startup skew into the diagnosis. Update this plan and close with `bd close oc-yy9e --reason "Timing-basis audit complete" --json` only if the audit truthfully passes.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+
+**Files Created/Deleted/Modified:**
+- `.plans/2026-05-13-boxing-fixture-system-truth-and-schema.md`
+
+**Status:** ⏳ Pending
+
+**Results:** Pending.
+
+---
+
+### Task 25: Implement the first single-gesture detector slice for punch_left after timing is trustworthy
+
+**Bead ID:** `oc-zqw4`
+**SubAgent:** `primary` (for `coder` workflow role)
+**Role:** `coder`
+**References:** `REF-06`, `REF-12`, `REF-13`, `REF-14` plus timing-basis-audited artifacts
+**Prompt:** Use bead `oc-zqw4`. Claim it on start with `bd update oc-zqw4 --status in_progress --json`. After the timing-basis slice is audited complete, implement only the smallest truthful `punch_left` detector slice needed to make the trimmed boxing-left clip closer to truth. Do not also tune uppercut, squat, or late-guard behavior unless a tiny localized change is inseparable from the punch-left fix. Re-run the trimmed fixture, update this plan with exact evidence, commit/push by default, and close with `bd close oc-zqw4 --reason "Punch-left detector slice implemented" --json` when done.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- owned detector/provider/harness paths only if required
+- `.testbed/test-results/fixtures/`
+
+**Files Created/Deleted/Modified:**
+- `.plans/2026-05-13-boxing-fixture-system-truth-and-schema.md`
+- exact detector/provider/harness files required by the punch-left slice
+
 **Status:** ⏳ Pending
 
 **Results:** Pending.
