@@ -620,9 +620,44 @@ Net recommendation: keep the truthful schema work separate from library-ingestio
 **Files Created/Deleted/Modified:**
 - plan updates / QA notes only unless a tiny truthful docs correction is required
 
-**Status:** ⏳ Pending
+**Status:** ❌ Failed
 
-**Results:** Pending.
+**Results:** QA failed on the safe-normalization claim even though the naming/alignment intent itself is mostly correct.
+
+- **Exact checks run:**
+  - `find .testbed/assets/fixtures/boxing -maxdepth 4 \( -name '*.webm' -o -name '*.mp4' -o -name '*.fixture.yaml' \) | sort`
+  - `grep -RInE 'dodge|Dodge|weave|Weave|hook_left|hook_right|cross|stance_transition|run_in_place' .testbed/scripts .testbed/assets/fixtures/boxing README.md docs src 2>/dev/null | head -n 400`
+  - `git log --oneline --decorate -n 20`
+  - `python3 - <<'PY' ... from scripts.proving_fixture_runner import load_fixture ... fixture sweep ... PY`
+  - `python3 - <<'PY' ... legacy loose-file existence check for boxing_cross_*, boxing_run_in_place_x1, boxing_stance_change_x4, boxing_weave_* ... PY`
+  - `grep -RInE 'Dodge|dodge' .testbed/scripts README.md docs src .testbed/assets/fixtures 2>/dev/null`
+  - `grep -RInE '\bcross\b|cross_right|cross_left|hook_left|hook_right|punch_left|punch_right|run_in_place|orthodox|southpaw' ../aerobeat-content-core/README.md ../aerobeat-docs/docs/examples/workout-packages/demo-neon-boxing-bootcamp/charts 2>/dev/null | head -n 200`
+  - `~/.local/bin/godot --headless --path ../aerobeat-content-core/.testbed --script res://../tests/run_contract_tests.gd`
+
+- **What passed:**
+  - The unresolved loose Boxing filenames from Task 9 are no longer present at the old paths: `boxing_cross_left_x4.webm`, `boxing_cross_right_x4.webm`, `boxing_run_in_place_x1.webm`, `boxing_stance_change_x4.webm`, `boxing_weave_left_x4.webm`, and `boxing_weave_right_x4.webm` all now return `exists=False` at their legacy loose locations.
+  - Boxing proving-surface wording is aligned to `weave`, not `dodge`, on the actual user-facing surface: `.testbed/scripts/boxing_proving_harness.gd` now uses tile label `"Weave"` plus event labels `"Weave Left"`, `"Weave Left Ended"`, `"Weave Right"`, and `"Weave Right Ended"`.
+  - Shared runtime/proving surfaces also use `hook_*` and `weave_*` consistently in current repo-owned code (`.testbed/scripts/proving_harness.gd`, `.testbed/scripts/boxing_proving_harness.gd`, `src/providers/mediapipe_provider.gd`, `src/input_provider.gd`, `src/detectors/pose_detector_substrate.gd`).
+  - The shared content-core change is justified by surrounding source truth rather than guesswork:
+    - `../aerobeat-content-core/data_types/chart.gd` now maps legacy `cross` / `cross_right` to `hook_right`.
+    - `../aerobeat-content-core/README.md` says straight punches are `punch_left` / `punch_right` and rejects legacy labels such as `cross`.
+    - Example Boxing charts in `../aerobeat-docs/.../charts/` use `hook_left` / `hook_right`, `punch_left` / `punch_right`, `orthodox` / `southpaw`, and `run_in_place` — not `cross` as the canonical authored term.
+    - `../aerobeat-content-core/.testbed/tests/run_contract_tests.gd` passed, and its `chart_event_contract` fixture now truthfully reports legacy `cross` should be replaced by `hook_right`.
+
+- **What failed / why QA cannot pass:**
+  - The normalized Boxing stub fixtures are **not currently safe/truthful to run as a batch**. A loader sweep using `scripts/proving_fixture_runner.py::load_fixture(...)` succeeded for only **1/15** Boxing `.fixture.yaml` files.
+  - **14/15** fixture YAMLs fail because their `video.path` still points at a sibling `.webm` while the actual normalized video file now exists as `.mp4`.
+  - Concrete examples from the failing sweep:
+    - `.testbed/assets/fixtures/boxing/hook_right/boxing__hook_right__positive__repeat_04__take_01.fixture.yaml` points at `boxing__hook_right__positive__repeat_04__take_01.webm`, but the folder contains `boxing__hook_right__positive__repeat_04__take_01.mp4`.
+    - The same broken `.webm`-vs-`.mp4` mismatch exists for `knee_left`, `knee_right`, `leg_lift_left`, `leg_lift_right`, `run_in_place`, `sidestep_left`, `sidestep_right`, `squat`, `stance_transition`, `uppercut_left`, `uppercut_right`, `weave_left`, and `weave_right`.
+    - Only `hook_left` currently loads cleanly in the sweep.
+  - Because those sidecars do not currently resolve their sibling videos through the actual fixture runner, the Task 9 claim that unresolved Boxing fixtures were normalized safely is not yet truthfully satisfied in the repo’s present state.
+
+- **Important nuance about `dodge` leakage:**
+  - The only remaining repo-owned `dodge` hit from the sweep is the non-user-facing asset filename `res://assets/icons/boxing-dodge-1.svg` plus historical explanatory notes inside the stub YAML comments (`legacy public wording used dodge/lean drift ...`).
+  - I did **not** find active displayed UI labels or runtime/public event names still saying `dodge`, so the proving-surface wording part of the rename looks good.
+
+- **QA verdict:** fail Task 10 for now. The naming truth and `cross -> hook_right` contract change look justified, but the normalized Boxing fixture sidecars are currently broken against the real fixture loader due to widespread `video.path` extension drift. Per task instructions, I am **not** closing bead `oc-fplk` because QA did not truthfully pass.
 
 ---
 
@@ -708,9 +743,37 @@ Net recommendation: keep the truthful schema work separate from library-ingestio
 **Files Created/Deleted/Modified:**
 - plan updates / QA notes only unless a tiny truthful docs correction is required
 
-**Status:** ⏳ Pending
+**Status:** ❌ Failed
 
-**Results:** Pending.
+**Results:** QA completed against the current repo-owned naming surface after Task 15 removed the repo-local compatibility layer, and the result is a truthful **fail** because stale public `lean` wording still remains in repo-owned docs/README even though the runtime/proving/fixture surfaces now speak `weave`.
+
+- **Exact checks run:**
+  - `grep -RInE "lean_(left|right)|\blean\b|Lean (Left|Right)|lean\*|dodge|Dodge" src .testbed/scripts scripts docs README.md .testbed/assets/fixtures .testbed/tests 2>/dev/null || true`
+  - `grep -RInE "weave_(left|right)|\bweave\b|Weave (Left|Right)|Weave" src .testbed/scripts scripts docs README.md .testbed/assets/fixtures .testbed/tests 2>/dev/null || true`
+  - `grep -RInE "lean_(left|right)|\blean\b|Lean (Left|Right)|dodge|Dodge" scripts .testbed/assets/fixtures 2>/dev/null || true`
+  - `python3 scripts/test_proving_fixture_runner.py` → `OK`
+  - `~/.local/bin/godot --headless --path .testbed --check-only --script scripts/proving_harness.gd`
+  - `~/.local/bin/godot --headless --path .testbed --check-only --script addons/aerobeat-input-mediapipe-python/src/providers/mediapipe_provider.gd`
+  - `~/.local/bin/godot --headless --path .testbed --check-only --script addons/aerobeat-input-mediapipe-python/src/input_provider.gd`
+  - `~/.local/bin/godot --headless --path .testbed --script addons/gut/gut_cmdln.gd -gtest=res://tests/unit/test_pose_detector_substrate.gd -gexit` → `12/12 passed`
+- **Repo-owned runtime/provider/detector/public event surface is aligned to `weave`:**
+  - `src/detectors/pose_detector_substrate.gd` public gesture state keys are `weave_left` / `weave_right`.
+  - `src/providers/mediapipe_provider.gd` declares and emits only `weave_left_start/end` and `weave_right_start/end` for this family.
+  - `src/input_provider.gd` exposes only `weave_left_start/end` and `weave_right_start/end` on the addon-facing surface.
+  - `.testbed/scripts/proving_harness.gd` consumes/records only `weave_*` for Boxing state rows, event wiring, summary text, and fixture capture output.
+  - `.testbed/scripts/boxing_proving_harness.gd` presents `Weave`, `Weave Left`, and `Weave Right` on the proving UI; the remaining `boxing-dodge-1.svg` asset filename is just a file path, not leaked public wording.
+  - Fixture/validation surfaces are aligned: `scripts/proving_fixture_runner.py` has no stale `lean` mapping, normalized Boxing weave fixture stub YAMLs use `weave_*`, and the trimmed punch fixtures forbid `weave_left_start` / `weave_right_start` rather than `lean_*`.
+- **Stale public wording still present where `weave` is now intended:**
+  - `README.md:98` still says shipped Boxing signals include `lean`.
+  - `README.md:254` still describes `boxing_proving.tscn` as covering `lean`.
+  - `docs/proving-scene-human-verification-checklist.md:164` still lists `guard / squat / lean / sidestep / leg_lift` rows.
+  - `docs/proving-scene-human-verification-checklist.md:302` still says `lean being mistaken for sidestep`.
+  - `docs/proving-scene-human-verification-checklist.md:380` still says `stale guard/squat/lean/sidestep/leg-lift state`.
+  - `docs/proving-scene-human-verification-checklist.md:77` uses plain-English `lean` as body movement wording; this may be acceptable as generic English in isolation, but the later checklist rows above are clearly stale product/runtime vocabulary because they enumerate the Boxing named state surface.
+- **Truthful QA verdict:**
+  - **Pass** for detector/provider/input-provider/proving-harness/fixture-validation implementation surfaces.
+  - **Fail overall** for Task 13 because the repo still exposes stale public `lean` wording in owned README/checklist docs where `weave` is now the intended Boxing term.
+- **Required follow-up before this bead can close:** repo-owned public docs/README wording needs one cleanup pass from `lean` to `weave` (while leaving non-user-facing asset filenames alone unless someone explicitly wants an asset rename).
 
 ---
 
@@ -818,9 +881,37 @@ Net recommendation: keep the truthful schema work separate from library-ingestio
 **Files Created/Deleted/Modified:**
 - `.plans/2026-05-13-boxing-fixture-system-truth-and-schema.md`
 
-**Status:** ⏳ Pending
+**Status:** ❌ Failed
 
-**Results:** Pending.
+**Results:** Independent audit completed. The repo-owned `lean_*` compatibility removal itself passes, but the broader Task 17 audit does **not** truthfully pass because the current fixture-library readiness claim from Task 16 is overstated.
+
+- **Repo-owned `lean_*` compatibility removal passes where intended:**
+  - `grep -RInE 'lean_(left|right)|lean\*|lean_' src README.md docs .testbed/scripts .testbed/tests .testbed/assets/fixtures --exclude-dir=test-results 2>/dev/null || true` → **no matches** in repo-owned runtime/public surfaces.
+  - `grep -RInE 'Lean (Left|Right)|Dodge( Left| Right)?|\bdodge\b|lean_(left|right)' src README.md docs .testbed/scripts .testbed/tests .testbed/assets/fixtures --exclude-dir=test-results 2>/dev/null || true` found only `.testbed/scripts/boxing_proving_harness.gd:18` referencing the `boxing-dodge-1.svg` asset filename plus two weave-fixture note lines documenting historical wording drift.
+  - Those remaining matches are **not** active public/runtime `lean_*` compatibility aliases. Current repo-owned authored/runtime wording is consistently `weave_*` across `src/providers/mediapipe_provider.gd`, `src/input_provider.gd`, `src/detectors/pose_detector_substrate.gd`, `.testbed/scripts/proving_harness.gd`, `.testbed/scripts/boxing_proving_harness.gd`, README, docs, tests, and normalized weave fixture names.
+- **Runtime/validation surfaces still parse after the alias removal:**
+  - `python3 scripts/test_proving_fixture_runner.py` → `OK`
+  - `~/.local/bin/godot --headless --path .testbed --check-only --script scripts/proving_harness.gd`
+  - `~/.local/bin/godot --headless --path .testbed --check-only --script addons/aerobeat-input-mediapipe-python/src/providers/mediapipe_provider.gd`
+  - `~/.local/bin/godot --headless --path .testbed --check-only --script addons/aerobeat-input-mediapipe-python/src/input_provider.gd`
+  - `~/.local/bin/godot --headless --path .testbed --script addons/gut/gut_cmdln.gd -gtest=res://tests/unit/test_pose_detector_substrate.gd -gexit` → `12/12 passed`
+- **Practical readiness audit found a real fixture-library gap that blocks a full pass:**
+  - I independently re-ran fixture loading against the current tree using `load_fixture(...)` from `scripts/proving_fixture_runner.py`.
+  - Result: only **3** fixture YAMLs currently load successfully; **14** fail because their `video.path` points to a sibling `.webm` that does not exist, while the actual normalized sibling file is `.mp4`.
+  - Example: `.testbed/assets/fixtures/boxing/weave_left/boxing__weave_left__positive__repeat_04__take_01.fixture.yaml` declares `video.path: ./boxing__weave_left__positive__repeat_04__take_01.webm`, but the directory actually contains `boxing__weave_left__positive__repeat_04__take_01.mp4`.
+  - The same broken `.webm` → `.mp4` mismatch is present across the current normalized stub fixtures for `hook_right`, `knee_left`, `knee_right`, `leg_lift_left`, `leg_lift_right`, `run_in_place`, `sidestep_left`, `sidestep_right`, `squat`, `stance_transition`, `uppercut_left`, `uppercut_right`, `weave_left`, and `weave_right`.
+  - This directly contradicts Task 16’s claim that all `17` fixture YAMLs currently load successfully and means the normalized stub-fixture inventory is **not yet fully loadable as-authored**.
+- **Readiness verdict, corrected:**
+  - **Yes, partially:** Derrick can continue trimming videos and can continue manually authoring YAML truth for the already-working / actively used fixtures.
+  - **No, not fully:** the broader normalized fixture inventory is **not** yet cleanly ready for routine fill-in authoring because many stub YAMLs currently fail their own `video.path` resolution.
+  - Therefore incomplete YAML authoring is **not yet the sole main blocker** before deeper fixture-driven work proceeds; there is still a repo-local fixture-normalization correctness issue to fix first.
+- **Deeper `punch_left` / `punch_right` readiness remains blocked by detector truth too:**
+  - Existing evidence in `.testbed/test-results/fixtures/20260514-183547__boxing_punch_left_x4_while_guarding_take_01/report.md` still shows the current left-punch validation run failing materially: `0` matched `punch_left` events where `4` were expected, several authored `guard` windows miss, and false-positive `uppercut_right` plus `squat_start` events appear.
+  - So even after the stub-fixture path issue is fixed, incomplete YAML authoring would still **not** be the only blocker for deeper `punch_left` / `punch_right` truth work; detector/runtime behavior remains a separate blocker already exposed by the existing validation artifacts.
+- **Audit verdict:**
+  - **Pass:** repo-owned legacy Boxing `lean_*` compatibility aliases are gone where intended and `weave_*` is the consistent repo-owned public/runtime wording.
+  - **Fail:** the full Task 17 audit does not truthfully pass because the current fixture-inventory readiness claim is too strong: many normalized stub fixtures still have broken `video.path` extensions, and deeper punch-fixture work still has known detector-truth failures beyond YAML authoring.
+- **Bead closure:** intentionally **not** closed, because the combined audit requested by Task 17 does not pass in full.
 
 ---
 
@@ -872,9 +963,36 @@ Net result: Derrick's trimmed YAML/video pair is now **valid and usable in the c
 **Files Created/Deleted/Modified:**
 - plan updates / QA notes only unless a tiny truthful docs correction is required
 
-**Status:** ⏳ Pending
+**Status:** ✅ Complete
 
-**Results:** Pending.
+**Results:** QA pass. The trimmed Boxing-left fixture now loads cleanly against the current contract, the saved harness evidence is understandable, and the remaining failures are detector/runtime truth rather than fixture-system breakage.
+
+- **Exact checks run:**
+  - Read `REF-12` directly to inspect the authored YAML surface after Task 18.
+  - `find .testbed/test-results/fixtures/20260514-183547__boxing_punch_left_x4_while_guarding_take_01 -maxdepth 1 -type f | sort` to confirm the salvaged evidence bundle exists.
+  - `grep -nE "surface: state|expected_gestures|forbidden_gestures|load_fixture|validate_capture" scripts/proving_fixture_runner.py scripts/test_proving_fixture_runner.py docs/proving-scene-video-fixtures.md` to confirm the current runner/tests/docs all expose the `surface: state` path used by `guard`.
+  - `python3 scripts/test_proving_fixture_runner.py` → `3` tests passed. (Non-blocking QA note: `python3 -m unittest -v scripts/test_proving_fixture_runner.py` does **not** work from repo root because the test file imports `proving_fixture_runner` as a sibling module without adding `scripts/` to `sys.path`; the direct script invocation is the working repo-local path.)
+  - `python3 - <<'PY' ... sys.path.insert(0, 'scripts'); import proving_fixture_runner as runner; fixture = runner.load_fixture(REF-12); report = json.load(REF-14/report.json); result = runner.validate_capture(fixture, report) ... PY` to independently re-load the fixture and re-run current validation against the saved harness capture.
+  - `python3 - <<'PY' ... json.load(report.json/summary.json/assertions.json) ... PY` to confirm the run metadata points at the trimmed YAML/video pair and that the saved failure surfaces match the current validator output.
+
+- **Did the YAML parse cleanly?** **Yes.** `load_fixture(...)` resolves `fixture_id = boxing_punch_left_x4_while_guarding_take_01`, `family = boxing`, `scene_path = res://scenes/boxing_proving.tscn`, and the sibling MP4 in `REF-13` with **no loader warnings**. The current fixture surface parses as two expectations: `punch_left` on `surface: event` plus `guard` on `surface: state`, alongside the authored forbidden gesture list.
+
+- **Did any authored expectations need repair to match the current validator/runtime surface?** **Yes — already repaired by Task 18, and the repaired surface now matches current source truth.** The key truthful repair was preserving Derrick's authored `guard` windows by expressing them as `surface: state` expectations instead of flattening them away, and normalizing the forbidden expectations to the current runtime-emitted names (`squat_start`, `leg_lift_*_start`, `weave_*_start`, `sidestep_*_start`). QA verified the current runner, tests, and docs all support that repaired surface.
+
+- **Did the fixture runner actually use the new trimmed video/YAML pair?** **Yes.** `REF-14/report.json` records:
+  - `fixture_path = /home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-input-mediapipe-python/.testbed/assets/fixtures/boxing/punch_left/boxing_punch_left_x4_while_guarding_take_01.yaml`
+  - `video_path = /home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-input-mediapipe-python/.testbed/assets/fixtures/boxing/punch_left/boxing_punch_left_x4_while_guarding_take_01.mp4`
+  - `summary.json` also names the same `fixture_id`, `video_path`, and Boxing proving scene.
+  The saved artifact folder contains the expected salvaged validation bundle: `report.json`, `summary.json`, `assertions.json`, `event_timeline.json`, `state_timeline.json`, `report.md`, `godot.log`, and `proving.png`.
+
+- **Are the remaining failures now detector-truth failures rather than fixture-system breakage?** **Yes.** Independent re-validation still yields `25` assertions with `15` pass / `10` fail, and the failure shape is consistent with runtime truth rather than YAML/runner breakage:
+  - all four authored `punch_left` windows fail with **0** matching emitted `punch_left` events;
+  - authored `guard` windows at `0-1150ms`, `1650-2150ms`, and `5287-6000ms` fail to overlap any saved true guard segment on this run's timing basis;
+  - forbidden `uppercut_right` appears three times (`2514ms`, `3585ms`, `3799ms`);
+  - forbidden `squat_start` appears once (`2349ms`).
+  That is detector/runtime mismatch evidence. The fixture loader, schema surface, and validator are all functioning well enough to expose those failures truthfully.
+
+- **QA verdict:** pass this QA slice. The trimmed YAML/video pair is now valid and usable in the current fixture system, the evidence bundle is understandable, and the open problems are detector/runtime truth problems rather than fixture-contract breakage.
 
 ---
 
@@ -892,9 +1010,39 @@ Net result: Derrick's trimmed YAML/video pair is now **valid and usable in the c
 **Files Created/Deleted/Modified:**
 - `.plans/2026-05-13-boxing-fixture-system-truth-and-schema.md`
 
-**Status:** ⏳ Pending
+**Status:** ✅ Complete
 
-**Results:** Pending.
+**Results:** Audit pass. The trimmed Boxing-left YAML/video pair is valid and usable in the current fixture system, and the saved evidence cleanly separates fixture-contract truth from detector/runtime truth.
+
+- **Exact checks run:**
+  - Read `REF-12` directly to verify the authored fixture surface now matches the current contract: sibling `video.path`, `expected_gestures` windows, `surface: state` for `guard`, and explicit `forbidden_gestures`.
+  - `find .testbed/test-results/fixtures/20260514-183547__boxing_punch_left_x4_while_guarding_take_01 -maxdepth 1 -type f | sort` to confirm the expected saved artifact bundle exists (`report.json`, `summary.json`, `assertions.json`, `event_timeline.json`, `state_timeline.json`, `report.md`, `godot.log`, `proving.png`).
+  - `grep -nE 'surface: state|expected_gestures|forbidden_gestures|load_fixture|validate_capture|state_timeline' scripts/proving_fixture_runner.py scripts/test_proving_fixture_runner.py docs/proving-scene-video-fixtures.md` to independently confirm the runner/tests/docs all support the current truthful fixture surface, including authored state-window expectations.
+  - `python3 scripts/test_proving_fixture_runner.py` → `3` tests passed.
+  - `python3 - <<'PY' ... sys.path.insert(0, 'scripts'); import proving_fixture_runner as runner; fixture = runner.load_fixture(Path(REF-12)); report = json.load(report.json); result = runner.validate_capture(fixture, report) ... PY` to independently re-load the fixture, re-run validation against the saved capture, and compare that result against the saved `assertions.json` / `summary.json`.
+  - `ffprobe -v error -show_entries format=duration -of json REF-13` to confirm the trimmed clip is real media and that the authored latest window still fits within the clip (`duration = 6.016s`, authored latest window ends at `6000ms`).
+
+- **Independent audit findings:**
+  - **Fixture pair validity:** **pass.** `load_fixture(...)` resolves `fixture_id = boxing_punch_left_x4_while_guarding_take_01`, `family = boxing`, `scene_path = res://scenes/boxing_proving.tscn`, and the sibling MP4 at `REF-13`. The loader produced **no warnings**.
+  - **Current authored contract shape:** the YAML truthfully uses two expectations: `punch_left` on the default `event` surface with `4` authored windows, and `guard` on `surface: state` with `5` authored windows, plus `14` explicit forbidden gesture names. That is a usable current-boxing authoring pattern.
+  - **Artifact bundle consistency:** the saved run bundle is internally coherent. `summary.json` names the trimmed YAML/video pair, records `time_basis = harness_monotonic_ms_since_ready`, and reports `25` assertions with `15` pass / `10` fail. Independent re-validation reproduced the **same 15/10/25 counts** and the **same assertion messages**.
+  - **Saved runtime evidence:** `event_timeline.json` contains `11` emitted events total: `provider_started@2251ms`, `squat_start@2349ms`, `uppercut_right@2514ms`, `guard_start@2866ms`, `guard_end@3336ms`, `uppercut_right@3585ms`, `uppercut_right@3799ms`, `guard_start@4019ms`, `guard_end@4086ms`, `guard_start@4334ms`, `guard_end@4484ms`. There are **zero** emitted `punch_left` events.
+  - **Saved state evidence:** rebuilding `guard` true segments from `state_timeline.json` yields `(2867-3334ms)`, `(4020-4084ms)`, and `(4336-4453ms)`. Those segments overlap the third and fourth authored `guard` windows but not the first, second, or final authored windows on this run’s current time basis.
+
+- **Does the evidence clearly separate fixture-contract issues from detector-truth issues?** **Yes.** The split is now good enough for future authoring work:
+  - **No longer a fixture-contract problem:** the fixture parses, resolves its own video, uses a validator-supported `surface: state` expectation for `guard`, produces a complete artifact bundle, and can be re-validated deterministically from saved artifacts.
+  - **Clearly detector/runtime truth problems in this run:** all `4` `punch_left` windows fail with `0` emitted `punch_left` events; forbidden `uppercut_right` appears `3` times; forbidden `squat_start` appears once; and only `2` of the `5` authored `guard` windows overlap saved true guard segments. Those are runtime mismatches being surfaced by a functioning fixture system, not YAML-shape breakage.
+  - **One nuance to keep explicit:** some authored `guard` windows may still need later human re-scrub or time-basis refinement, but that is now a truth-labeling question inside a usable fixture workflow, not evidence that the fixture contract itself is broken.
+
+- **What Derrick should do next when authoring more Boxing fixture YAMLs:**
+  1. **Use this YAML shape as the current template**: `schema_version`, `fixture_id`, `family`, sibling `video.path`, `expected_gestures`, optional `surface: state` when the truth is a sustained state like `guard`, and explicit `forbidden_gestures` only where false positives matter.
+  2. **Author coarse truthful windows, not fake precision.** Stay near the current hand-scrubbed style (roughly second-scale windows / a few hundred ms granularity) unless a clip has been reviewed tightly enough to justify narrower bounds.
+  3. **Prefer one dominant positive gesture per fixture at first.** For Boxing, keep authoring clips like “one intended attack family plus optional guard-state windows plus explicit forbidden siblings.” That keeps detector diagnosis clean.
+  4. **Include `surface: state` only for real sustained-state truth.** Use it for things like `guard`; keep attack gestures on the default event surface.
+  5. **Treat saved failures as detector evidence unless the fixture cannot parse or cannot reproduce.** If the loader resolves cleanly, warnings stay empty, and saved re-validation reproduces the same counts/messages, the fixture is probably usable even when the result is FAIL.
+  6. **Keep authoring notes human-meaningful.** The current clip note pattern ("starts in guard, ends in guard, four repeated left punches, no other gestures should fire") is worth preserving because it explains intent without pretending the detector already matches it.
+
+- **Audit verdict:** **PASS.** The trimmed Boxing-left YAML/video pair is a valid reusable fixture pair in the current system, the artifact evidence is strong enough to support further Boxing fixture authoring, and the remaining mismatches are now exposed as detector/runtime truth work rather than fixture-contract breakage.
 
 ---
 
@@ -984,9 +1132,26 @@ Net result: Derrick's trimmed YAML/video pair is now **valid and usable in the c
 **Files Created/Deleted/Modified:**
 - `.plans/2026-05-13-boxing-fixture-system-truth-and-schema.md`
 
-**Status:** ⏳ Pending
+**Status:** ✅ Complete
 
-**Results:** Pending.
+**Results:** Independently QA-checked the fresh provider-anchored artifacts against `REF-12`/`REF-14` and confirmed the timing basis change is truthful.
+
+- **Exact checks run:**
+  - `find .testbed/test-results/fixtures/20260514-214817__boxing_punch_left_x4_while_guarding_take_01 -maxdepth 2 -type f | sort` and the same for `REF-14` to confirm artifact contents.
+  - `python3 - <<'PY' ... json.load(report.json) ... print(time_basis/time_origin/event_timeline/state_timeline) ... PY` on both runs to compare raw captured timestamps.
+  - `python3 - <<'PY' ... import scripts/proving_fixture_runner.py ... load_fixture(REF-12) ... validate_capture(fixture, report) ... PY` on both runs to truth-check the authored windows against the fresh and salvaged captures using the current validator logic.
+  - Read `REF-12` directly to compare authored `punch_left` / `guard` windows with the rebased capture timings.
+- **Truthful timing-basis verdict:** the fresh run now starts fixture-relative time on the provider-tracking basis, not proving-scene startup. `report.json` in `.testbed/test-results/fixtures/20260514-214817__boxing_punch_left_x4_while_guarding_take_01/` reports `time_basis = provider_tracking_ms_since_first_pose`, `time_origin_reason = first_tracking_pose`, and `time_origin_offset_ms = 2240`. The first tracking snapshot is at `0ms`, `provider_started` is recorded at `0ms`, and the old event/state timings were consistently rebased earlier by about `2240ms` versus `REF-14` (`provider_started 2251→0`, `squat_start 2349→80`, `uppercut_right 2514→278`, first `guard` segment `2867-3337→629-1098`).
+- **Which old early failures were startup-skew artifacts:** the first two authored `guard` state windows in `REF-12` were genuinely skew artifacts under the old clock and now pass on the provider-anchored clock:
+  - `guard 0-1150ms` — **old FAIL**, **new PASS** via actual guard segment `629-1098ms`
+  - `guard 1650-2150ms` — **old FAIL**, **new PASS** via actual guard segments `1814-1848ms` and `2083-2265ms`
+- **Which issues are still real detector/runtime failures after rebasing:**
+  - `punch_left 1150-1300ms` still fails with **0 events** even after startup skew removal, so the first punch miss is a real detector failure on the truthful clock, not just a startup artifact.
+  - Later `punch_left` windows (`2150-2650`, `3333-3833`, `4833-5088`) still fail with **0 events**.
+  - Forbidden early emissions remain real problems: `squat_start` still appears at `80ms`, and `uppercut_right` still appears at `278ms` (plus later repeats at `1345ms` and `1546ms`).
+  - Final authored `guard 5287-6000ms` still fails because the capture never reacquires guard that late.
+- **Important QA clarification:** the old PASS results for authored `guard 2900-3400ms` and `3900-4650ms` in `REF-14` were themselves skew-induced false passes. In the provider-anchored run those same physical guard holds correctly land at `629-1098ms`, `1814-1848ms`, and `2083-2265ms`, so those later authored windows now fail for truthful clock reasons instead of appearing to pass on the startup-skewed clock.
+- **QA outcome:** pass for the timing-basis slice. The fixture still fails overall on detector truth, but the timing basis is now provider-anchored and the remaining failures are easier to reason about because startup skew has been removed from the comparison clock.
 
 ---
 
@@ -1004,9 +1169,36 @@ Net result: Derrick's trimmed YAML/video pair is now **valid and usable in the c
 **Files Created/Deleted/Modified:**
 - `.plans/2026-05-13-boxing-fixture-system-truth-and-schema.md`
 
-**Status:** ⏳ Pending
+**Status:** ✅ Complete
 
-**Results:** Pending.
+**Results:** Independent audit pass: the timing basis is now truthful enough for per-gesture detector tuning to proceed, and the remaining failures in the trimmed Boxing-left clip are cleanly separated into timing-authoring fallout versus detector/runtime truth.
+
+- **Exact independent checks run:**
+  - `find .testbed/test-results/fixtures/20260514-214817__boxing_punch_left_x4_while_guarding_take_01 -maxdepth 1 -type f | sort` and the same for `REF-14` to compare artifact completeness.
+  - `python3 - <<'PY' ... json.load(report.json) ... print(time_basis/time_origin_offset/event timeline counts and first events) ... PY` on both runs to compare raw captured timing basis and rebased event positions.
+  - `python3 - <<'PY' ... sys.path.insert(0, 'scripts'); import proving_fixture_runner as runner; fixture = runner.load_fixture(REF-12); runner.validate_capture(fixture, report) ... PY` on both runs to re-evaluate the authored windows from current source instead of trusting prior summaries.
+  - `python3 - <<'PY' ... derive guard true-state segments from report.json state_timeline ... PY` on both runs to compare actual guard-state overlap before vs after rebasing.
+  - Read `REF-12` directly to compare authored `punch_left`/`guard` windows against the provider-anchored capture.
+- **Artifact completeness truth:** the new provider-anchored run currently contains only `report.json`, `report.md`, `godot.log`, and `proving.png`, while the salvaged older run also includes `summary.json`, `assertions.json`, `event_timeline.json`, and `state_timeline.json`. That missing wrapper-output bundle on the new run is an evidence-packaging gap, not a timing-basis truth failure, because the raw `report.json` still contains the full structured `fixture_capture` used for independent re-validation.
+- **Time-basis truth now looks correct:**
+  - Old run: `time_basis = harness_monotonic_ms_since_ready`
+  - New run: `time_basis = provider_tracking_ms_since_first_pose`, `time_origin_reason = first_tracking_pose`, `time_origin_offset_ms = 2240`
+  - Event rebasing is consistent with startup-skew removal: `provider_started 2251→0`, `squat_start 2349→80`, first `uppercut_right 2514→278`, first `guard_start 2866→629`.
+- **Timing-authoring fallout is now clearly isolated:**
+  - Old guard true segments: `2867-3334`, `4020-4084`, `4336-4453`
+  - New guard true segments: `629-1095`, `1814-1846`, `2083-2233`
+  - This confirms the first two authored `guard` windows (`0-1150`, `1650-2150`) were startup-skew casualties in the old run and now pass on the provider-anchored clock.
+  - It also exposes that the previously passing authored late guard windows (`2900-3400`, `3900-4650`) were false passes caused by the old skewed clock; they now truthfully fail because the physical guard holds really happened much earlier on the clip-relative timeline.
+- **Detector/runtime failures remain clearly separate after rebasing:**
+  - Re-running `validate_capture(...)` on both reports still yields `15 pass / 10 fail`, but the identity of the failing guard windows changes exactly where startup skew was removed.
+  - All four `punch_left` event windows still fail with zero events on the provider-anchored clock, so punch-left diagnosis can now proceed without startup skew as a confounder.
+  - Forbidden `uppercut_right` still appears three times and forbidden `squat_start` still appears at `80ms`, which are real detector/runtime problems, not time-origin artifacts.
+  - Final guard window `5287-6000` still fails with no late guard reacquisition, again a detector/runtime or authored-window truth issue, not startup skew.
+- **Audit verdict:** **PASS.** Per-gesture tuning should not wait for more timing-basis work first. The remaining work is now cleanly partitioned:
+  - **Resolved by timing-basis fix:** startup-skew contamination of early-window diagnosis.
+  - **Still likely authored-window truth to revisit later:** late authored `guard` windows that were previously masked by the old clock and may need human re-scrub against the provider-anchored run.
+  - **Clearly detector/runtime issues:** missing all `punch_left` emissions, false-positive `uppercut_right`, false-positive `squat_start`, and failure to reacquire the final guard hold.
+- **Recommendation for the next slice:** proceed with the `punch_left` detector slice now, but use the provider-anchored run as the only trustworthy timing basis and keep any future guard-window re-authoring separate from gesture-threshold tuning.
 
 ---
 
@@ -1030,6 +1222,149 @@ Net result: Derrick's trimmed YAML/video pair is now **valid and usable in the c
 **Status:** ⏳ Pending
 
 **Results:** Pending.
+
+---
+
+### Task 26: Audit the current punch_left detector code against likely accuracy-improvement options
+
+**Bead ID:** `oc-n5n8`
+**SubAgent:** `primary` (for `research` workflow role)
+**Role:** `research`
+**References:** `REF-06`, `REF-12`, `REF-13`, `REF-14` plus timing-basis QA/audit findings and the live punch-left coder slice
+**Prompt:** Use bead `oc-n5n8`. Claim it on start with `bd update oc-n5n8 --status in_progress --json`. Audit the current `punch_left` detection path against likely solution options to improve gesture-detection accuracy on the trimmed boxing-left fixture. Focus on source-truth analysis rather than broad implementation: inspect the current straight-punch code path, current thresholds/gates, any side/body geometry assumptions, and the saved provider-anchored fixture evidence. Compare the current behavior against plausible improvement options such as threshold tuning, metric/feature changes, state-machine/rearm changes, shoulder/torso-relative gating, velocity-shape changes, or separating false-positive sibling-family cases more explicitly. Be explicit about which recommendations are low-risk narrow slices versus broader detector redesign. Do not implement fixes in this task. Update this plan with exact code/artifacts reviewed, findings, and ranked recommendations. Close with `bd close oc-n5n8 --reason "Punch-left detector accuracy audit complete" --json` when done.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- analysis-only paths if a tiny truthful note is required
+
+**Files Created/Deleted/Modified:**
+- `.plans/2026-05-13-boxing-fixture-system-truth-and-schema.md`
+- exact analysis notes only if truthfully needed
+
+**Status:** ✅ Complete
+
+**Results:** Research audit completed against the current detector source plus the saved provider-anchored fixture evidence. No code changes were made.
+
+---
+
+### Task 27: Clean remaining public lean wording after weave migration
+
+**Bead ID:** `oc-qvif`
+**SubAgent:** `primary` (for `coder` workflow role)
+**Role:** `coder`
+**References:** `REF-06`, `REF-08`, `REF-09`, `REF-10`, `REF-11` plus Task 13 QA findings
+**Prompt:** Use bead `oc-qvif`. Claim it on start with `bd update oc-qvif --status in_progress --json`. Task 13 QA found that the repo-owned runtime/provider/proving/fixture surfaces are already on `weave`, but a few repo-owned docs/readme entries still leak stale public `lean` wording. Make the smallest truthful cleanup needed to align those remaining public docs with the current `weave` terminology. Keep scope tight to repo-owned docs/readme text only; do not broaden detector/runtime behavior. Re-run the relevant lightweight validation and grep checks, update this plan with exact files changed and commands run, commit/push by default, and close with `bd close oc-qvif --reason "Remaining public lean wording cleaned" --json` when done.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- `docs/`
+
+**Files Created/Deleted/Modified:**
+- `README.md`
+- `docs/proving-scene-human-verification-checklist.md`
+- `.plans/2026-05-13-boxing-fixture-system-truth-and-schema.md`
+
+**Status:** ✅ Complete
+
+**Results:** Made the smallest truthful repo-owned doc cleanup only: replaced stale public Boxing `lean` wording with `weave` in `README.md` and `docs/proving-scene-human-verification-checklist.md` at the exact Task 13 QA callout surfaces (`README.md:98`, `README.md:254`, `docs/proving-scene-human-verification-checklist.md:164`, `:302`, `:380`). No detector/provider/runtime behavior changed. Commands run for this task: `nl -ba README.md | sed -n '90,110p'`; `nl -ba README.md | sed -n '246,262p'`; `nl -ba docs/proving-scene-human-verification-checklist.md | sed -n '156,172p'`; `nl -ba docs/proving-scene-human-verification-checklist.md | sed -n '294,310p'`; `nl -ba docs/proving-scene-human-verification-checklist.md | sed -n '372,388p'`; targeted `python3` text replacement over the two repo-owned docs; `grep -RInE '\\blean\\b|Lean' README.md docs/proving-scene-human-verification-checklist.md || true`; `grep -RInE '\\bweave\\b|Weave' README.md docs/proving-scene-human-verification-checklist.md`; `nl -ba ... | sed -n ...` rechecks for the five flagged lines; and `git diff --check`. Validation remained intentionally lightweight and doc-scoped; the only remaining `lean` hit in the checklist is plain-English movement guidance at line 77, which Task 13 QA had already called acceptable as generic English rather than stale product/runtime vocabulary.
+
+---
+
+### Task 28: Fix normalized Boxing fixture YAML video.path extension mismatches
+
+**Bead ID:** `oc-pwbe`
+**SubAgent:** `primary` (for `coder` workflow role)
+**Role:** `coder`
+**References:** `REF-04`, `REF-12`, `REF-13` plus Task 10 QA findings
+**Prompt:** Use bead `oc-pwbe`. Claim it on start with `bd update oc-pwbe --status in_progress --json`. Task 10 QA found that the Boxing naming-alignment normalization moved/renamed many videos successfully, but the normalized stub `.fixture.yaml` sidecars are not truthfully batch-loadable because their `video.path` values still point at `.webm` while the actual sibling videos are `.mp4`. Make the smallest truthful repair needed: align the affected normalized Boxing fixture YAML `video.path` values to the real sibling filenames/extensions, verify the loader sweep passes, keep scope tight to those sidecars plus any tiny directly related plan/doc note required, commit/push by default, and close with `bd close oc-pwbe --reason "Normalized Boxing fixture video.path mismatches fixed" --json` when done.
+
+**Folders Created/Deleted/Modified:**
+- `.plans/`
+- `.testbed/assets/fixtures/boxing/`
+
+**Files Created/Deleted/Modified:**
+- `.testbed/assets/fixtures/boxing/hook_right/boxing__hook_right__positive__repeat_04__take_01.fixture.yaml`
+- `.testbed/assets/fixtures/boxing/knee_left/boxing__knee_left__positive__repeat_04__take_01.fixture.yaml`
+- `.testbed/assets/fixtures/boxing/knee_right/boxing__knee_right__positive__repeat_04__take_01.fixture.yaml`
+- `.testbed/assets/fixtures/boxing/leg_lift_left/boxing__leg_lift_left__positive__repeat_04__take_01.fixture.yaml`
+- `.testbed/assets/fixtures/boxing/leg_lift_right/boxing__leg_lift_right__positive__repeat_04__take_01.fixture.yaml`
+- `.testbed/assets/fixtures/boxing/run_in_place/boxing__run_in_place__positive__repeat_01__take_01.fixture.yaml`
+- `.testbed/assets/fixtures/boxing/sidestep_left/boxing__sidestep_left__positive__repeat_04__take_01.fixture.yaml`
+- `.testbed/assets/fixtures/boxing/sidestep_right/boxing__sidestep_right__positive__repeat_03__take_01.fixture.yaml`
+- `.testbed/assets/fixtures/boxing/squat/boxing__squat__positive__repeat_04__take_01.fixture.yaml`
+- `.testbed/assets/fixtures/boxing/stance_transition/boxing__stance_transition__positive__orthodox_southpaw_swap_repeat_04__take_01.fixture.yaml`
+- `.testbed/assets/fixtures/boxing/uppercut_left/boxing__uppercut_left__positive__repeat_04__take_01.fixture.yaml`
+- `.testbed/assets/fixtures/boxing/uppercut_right/boxing__uppercut_right__positive__repeat_04__take_01.fixture.yaml`
+- `.testbed/assets/fixtures/boxing/weave_left/boxing__weave_left__positive__repeat_04__take_01.fixture.yaml`
+- `.testbed/assets/fixtures/boxing/weave_right/boxing__weave_right__positive__repeat_04__take_01.fixture.yaml`
+- `.plans/2026-05-13-boxing-fixture-system-truth-and-schema.md`
+
+**Status:** ✅ Complete
+
+**Results:** Applied the smallest truthful repair: updated 14 normalized Boxing sidecars so each `video.path` now matches its real sibling `.mp4` file instead of a nonexistent `.webm`.
+
+- **Commands run:**
+  - `python3 - <<'PY' ... yaml.safe_load(...) ... raw['video']['path'] = mp4_rel ... PY` to rewrite only Boxing `.fixture.yaml` files whose sibling `.mp4` existed and sibling `.webm` did not
+  - `python3 - <<'PY' ... from scripts.proving_fixture_runner import load_fixture ... PY` to sweep all Boxing `.fixture.yaml` sidecars through the loader
+- **Loader sweep result:** `15` pass, `0` fail across all Boxing normalized `.fixture.yaml` sidecars under `.testbed/assets/fixtures/boxing/`.
+- **Scope kept tight:** no video files, detector code, UI text, or shared-contract files changed in this repair.
+
+**Exact code / artifacts reviewed:**
+- `src/detectors/pose_detector_substrate.gd`
+  - constants / metric build / tracking+baseline path (`sed -n '1,360p' ...`, `sed -n '360,620p' ...`)
+  - straight-punch / hook / uppercut path (`sed -n '620,760p' ...`)
+  - guard / squat / weave path (`sed -n '930,990p' ...`)
+  - targeted symbol/constant sweeps via `grep -nE "_process_straight_punch|_process_uppercut|_process_guard|punch_left|uppercut_right|PUNCH_|UPPERCUT_|HOOK_" ...`
+- `src/detectors/pose_metrics.gd` (`sed -n '1,140p' ...`) to confirm how elbow angle / normalized ratios are actually computed
+- `src/providers/mediapipe_provider.gd`, `.testbed/scripts/proving_harness.gd`, and `scripts/proving_fixture_runner.py` via targeted `grep` / `sed` to confirm signal wiring, saved fixture-capture shape, and state-segment validation behavior
+- Fixture truth input: `REF-12` (`.testbed/assets/fixtures/boxing/punch_left/boxing_punch_left_x4_while_guarding_take_01.yaml`)
+- Provider-anchored artifact run: `REF-14`
+  - `report.json` parsed with ad-hoc Python summaries for event timeline, guard/squat segments, ready-state changes, and latest saved detector metrics
+  - `report.md` and `godot.log` reviewed for emitted-event / capture-context confirmation
+
+**Commands reviewed / used during the audit:**
+- `grep -nE "_process_straight_punch|_process_uppercut|_process_guard|ready\.|punch_left|punch_right|hook_left|hook_right|uppercut_left|uppercut_right|weave_left|weave_right|squat" src/detectors/pose_detector_substrate.gd`
+- `grep -nE "PUNCH_|HOOK_|UPPERCUT_|LATERAL_VELOCITY_RATIO|ELBOW_STRAIGHT|READY_EXTENSION|FIRE_EXTENSION" src/detectors/pose_detector_substrate.gd`
+- `sed -n '1,360p' src/detectors/pose_detector_substrate.gd`
+- `sed -n '360,620p' src/detectors/pose_detector_substrate.gd`
+- `sed -n '620,760p' src/detectors/pose_detector_substrate.gd`
+- `sed -n '930,990p' src/detectors/pose_detector_substrate.gd`
+- `sed -n '1,140p' src/detectors/pose_metrics.gd`
+- `grep -nE "punch_left|uppercut_right|guard|ready|state_timeline|latest_state" src/providers/mediapipe_provider.gd .testbed/scripts/proving_harness.gd scripts/proving_fixture_runner.py`
+- ad-hoc `python3` report parsing against `REF-14/report.json` to list event timestamps, derive guard/squat segments, inspect `ready.punch_left`, and inspect `latest_state.metrics`
+
+**Evidence-backed findings:**
+- **The miss is not primarily a rearm/cooldown problem.** `punch_left` starts ready and stays ready throughout the saved capture (`READY_PUNCH_LEFT_CHANGES [(0, None), (0, True)]` from `report.json`), so the detector is not getting stuck disarmed after a previous emit. The problem is that the fire gates are never satisfied.
+- **Current left straight-punch detection is a single-frame instantaneous gate stack, not a short-window motion pattern.** `_process_straight_punch(...)` requires all of the following in one frame before firing `punch_left`: arm extension `>= 0.88`, elbow angle `>= 155°`, outward x velocity `> shoulder_width * 1.35`, lateral dominance over vertical speed `> 1.05x`, and wrist outward distance from the shoulder `> shoulder_width * 0.75`.
+- **That gate stack is likely too brittle for a guarded left jab on this fixture.** The authored clip is explicitly “starts in guard, ends in guard, with four repeated left punches,” and guarded jabs commonly extend and retract without reaching the detector’s current “nearly fully straight + far outside shoulder lane + strong single-frame outward burst” combination on a single 2D-smoothed frame.
+- **The artifact already shows sibling-family confusion instead of just silence.** `REF-14/report.json` contains `uppercut_right` false positives at `278ms`, `1345ms`, and `1546ms`, plus a false `squat_start` at `80ms`, while emitting **zero** `punch_left` events. So the current failure mode is not just “left punch thresholds slightly too high”; it also includes weak separation from other gesture families.
+- **Guard suppression is not hiding `punch_left`.** Guard only suppresses hook/uppercut processing (`if not _get_state("guard")` around those branches). Straight punches still run during guard. Saved guard segments from the artifact are only `629-1095ms`, `1814-1846ms`, and `2083-2233ms`, which also shows current guard truth is only partial versus the authored windows, but that partial guard state is not the reason left punches never fire.
+- **The saved artifact points at metric fragility, not just threshold fragility.** `latest_state.metrics` in `REF-14/report.json` shows suspicious values such as `left_elbow_bend_deg: 0.0`, `right_elbow_bend_deg: 0.0`, `height_ratio: 0.004398...`, `torso_height: 0.000349...`, and persistent `squat=true` late in the run. Even though that is only the final saved frame and not the exact punch moments, it strongly suggests some core 2D/body-geometry metrics are unstable under this clip, which makes any single-frame threshold stack more fragile.
+- **Post-hoc diagnosis is currently limited because the fixture capture does not persist per-frame measurements for the whole run.** `state_timeline` keeps guard/ready/flow snapshots, but not the full per-frame `measurements` / `velocities` needed to prove whether left-punch misses are failing mostly on extension, elbow angle, outward velocity, or distance. That is why some ranking below is necessarily “most likely” rather than mathematically proven from every candidate punch frame.
+- **Timeline limitation to keep explicit:** the saved provider-tracking timeline in `REF-14/report.json` ends at `2982ms`, so the artifact gives direct truth for the early/middle slice and the existing false positives, but it does not provide full provider-tracking coverage through the later authored windows in `REF-12`. That limits certainty for reps 3-4 in this specific artifact, but it does not change the core code-path audit: reps 1-2 plus the false positives already show the current left straight-punch gate stack is missing the intended motion.
+
+**Ranked recommendations:**
+1. **Most promising next fix path — medium-risk, still fairly narrow:** change `punch_left` from a pure single-frame fire test into a short-window, shoulder/torso-relative jab test while keeping the current gates only as supporting evidence.
+   - Concretely: score/fire on **outward travel from a recent contracted/guarded baseline** plus **peak extension / immediate retraction shape** over ~120-220 ms, normalized by shoulder width or torso size.
+   - Strong candidate features: change in wrist-vs-shoulder x offset, change in arm extension from local ready baseline, outward-then-return velocity shape, and wrist staying near shoulder/head lane instead of dropping into an uppercut path.
+   - Why this ranks first: the current guarded-left fixture is exactly the kind of motion where local travel/retraction shape is more reliable than demanding one perfect fully-straight frame.
+2. **Low-risk narrow slice:** relax the current `punch_left` fire thresholds before broader redesign, especially the distance/extension requirements.
+   - Highest-probability narrow relax candidates: `PUNCH_LEFT_FIRE_EXTENSION`, outward-distance gate (`shoulder_width * 0.75`), and outward-velocity gate (`shoulder_width * 1.35`).
+   - Keep the left-side lateral-dominance ratio relatively permissive unless evidence later shows it is the real blocker.
+   - Why only rank second: this may recover some misses cheaply, but if elbow/torso metrics are unstable, threshold relaxation alone risks trading misses for new sibling false positives.
+3. **Medium-risk threshold/feature change:** soften or replace the hard elbow-angle requirement for left straights.
+   - Right now `punch_left` still requires `left_elbow_bend_deg >= 155`, but the saved artifact’s final-frame elbow metrics hitting `0.0` makes angle reliability suspect in this clip class.
+   - Safer version: treat elbow straightness as a bonus / soft threshold or use “extension increased materially from local ready state” instead of requiring a near-straight absolute elbow angle.
+4. **Medium-risk sibling-separation fix:** tighten `uppercut_right` (and related sibling-family) disambiguation at the same time as any punch-left tuning.
+   - Add stronger lane/origin checks so uppercuts require a clearer below-to-up travel shape and do not fire from motions that are mostly lateral/outward or already living in a guard lane.
+   - Without this, any left-punch relaxation risks just shifting the confusion matrix rather than improving it.
+5. **Low-risk diagnostic slice with high leverage for the next pass:** persist per-frame attack metrics (`left/right arm extension`, elbow angle, wrist-vs-shoulder offset, hand velocities, guard state, maybe candidate fire booleans) into fixture captures.
+   - This is not the user-visible accuracy fix itself, but it would turn the next punch audit from inference into exact proof of which gate fails per rep.
+6. **Broader redesign:** unify Boxing attacks around short-window motion classifiers instead of separate single-frame threshold stacks.
+   - Example direction: one shared attack candidate window per hand, then classify straight / hook / uppercut from trajectory shape, lane, extension change, and vertical-vs-lateral profile.
+   - This is likely the most robust long-term path, but it is a broader slice than the current fixture problem needs first.
+
+**Bottom-line recommendation:** the best next move is **not** a rearm tweak. The strongest next fix path is a **shoulder/torso-relative short-window jab detector for `punch_left`**, paired with small sibling-disambiguation tightening for `uppercut_right`. If Derrick wants the narrowest possible first attempt before that, relax the left punch distance/extension/outward-velocity thresholds — but do it knowing that threshold-only tuning may help less than expected if the underlying elbow/torso metrics stay noisy on guarded jabs.
 
 ---
 
